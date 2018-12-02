@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2018, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -161,6 +161,29 @@ int left_pad_buf(struct buffer *buf, size_t required_len)
 			goto out;
 
 		memcpy(tmp.buf + required_len - buf->len, buf->buf, buf->len);
+		copy_ptr_buf(&cpy_tmp, buf);
+		copy_ptr_buf(buf, &tmp);
+		free_buf(&cpy_tmp);
+	}
+out:
+	return ret;
+}
+
+int mpi_remove_pad(struct buffer *buf, size_t required_len)
+{
+	int ret = 0;
+
+	if (buf->len > required_len) {
+		struct buffer cpy_tmp;
+		BUFFER_INIT(tmp);
+
+		CKINT(alloc_buf(required_len, &tmp));
+
+		if (!tmp.buf)
+			goto out;
+
+		memcpy(tmp.buf, buf->buf +  buf->len - required_len,
+		       required_len);
 		copy_ptr_buf(&cpy_tmp, buf);
 		copy_ptr_buf(buf, &tmp);
 		free_buf(&cpy_tmp);

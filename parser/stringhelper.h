@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2018, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -34,5 +34,6 @@ void free_buf(struct buffer *buf);
 int alloc_buf(size_t size, struct buffer *buf);
 void copy_ptr_buf(struct buffer *dst, struct buffer *src);
 int left_pad_buf(struct buffer *buf, size_t required_len);
+int mpi_remove_pad(struct buffer *buf, size_t required_len);
 
 #endif /* _STRINGHELPER_H */
