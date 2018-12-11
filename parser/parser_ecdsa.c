@@ -36,7 +36,7 @@ struct ecdsa_static_key {
 	struct buffer Qx;
 	struct buffer Qy;
 };
-static struct ecdsa_static_key ecdsa_key = { 0 };
+static struct ecdsa_static_key ecdsa_key = { NULL, 0, {NULL, 0}, {NULL, 0} };
 
 static void ecdsa_key_free(struct ecdsa_static_key *key)
 {

@@ -76,9 +76,12 @@ static int openssl_cipher(uint64_t cipher, uint32_t keylen,
 {
 	int ret = 0;
 	const EVP_CIPHER *l_type = NULL;
+	const char *algo;
+
+	CKINT(convert_cipher_algo(cipher, &algo));
 
 	logger(LOGGER_DEBUG, "Key size = %u\n", keylen);
-	logger(LOGGER_DEBUG, "Cipher = %lu\n", cipher);
+	logger(LOGGER_DEBUG, "Cipher = %s\n", algo);
 
 	switch (cipher) {
 	case ACVP_ECB:
@@ -288,6 +291,7 @@ static int openssl_cipher(uint64_t cipher, uint32_t keylen,
 
 	*type = l_type;
 
+out:
 	return ret;
 }
 
@@ -295,9 +299,12 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 {
 	int ret = 0;
 	const EVP_MD *l_type = NULL;
+	const char *algo;
 
-	logger(LOGGER_DEBUG, "SHA = %lu\n",
-	       cipher & (ACVP_HASHMASK | ACVP_HMACMASK));
+	CKINT(convert_cipher_algo(cipher & (ACVP_HASHMASK | ACVP_HMACMASK),
+				  &algo));
+
+	logger(LOGGER_DEBUG, "SHA = %s\n", algo);
 
 	switch (cipher & (ACVP_HASHMASK | ACVP_HMACMASK)) {
 	case ACVP_HMACSHA1:
@@ -327,6 +334,7 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 
 	*type = l_type;
 
+out:
 	return ret;
 }
 

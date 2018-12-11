@@ -1,3 +1,8 @@
+Changes 0.4.2
+- add helper convert_cipher_algo
+- use specific initializations for static variables (some compilers cannot handle generic initializations)
+- statically link JSON-C
+
 Changes 0.4.1
  * Addition of helper function to turn an MPI into a byte array
 

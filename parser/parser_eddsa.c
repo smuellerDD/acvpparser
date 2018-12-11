@@ -36,7 +36,7 @@ struct eddsa_static_key {
 	uint64_t curve;
 	struct buffer q;
 };
-static struct eddsa_static_key eddsa_key = { 0 };
+static struct eddsa_static_key eddsa_key = { NULL, 0, {NULL, 0} };
 
 static void eddsa_key_free(struct eddsa_static_key *key)
 {

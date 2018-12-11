@@ -92,7 +92,7 @@ struct dsa_static_key {
 	uint32_t N;
 	struct buffer Y;
 };
-static struct dsa_static_key dsa_key = { 0 };
+static struct dsa_static_key dsa_key = { NULL, 0, 0, { NULL, 0 } };
 
 static void dsa_key_free(struct dsa_static_key *key)
 {

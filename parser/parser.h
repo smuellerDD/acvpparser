@@ -45,7 +45,7 @@ extern "C"
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
-#define PATCHLEVEL 1   /* API / ABI compatible, no functional
+#define PATCHLEVEL 2   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
 
@@ -85,6 +85,7 @@ struct cavs_tester {
 
 void register_tester(struct cavs_tester *curr_tester, const char *log);
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher);
+int convert_cipher_algo(uint64_t cipher, const char **algo);
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
 

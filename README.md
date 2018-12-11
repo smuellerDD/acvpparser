@@ -97,39 +97,7 @@ Building
 Prerequisite
 ------------
 
-The ACVP parser uses the lightweight json-C library for the processing and
-writing of JSON formatted data. The json-C code can be found at [1]. As this
-library is lightweight and yet versatile (it works on Unix and Windows),
-it was chosen as the fundamental JSON processor.
-
-[1] https://github.com/json-c/json-c
-
-Prerequisites on macOS
-----------------------
-
-The application works out of the box on macOS without any changes. Though
-json-C must be installed. As I am currently unaware of json-C macOS packages
-you need to perform the following steps
-
-1. Get json-c: git clone https://github.com/json-c/json-c
-
-2. Get the autotool set to configure and install json-c:
-
-	a. Install homebrew from https://brew.sh by invoking `/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"`
-
-	b. Install autoconf: `brew install autoconf`
-
-	c. Install automake: `brew install automake`
-
-	d. Install libtool: `brew install libtool`
-
-3. Compile json-c: go into json-c directory and invoke `./configure`
-
-4. `make`
-
-5. `sudo make install`
-
-Now you are ready to compile the ACVP Parser.
+The ACVP parser requires the presence of the POSIX APIs.
 
 Compiling
 ---------

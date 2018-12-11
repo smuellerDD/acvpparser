@@ -35,11 +35,12 @@ LIBPATCH=$(shell cat $(PARSERDIR)/parser.h | grep define | grep PATCHLEVEL | awk
 LIBVERSION := $(LIBMAJOR).$(LIBMINOR).$(LIBPATCH)
 
 C_SRCS := $(wildcard $(PARSERDIR)/*.c)
+C_SRCS += $(wildcard $(PARSERDIR)/json-c/*.c)
 C_SRCS := $(filter-out $(wildcard backend*.c), $(C_SRCS))
 
 INCLUDE_DIRS := $(PARSERDIR)
 LIBRARY_DIRS :=
-LIBRARIES := json-c
+LIBRARIES :=
 
 ################## CONFIGURE BACKEND KCAPI ###################
 
@@ -91,6 +92,7 @@ endif
 ################## CONFIGURE BACKEND CommonCrypto ################
 
 ifeq (commoncrypto,$(firstword $(MAKECMDGOALS)))
+	INCLUDE_DIRS += backend_interfaces/commoncrypto
 	C_SRCS += backends/backend_commoncrypto.c
 endif
 
@@ -225,11 +227,13 @@ asm:
 clean:
 	@- $(RM) $(NAME)
 	@- $(RM) $(wildcard $(PARSERDIR)/*.o)
+	@- $(RM) $(wildcard $(PARSERDIR)/json-c/*.o)
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.o)
 	@- $(RM) $(wildcard backends/*.o)
 	@- $(RM) $(ASM)
 	@- $(RM) $(wildcard *.plist)
 	@- $(RM) $(wildcard *$(PARSERDIR)/*.plist)
+	@- $(RM) $(wildcard *$(PARSERDIR)/json-c/*.plist)
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.plist)
 	@- $(RM) $(wildcard backends/*.plist)
 

@@ -28,8 +28,10 @@
  *	  operations specified in aead_backend
  *
  * @param key [in] Symmetric key for cipher operation in binary form
- * @param iv [in] IV for the cipher operation in binary form. It may be empty
- *		  for ciphers that do not support IVs (like AES-ECB or AES-KW).
+ * @param iv [in/out] IV for the cipher operation in binary form. It may be
+ *		      empty for ciphers that do not support IVs (like AES-ECB or
+ *		      AES-KW). For GCM with internal IV generation, the backend
+ *		      must allocate the buffer, and fill it appropriately.
  * @param ivlen [in] If @param iv is NULL, but @param ivlen is set, the
  *		     cipher implementation is requested to invoke GCM with
  *		     internal IV generation. The IV of the given length shall

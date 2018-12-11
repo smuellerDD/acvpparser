@@ -39,7 +39,7 @@ struct rsa_static_key {
 	struct buffer e;
 	struct buffer n;
 };
-static struct rsa_static_key rsa_key = { 0 };
+static struct rsa_static_key rsa_key = { NULL, 0, {NULL, 0}, {NULL, 0} };
 
 static void rsa_key_free(struct rsa_static_key *key)
 {

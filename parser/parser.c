@@ -51,106 +51,106 @@ void register_tester(struct cavs_tester *curr_tester, const char *log)
 	}
 }
 
+const struct { char *algo; uint64_t cipher; } conv[] = {
+	{"AES-ECB", ACVP_ECB},
+	{"AES-CBC", ACVP_CBC},
+	{"AES-OFB", ACVP_OFB},
+	{"AES-CFB8", ACVP_CFB8},
+	{"AES-CFB128", ACVP_CFB128},
+	{"AES-CFB1", ACVP_CFB1},
+	{"AES-CTR", ACVP_CTR},
+	{"AES-GCM", ACVP_GCM},
+	{"AES-CCM", ACVP_CCM},
+	{"AES-XTS", ACVP_XTS},
+	{"AES-KWP", ACVP_KWP},
+	{"AES-KW", ACVP_KW},
+	{"AES-128", ACVP_AES128},
+	{"AES-192", ACVP_AES192},
+	{"AES-256", ACVP_AES256},
+
+	{"TDES-ECB", ACVP_TDESECB},
+	{"TDES-CBC", ACVP_TDESCBC},
+	{"TDES-OFB", ACVP_TDESOFB},
+	{"TDES-CFB1", ACVP_TDESCFB1},
+	{"TDES-CFB8", ACVP_TDESCFB8},
+	{"TDES-CFB64", ACVP_TDESCFB64},
+	{"TDES-CTR", ACVP_TDESCTR},
+	{"TDES-KW", ACVP_TDESKW},
+	/* CTR DRBG */
+	{"3keyTDEA", ACVP_TDESCTR},
+
+	{"CMAC-AES", ACVP_AESCMAC},
+	{"CMAC-TDES", ACVP_TDESCMAC},
+	{"HMAC-SHA-1", ACVP_HMACSHA1},
+	{"HMAC-SHA2-224", ACVP_HMACSHA2_224},
+	{"HMAC-SHA2-256", ACVP_HMACSHA2_256},
+	{"HMAC-SHA2-384", ACVP_HMACSHA2_384},
+	{"HMAC-SHA2-512", ACVP_HMACSHA2_512},
+	{"HMAC-SHA2-512/224", ACVP_HMACSHA2_512224},
+	{"HMAC-SHA2-512/256", ACVP_HMACSHA2_512256},
+	{"HMAC-SHA3-224", ACVP_HMACSHA3_224},
+	{"HMAC-SHA3-256", ACVP_HMACSHA3_256},
+	{"HMAC-SHA3-384", ACVP_HMACSHA3_384},
+	{"HMAC-SHA3-512", ACVP_HMACSHA3_512},
+
+	{"RSA", ACVP_RSA},
+	{"ECDSA", ACVP_ECDSA},
+	{"EDDSA", ACVP_EDDSA},
+	{"DSA", ACVP_DSA},
+
+	{"SHA-1", ACVP_SHA1},
+
+	{"SHA3-224", ACVP_SHA3_224},
+	{"SHA3-256", ACVP_SHA3_256},
+	{"SHA3-384", ACVP_SHA3_384},
+	{"SHA3-512", ACVP_SHA3_512},
+	{"SHA2-224", ACVP_SHA224},
+	{"SHA2-256", ACVP_SHA256},
+	{"SHA2-384", ACVP_SHA384},
+	{"SHA2-512", ACVP_SHA512},
+	{"SHA2-512/224", ACVP_SHA512224},
+	{"SHA2-512/256", ACVP_SHA512256},
+	{"ctrDRBG", ACVP_DRBGCTR},
+	{"hashDRBG", ACVP_DRBGHASH},
+	{"hmacDRBG", ACVP_DRBGHMAC},
+
+	{"KAS-ECC", ACVP_ECDH},
+	{"KAS-FFC", ACVP_DH},
+
+	{"kdf-components", ACVP_KDF_COMPONENT},
+	{"KDF", ACVP_KDF_800_108},
+	{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
+	{"feedback", ACVP_KDF_108_FEEDBACK},
+	{"counter", ACVP_KDF_108_COUNTER},
+	{"after fixed data", ACVP_KDF_108_AFTER_FIXED},
+	{"before fixed data", ACVP_KDF_108_BEFORE_FIXED},
+	{"middle fixed data", ACVP_KDF_108_MIDDLE_FIXED},
+	{"before iterator", ACVP_KDF_108_BEFORE_ITERATOR},
+
+	{"P-224", ACVP_NISTP224},
+	{"P-256", ACVP_NISTP256},
+	{"P-384", ACVP_NISTP384},
+	{"P-521", ACVP_NISTP521},
+	{"K-233", ACVP_NISTK233},
+	{"K-283", ACVP_NISTK283},
+	{"K-409", ACVP_NISTK409},
+	{"K-571", ACVP_NISTK571},
+	{"B-233", ACVP_NISTB233},
+	{"B-283", ACVP_NISTB283},
+	{"B-409", ACVP_NISTB409},
+	{"B-571", ACVP_NISTB571},
+
+	{"ED-25519", ACVP_ED25519},
+	{"ED-448", ACVP_ED448},
+
+	/* SSH */
+	{"TDES", ACVP_TDESECB},
+};
+
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
 {
 	uint64_t p_res = 0;
 	unsigned int i;
-
-	struct { char *algo; uint64_t cipher; } conv[] = {
-		{"AES-ECB", ACVP_ECB},
-		{"AES-CBC", ACVP_CBC},
-		{"AES-OFB", ACVP_OFB},
-		{"AES-CFB8", ACVP_CFB8},
-		{"AES-CFB128", ACVP_CFB128},
-		{"AES-CFB1", ACVP_CFB1},
-		{"AES-CTR", ACVP_CTR},
-		{"AES-GCM", ACVP_GCM},
-		{"AES-CCM", ACVP_CCM},
-		{"AES-XTS", ACVP_XTS},
-		{"AES-KWP", ACVP_KWP},
-		{"AES-KW", ACVP_KW},
-		{"AES-128", ACVP_AES128},
-		{"AES-192", ACVP_AES192},
-		{"AES-256", ACVP_AES256},
-
-		{"TDES-ECB", ACVP_TDESECB},
-		{"TDES-CBC", ACVP_TDESCBC},
-		{"TDES-OFB", ACVP_TDESOFB},
-		{"TDES-CFB1", ACVP_TDESCFB1},
-		{"TDES-CFB8", ACVP_TDESCFB8},
-		{"TDES-CFB64", ACVP_TDESCFB64},
-		{"TDES-CTR", ACVP_TDESCTR},
-		{"TDES-KW", ACVP_TDESKW},
-		/* CTR DRBG */
-		{"3keyTDEA", ACVP_TDESCTR},
-
-		{"CMAC-AES", ACVP_AESCMAC},
-		{"CMAC-TDES", ACVP_TDESCMAC},
-		{"HMAC-SHA-1", ACVP_HMACSHA1},
-		{"HMAC-SHA2-224", ACVP_HMACSHA2_224},
-		{"HMAC-SHA2-256", ACVP_HMACSHA2_256},
-		{"HMAC-SHA2-384", ACVP_HMACSHA2_384},
-		{"HMAC-SHA2-512", ACVP_HMACSHA2_512},
-		{"HMAC-SHA2-512/224", ACVP_HMACSHA2_512224},
-		{"HMAC-SHA2-512/256", ACVP_HMACSHA2_512256},
-		{"HMAC-SHA3-224", ACVP_HMACSHA3_224},
-		{"HMAC-SHA3-256", ACVP_HMACSHA3_256},
-		{"HMAC-SHA3-384", ACVP_HMACSHA3_384},
-		{"HMAC-SHA3-512", ACVP_HMACSHA3_512},
-
-		{"RSA", ACVP_RSA},
-		{"ECDSA", ACVP_ECDSA},
-		{"EDDSA", ACVP_EDDSA},
-		{"DSA", ACVP_DSA},
-
-		{"SHA-1", ACVP_SHA1},
-
-		{"SHA3-224", ACVP_SHA3_224},
-		{"SHA3-256", ACVP_SHA3_256},
-		{"SHA3-384", ACVP_SHA3_384},
-		{"SHA3-512", ACVP_SHA3_512},
-		{"SHA2-224", ACVP_SHA224},
-		{"SHA2-256", ACVP_SHA256},
-		{"SHA2-384", ACVP_SHA384},
-		{"SHA2-512", ACVP_SHA512},
-		{"SHA2-512/224", ACVP_SHA512224},
-		{"SHA2-512/256", ACVP_SHA512256},
-		{"ctrDRBG", ACVP_DRBGCTR},
-		{"hashDRBG", ACVP_DRBGHASH},
-		{"hmacDRBG", ACVP_DRBGHMAC},
-
-		{"KAS-ECC", ACVP_ECDH},
-		{"KAS-FFC", ACVP_DH},
-
-		{"kdf-components", ACVP_KDF_COMPONENT},
-		{"KDF", ACVP_KDF_800_108},
-		{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
-		{"feedback", ACVP_KDF_108_FEEDBACK},
-		{"counter", ACVP_KDF_108_COUNTER},
-		{"after fixed data", ACVP_KDF_108_AFTER_FIXED},
-		{"before fixed data", ACVP_KDF_108_BEFORE_FIXED},
-		{"middle fixed data", ACVP_KDF_108_MIDDLE_FIXED},
-		{"before iterator", ACVP_KDF_108_BEFORE_ITERATOR},
-
-		{"P-224", ACVP_NISTP224},
-		{"P-256", ACVP_NISTP256},
-		{"P-384", ACVP_NISTP384},
-		{"P-521", ACVP_NISTP521},
-		{"K-233", ACVP_NISTK233},
-		{"K-283", ACVP_NISTK283},
-		{"K-409", ACVP_NISTK409},
-		{"K-571", ACVP_NISTK571},
-		{"B-233", ACVP_NISTB233},
-		{"B-283", ACVP_NISTB283},
-		{"B-409", ACVP_NISTB409},
-		{"B-571", ACVP_NISTB571},
-
-		{"ED-25519", ACVP_ED25519},
-		{"ED-448", ACVP_ED448},
-
-		/* SSH */
-		{"TDES", ACVP_TDESECB},
-	};
 
 	logger(LOGGER_DEBUG, "Convert cipher %s into internal representation\n",
 	       algo);
@@ -167,6 +167,23 @@ uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
 		return ACVP_UNKNOWN;
 
 	return (cipher | p_res);
+}
+
+int convert_cipher_algo(uint64_t cipher, const char **algo)
+{
+	unsigned int i;
+
+	if (!algo)
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(conv); i++) {
+		if (cipher == conv[i].cipher) {
+			*algo = conv[i].algo;
+			break;
+		}
+	}
+
+	return 0;
 }
 
 static int test_algo(struct json_object *in, struct json_object *out,
@@ -361,6 +378,12 @@ int main(int argc, char *argv[])
 
 	logger_set_verbosity(LOGGER_ERR);
 
+	if (argc == 2 && (!strncmp(argv[1], "-h", 2) ||
+		!strncmp(argv[curr_argc], "--help", 6))) {
+		usage();
+		return 0;
+	}
+
 	if (argc < 3 ) {
 		usage();
 		return EINVAL;
@@ -376,12 +399,6 @@ int main(int argc, char *argv[])
 		if (!strncmp(argv[curr_argc], "-e", 2) ||
 		    !strncmp(argv[curr_argc], "--expected", 10)) {
 			expected = 1;
-		}
-
-		if (!strncmp(argv[curr_argc], "-h", 2) ||
-		    !strncmp(argv[curr_argc], "--help", 6)) {
-			usage();
-			return 0;
 		}
 
 		curr_argc++;
