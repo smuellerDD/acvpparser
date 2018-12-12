@@ -208,7 +208,7 @@ int json_pointer_getf(struct json_object *obj, struct json_object **res, const c
 	}
 
 	va_start(args, path_fmt);
-	rc = vasprintf(&path_copy, path_fmt, args);
+	rc = _vasprintf(&path_copy, path_fmt, args);
 	va_end(args);
 
 	if (rc < 0)
@@ -287,7 +287,7 @@ int json_pointer_setf(struct json_object **obj, struct json_object *value, const
 
 	/* pass a working copy to the recursive call */
 	va_start(args, path_fmt);
-	rc = vasprintf(&path_copy, path_fmt, args);
+	rc = _vasprintf(&path_copy, path_fmt, args);
 	va_end(args);
 
 	if (rc < 0)

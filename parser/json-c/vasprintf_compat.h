@@ -10,7 +10,7 @@
 
 #if !defined(HAVE_VASPRINTF)
 /* CAW: compliant version of vasprintf */
-static int vasprintf(char **buf, const char *fmt, va_list ap)
+static int _vasprintf(char **buf, const char *fmt, va_list ap)
 {
 #ifndef WIN32
 	static char _T_emptybuffer = '\0';
