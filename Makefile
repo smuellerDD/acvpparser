@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2018, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 
@@ -11,7 +11,7 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -std=gnu99 -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -Wno-gnu-zero-variadic-macro-arguments
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -std=gnu99 -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -Wno-gnu-zero-variadic-macro-arguments -g
 #Hardening
 CFLAGS +=-D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer-size=4
 # Set all symbols to hidden -- increases load time performance, forces
@@ -20,7 +20,7 @@ CFLAGS +=-D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
-LDFLAGS +=-Wl,-z,relro,-z,now -pie
+LDFLAGS +=-Wl,-z,relro,-z,now -pie -g
 endif
 
 NAME := acvp-parser
@@ -41,6 +41,18 @@ C_SRCS := $(filter-out $(wildcard backend*.c), $(C_SRCS))
 INCLUDE_DIRS := $(PARSERDIR)
 LIBRARY_DIRS :=
 LIBRARIES :=
+
+############### CONFIGURE BACKEND ACVP2CAVS ##################
+
+ifeq (acvp2cavs,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_acvp2cavs.c
+endif
+
+############### CONFIGURE BACKEND CAVS2ACVP ##################
+
+ifeq (cavs2acvp,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_cavs2acvp.c
+endif
 
 ################## CONFIGURE BACKEND KCAPI ###################
 
@@ -174,6 +186,34 @@ ifeq (libnacl,$(firstword $(MAKECMDGOALS)))
 	LIBRARIES += nacl
 endif
 
+################## CONFIGURE BACKEND BoringSSL ########
+
+BORINGSSL_LIB_A := /home/sm/hacking/repos/boringssl/build/crypto/libcrypto.a
+
+ifeq (boringssl,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_boringssl.c
+	CFLAGS :=-Wextra -Wall -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -Wno-gnu-zero-variadic-macro-arguments -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer-size=4
+	INCLUDE_DIRS += /home/sm/hacking/repos/boringssl/include	\
+			/home/sm/hacking/repos/boringssl
+	LDFLAGS :=-Wl,-z,relro,-z,now
+	LDFLAGS += $(BORINGSSL_LIB_A) -lpthread
+endif
+
+################## CONFIGURE BACKEND Botan ########
+
+ifeq (botan,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_botan.c
+	INCLUDE_DIRS += /usr/include/botan-2
+	LIBRARIES += botan-2
+endif
+
+################## CONFIGURE BACKEND BouncyCastle ########
+
+ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_bouncycastle.c
+	INCLUDE_DIRS += /usr/lib/jvm/java-11-openjdk-11.0.1.13-11.rolling.fc29.x86_64/include
+	LIBRARIES += XXXX
+endif
 
 ######################################################
 
@@ -191,11 +231,13 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl default
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle default
 
 default:
-	$(error "Usage: make <kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan>|bouncycastle")
 
+acvp2cavs: $(NAME)
+cavs2acvp: $(NAME)
 kcapi: $(NAME)
 libkcapi: $(NAME)
 libgcrypt: $(NAME)
@@ -211,6 +253,9 @@ libreswan: $(NAME)
 acvpproxy: $(NAME)
 libsodium: $(NAME)
 libnacl: $(NAME)
+boringssl: $(NAME)
+botan: $(NAME)
+bouncycastle: $(NAME)
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)

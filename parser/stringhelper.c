@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2018, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -100,10 +100,12 @@ int get_binval(char *str, const char *delim, struct buffer *buf)
 
 	if (buf->buf || buf->len) {
 		printf("Buffer not empty, refusing to allocate new!\n");
-		return 1;
+		return -EINVAL;
 	}
 
 	hex = get_val(str, delim);
+	if (!hex)
+		return -EINVAL;
 
 	if (strlen(hex))
 		return hex2bin_alloc(hex, (uint32_t)strlen(hex), &buf->buf,

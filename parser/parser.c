@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2018, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -51,7 +51,7 @@ void register_tester(struct cavs_tester *curr_tester, const char *log)
 	}
 }
 
-const struct { char *algo; uint64_t cipher; } conv[] = {
+static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"AES-ECB", ACVP_ECB},
 	{"AES-CBC", ACVP_CBC},
 	{"AES-OFB", ACVP_OFB},
@@ -145,6 +145,25 @@ const struct { char *algo; uint64_t cipher; } conv[] = {
 
 	/* SSH */
 	{"TDES", ACVP_TDESECB},
+
+	/* Conversion from uint64_t back to a name */
+	{"ctrDRBG_AES128", (ACVP_DRBGCTR | ACVP_AES128)},
+	{"ctrDRBG_AES192", ACVP_DRBGCTR | ACVP_AES192},
+	{"ctrDRBG_AES256", ACVP_DRBGCTR | ACVP_AES256},
+	{"hashDRBG_SHA-1", ACVP_DRBGHASH | ACVP_SHA1},
+	{"hashDRBG_SHA-224", ACVP_DRBGHASH | ACVP_SHA224},
+	{"hashDRBG_SHA-256", ACVP_DRBGHASH | ACVP_SHA256},
+	{"hashDRBG_SHA-384", ACVP_DRBGHASH | ACVP_SHA384},
+	{"hashDRBG_SHA-512", ACVP_DRBGHASH | ACVP_SHA512},
+	{"hashDRBG_SHA-512224", ACVP_DRBGHASH | ACVP_SHA512224},
+	{"hashDRBG_SHA-512256", ACVP_DRBGHASH | ACVP_SHA512256},
+	{"hmacDRBG_SHA-1", ACVP_DRBGHMAC | ACVP_SHA1},
+	{"hmacDRBG_SHA-224", ACVP_DRBGHMAC | ACVP_SHA224},
+	{"hmacDRBG_SHA-256", ACVP_DRBGHMAC | ACVP_SHA256},
+	{"hmacDRBG_SHA-384", ACVP_DRBGHMAC | ACVP_SHA384},
+	{"hmacDRBG_SHA-512", ACVP_DRBGHMAC | ACVP_SHA512},
+	{"hmacDRBG_SHA-512224", ACVP_DRBGHMAC | ACVP_SHA512224},
+	{"hmacDRBG_SHA-512256", ACVP_DRBGHMAC | ACVP_SHA512256},
 };
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
@@ -172,6 +191,7 @@ uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
 int convert_cipher_algo(uint64_t cipher, const char **algo)
 {
 	unsigned int i;
+	unsigned int found = 0;
 
 	if (!algo)
 		return -EINVAL;
@@ -179,9 +199,13 @@ int convert_cipher_algo(uint64_t cipher, const char **algo)
 	for (i = 0; i < ARRAY_SIZE(conv); i++) {
 		if (cipher == conv[i].cipher) {
 			*algo = conv[i].algo;
+			found = 1;
 			break;
 		}
 	}
+
+	if (!found)
+		return -EINVAL;
 
 	return 0;
 }

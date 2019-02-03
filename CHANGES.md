@@ -1,3 +1,6 @@
+v0.4.3
+- OpenSSL: enable SHA3/HMAC SHA3
+
 Changes 0.4.2
 - add helper convert_cipher_algo
 - use specific initializations for static variables (some compilers cannot handle generic initializations)

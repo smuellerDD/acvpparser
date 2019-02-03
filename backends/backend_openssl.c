@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2019, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -327,6 +327,24 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 	case ACVP_SHA512:
 		l_type = EVP_sha512();
 		break;
+
+	case ACVP_HMACSHA3_224:
+	case ACVP_SHA3_224:
+		l_type = EVP_sha3_224();
+		break;
+	case ACVP_HMACSHA3_256:
+	case ACVP_SHA3_256:
+		l_type = EVP_sha3_256();
+		break;
+	case ACVP_HMACSHA3_384:
+	case ACVP_SHA3_384:
+		l_type = EVP_sha3_384();
+		break;
+	case ACVP_HMACSHA3_512:
+	case ACVP_SHA3_512:
+		l_type = EVP_sha3_512();
+		break;
+
 	default:
 		logger(LOGGER_WARN, "Unknown cipher\n");
 		ret = -EINVAL;
@@ -627,7 +645,7 @@ static int openssl_cmac_generate(struct hmac_data *data)
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 
 	CKINT_O_LOG(CMAC_Init(ctx, data->key.buf, data->key.len, type, NULL),
-		    "CMAC_Init() failed");
+		    "CMAC_Init() failed\n");
 
 	blocklen = EVP_CIPHER_block_size(type);
 	CKINT_LOG(alloc_buf(blocklen, &data->mac),
@@ -738,14 +756,15 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
-	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed");
+	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	CKINT_O_LOG(EVP_DigestUpdate(ctx, data->msg.buf, data->msg.len),
-		    "EVP_DigestUpdate() failed");
+		    "EVP_DigestUpdate() failed\n");
 
 	CKINT_O_LOG(EVP_DigestFinal(ctx, data->mac.buf,
 				    (unsigned int *) &data->mac.len),
-		    "EVP_DigestFinal() failed");
+		    "EVP_DigestFinal() failed\n");
 
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "hash");
 
@@ -2957,11 +2976,12 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		ctx = EVP_MD_CTX_create();
 		CKNULL(ctx, -ENOMEM);
 
-		CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed");
+		CKINT_O_LOG(EVP_DigestInit(ctx, md),
+			    "EVP_DigestInit() failed\n");
 		CKINT_O_LOG(EVP_DigestUpdate(ctx, ss->buf, ss->len),
-			    "EVP_DigestUpdate() failed");
+			    "EVP_DigestUpdate() failed\n");
 		CKINT_O_LOG(EVP_DigestFinal(ctx, hashzz_tmp, &hashlen),
-			    "EVP_DigestFinal() failed");
+			    "EVP_DigestFinal() failed\n");
 
 		logger_binary(LOGGER_DEBUG, hashzz_tmp, hashlen,
 			      "shared secret hash");

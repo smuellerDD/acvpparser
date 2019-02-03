@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2018, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -407,7 +407,7 @@ static void parse_flagblock(struct json_object *obj, flags_t *parsed_flags,
 	const struct parser_flagsconv *conv = flagsconv;
 	struct json_object *o = NULL;
 	flags_t remove_flags = 0;
-	const char *string;
+	const char *string = NULL;
 	int ret = json_find_key(obj, jsonkey, &o, type);
 	bool found = false;
 

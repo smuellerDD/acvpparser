@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2018, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -63,8 +63,8 @@
  * @param random [out] The buffer to hold the generated random number in binary
  *		       form (buffer must be allocated by the backend, and the
  *		       parser releases the buffer).
- * @param cipher [in] Cipher specification as defined in parser.h. The
- *		      value is an OR of DRBG type and cipher core):
+ * @param cipher [in] Cipher specification as defined in cipher_definitions.h.
+ *		       The value is an OR of DRBG type and cipher core):
  *				 * DRBGCTR | AES128
  *				 * DRBGCTR | AES192
  *				 * DRBGCTR | AES256

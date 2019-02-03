@@ -110,6 +110,67 @@ exist.
 
 Example: To compile the OpenSSL support, invoke: `make openssl`.
 
+Building on Cygwin
+------------------
+
+The following steps are required to build the ACVP Proxy on Cygwin:
+
+- Verify that the required cygwin packages are installed:
+
+	* gcc
+
+	* make
+
+- Build acvp-parser.exe using with a build target as outlined above.
+
+Backend-specific Hints: Linux Kernel
+------------------------------------
+
+The ACVP test for the Linux kernel requires a kernel module that is provided
+with the directory `backend_interfaces/kcapi/`. You need to compile it and load
+it into the kernel.
+
+The ACVP Parser tool must now be executed as root to access the kernel module's
+interface files at `/sys/kernel/debug/kcapi-cavs`.
+
+Backend-specific Hints: Libreswan
+---------------------------------
+
+To execute the Libreswan ACVP test, you need to compile an application
+that will be invoked by the ACVP parser. See
+`backend_interfaces/libreswan/README` for details on compiling the
+interface application.
+
+Ensure that the inteface application is found via the PATH environment
+variable.
+
+Backend-specific Hints: Strongswan
+----------------------------------
+
+To execute the Strongswan ACVP test, you need to compile an application
+that will be invoked by the ACVP parser. See
+`backend_interfaces/strongswan/README` for details on compiling the
+interface application.
+
+Ensure that the inteface application is found via the PATH environment
+variable.
+
+Backend-specific Hints: OpenSSH
+-------------------------------
+
+To execute the OpenSSH ACVP test, you need to compile an application
+that will be invoked by the ACVP parser. See
+`backend_interfaces/openssh/README` for details on compiling the
+interface application.
+
+Ensure that the inteface application is found via the PATH environment
+variable.
+
+Backend-specific Hints: BoringSSL
+---------------------------------
+
+Please modify the Makefile to point to the static library to compile against.
+
 Helper Scripts
 ==============
 
@@ -216,4 +277,4 @@ for a particular cipher type will fail.
 Author
 ======
 Stephan Mueller  <smueller@chronox.de>
-Copyright (C) 2018
+Copyright (C) 2018 - 2019

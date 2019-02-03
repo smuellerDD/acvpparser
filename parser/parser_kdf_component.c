@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -144,32 +144,32 @@ static int kdf_tester_ikev1(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * KDF IKEV1 operation
 	 **********************************************************************/
-	DEF_CALLBACK(kdf_ikev1, kdf_ikev1, FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK);
+	DEF_CALLBACK(kdf_ikev1, kdf_ikev1, FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT);
 
 	const struct json_entry kdf_ikev1_testresult_entries[] = {
-		{"sKeyId",	{.data.buf = &kdf_ikev1_vector.s_key_id,   WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"sKeyIdD",	{.data.buf = &kdf_ikev1_vector.s_key_id_d, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"sKeyIdA",	{.data.buf = &kdf_ikev1_vector.s_key_id_a, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"sKeyIdE",	{.data.buf = &kdf_ikev1_vector.s_key_id_e, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
+		{"sKeyId",	{.data.buf = &kdf_ikev1_vector.s_key_id,   WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"sKeyIdD",	{.data.buf = &kdf_ikev1_vector.s_key_id_d, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"sKeyIdA",	{.data.buf = &kdf_ikev1_vector.s_key_id_a, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"sKeyIdE",	{.data.buf = &kdf_ikev1_vector.s_key_id_e, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
 	};
 	const struct json_testresult kdf_ikev1_testresult =
 		SET_ARRAY(kdf_ikev1_testresult_entries, &kdf_ikev1_callbacks);
 
 	const struct json_entry kdf_ikev1_test_entries[] = {
-		{"nInit",	{.data.buf = &kdf_ikev1_vector.n_init, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"nResp",	{.data.buf = &kdf_ikev1_vector.n_resp, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"ckyInit",	{.data.buf = &kdf_ikev1_vector.cookie_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"ckyResp",	{.data.buf = &kdf_ikev1_vector.cookie_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"gxy",		{.data.buf = &kdf_ikev1_vector.gxy, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK},
-		{"preSharedKey",{.data.buf = &kdf_ikev1_vector.pre_shared_key, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_PSK},
+		{"nInit",	{.data.buf = &kdf_ikev1_vector.n_init, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"nResp",	{.data.buf = &kdf_ikev1_vector.n_resp, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"ckyInit",	{.data.buf = &kdf_ikev1_vector.cookie_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"ckyResp",	{.data.buf = &kdf_ikev1_vector.cookie_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"gxy",		{.data.buf = &kdf_ikev1_vector.gxy, PARSER_BIN},		FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"preSharedKey",{.data.buf = &kdf_ikev1_vector.pre_shared_key, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
 	};
 
 	/* search for empty arrays */
 	const struct json_array kdf_ikev1_test = SET_ARRAY(kdf_ikev1_test_entries, &kdf_ikev1_testresult);
 
 	const struct json_entry kdf_ikev1_testgroup_entries[] = {
-		{"hashAlg",			{.data.largeint = &kdf_ikev1_vector.hashalg, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK },
-		{"tests",			{.data.array = &kdf_ikev1_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK },
+		{"hashAlg",			{.data.largeint = &kdf_ikev1_vector.hashalg, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK | FLAG_OP_AFT},
+		{"tests",			{.data.array = &kdf_ikev1_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_IKEV1 | FLAG_OP_KDF_TYPE_IKEV1_DSA | FLAG_OP_KDF_TYPE_IKEV1_PKE | FLAG_OP_KDF_TYPE_IKEV1_PSK  | FLAG_OP_AFT},
 	};
 	const struct json_array kdf_ikev1_testgroup = SET_ARRAY(kdf_ikev1_testgroup_entries, NULL);
 
@@ -198,34 +198,34 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * KDF IKEV2 operation
 	 **********************************************************************/
-	DEF_CALLBACK(kdf_ikev2, kdf_ikev2, FLAG_OP_KDF_TYPE_IKEV2);
+	DEF_CALLBACK(kdf_ikev2, kdf_ikev2, FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT);
 
 	const struct json_entry kdf_ikev2_testresult_entries[] = {
-		{"sKeySeed",			{.data.buf = &kdf_ikev2_vector.s_key_seed, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2},
-		{"sKeySeedReKey",		{.data.buf = &kdf_ikev2_vector.s_key_seed_rekey, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"derivedKeyingMaterial",	{.data.buf = &kdf_ikev2_vector.dkm, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2},
-		{"derivedKeyingMaterialChild",	{.data.buf = &kdf_ikev2_vector.dkm_child, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2},
-		{"derivedKeyingMaterialDh",{.data.buf = &kdf_ikev2_vector.dkm_child_dh, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
+		{"sKeySeed",			{.data.buf = &kdf_ikev2_vector.s_key_seed, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"sKeySeedReKey",		{.data.buf = &kdf_ikev2_vector.s_key_seed_rekey, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"derivedKeyingMaterial",	{.data.buf = &kdf_ikev2_vector.dkm, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"derivedKeyingMaterialChild",	{.data.buf = &kdf_ikev2_vector.dkm_child, WRITER_BIN},		FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"derivedKeyingMaterialDh",{.data.buf = &kdf_ikev2_vector.dkm_child_dh, WRITER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
 	};
 	const struct json_testresult kdf_ikev2_testresult =
 		SET_ARRAY(kdf_ikev2_testresult_entries, &kdf_ikev2_callbacks);
 
 	const struct json_entry kdf_ikev2_test_entries[] = {
-		{"nInit",	{.data.buf = &kdf_ikev2_vector.n_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"nResp",	{.data.buf = &kdf_ikev2_vector.n_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"spiInit",	{.data.buf = &kdf_ikev2_vector.spi_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"spiResp",	{.data.buf = &kdf_ikev2_vector.spi_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"gir",		{.data.buf = &kdf_ikev2_vector.gir, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
-		{"girNew",	{.data.buf = &kdf_ikev2_vector.gir_new, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2},
+		{"nInit",	{.data.buf = &kdf_ikev2_vector.n_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"nResp",	{.data.buf = &kdf_ikev2_vector.n_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"spiInit",	{.data.buf = &kdf_ikev2_vector.spi_init, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"spiResp",	{.data.buf = &kdf_ikev2_vector.spi_resp, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"gir",		{.data.buf = &kdf_ikev2_vector.gir, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"girNew",	{.data.buf = &kdf_ikev2_vector.gir_new, PARSER_BIN},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
 	};
 
 	/* search for empty arrays */
 	const struct json_array kdf_ikev2_test = SET_ARRAY(kdf_ikev2_test_entries, &kdf_ikev2_testresult);
 
 	const struct json_entry kdf_ikev2_testgroup_entries[] = {
-		{"hashAlg",			{.data.largeint = &kdf_ikev2_vector.hashalg, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_IKEV2 },
-		{"derivedKeyingMaterialLength",	{.data.integer = &kdf_ikev2_vector.dkmlen, PARSER_UINT},	FLAG_OP_KDF_TYPE_IKEV2 },
-		{"tests",			{.data.array = &kdf_ikev2_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_IKEV2 },
+		{"hashAlg",			{.data.largeint = &kdf_ikev2_vector.hashalg, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
+		{"derivedKeyingMaterialLength",	{.data.integer = &kdf_ikev2_vector.dkmlen, PARSER_UINT},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT },
+		{"tests",			{.data.array = &kdf_ikev2_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT },
 	};
 	const struct json_array kdf_ikev2_testgroup = SET_ARRAY(kdf_ikev2_testgroup_entries, NULL);
 
@@ -288,7 +288,7 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		if (json_object_array_length(tmp) <= 1)
 			goto exec;
 
-		if (!ret) {
+		if ((json_object_array_length(testgroups) > 0) && !ret) {
 			kdf_tester_copy_array(tmp, out, version_copied);
 			version_copied = true;
 		}
@@ -311,7 +311,7 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		if (json_object_array_length(testgroups) <= 1)
 			goto exec;
 
-		if (!ret) {
+		if ((json_object_array_length(testgroups) > 0) && !ret) {
 			kdf_tester_copy_array(tmp, out, version_copied);
 			version_copied = true;
 		}
@@ -334,7 +334,7 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		if (json_object_array_length(tmp) <= 1)
 			goto exec;
 
-		if (!ret) {
+		if ((json_object_array_length(testgroups) > 0) && !ret) {
 			kdf_tester_copy_array(tmp, out, version_copied);
 			version_copied = true;
 		}
@@ -357,7 +357,7 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		if (json_object_array_length(tmp) <= 1)
 			goto exec;
 
-		if (!ret) {
+		if ((json_object_array_length(testgroups) > 0) && !ret) {
 			kdf_tester_copy_array(tmp, out, version_copied);
 		}
 		json_object_put(tmp);
