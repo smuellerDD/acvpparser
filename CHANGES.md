@@ -1,3 +1,8 @@
+v0.4.4:
+- Compile ACVP parser tool with -m32 for 32 bit testing
+- Fix DSA siggen helper to generate PQG and DSA key at the same time
+- constify data in parser_common.c
+
 v0.4.3
 - OpenSSL: enable SHA3/HMAC SHA3
 

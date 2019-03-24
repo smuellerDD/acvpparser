@@ -152,29 +152,29 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_array eddsa_keygen_testgroup = SET_ARRAY(eddsa_keygen_testgroup_entries, NULL);
 
 	/**********************************************************************
-	 * EDDSA PKV verification
+	 * EDDSA key verification
 	 **********************************************************************/
-	EDDSA_DEF_CALLBACK(eddsa_pkvver, FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER);
+	EDDSA_DEF_CALLBACK(eddsa_keyver, FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER);
 
-	const struct json_entry eddsa_pkvver_testresult_entries[] = {
-		{"testPassed",	{.data.integer = &eddsa_pkvver_vector.keyver_success, WRITER_BOOL},
+	const struct json_entry eddsa_keyver_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &eddsa_keyver_vector.keyver_success, WRITER_BOOL},
 			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
 	};
-	const struct json_testresult eddsa_pkvver_testresult = SET_ARRAY(eddsa_pkvver_testresult_entries, &eddsa_pkvver_callbacks);
+	const struct json_testresult eddsa_keyver_testresult = SET_ARRAY(eddsa_keyver_testresult_entries, &eddsa_keyver_callbacks);
 
-	const struct json_entry eddsa_pkvver_test_entries[] = {
-		{"q",		{.data.buf = &eddsa_pkvver_vector.q, PARSER_BIN},
+	const struct json_entry eddsa_keyver_test_entries[] = {
+		{"q",		{.data.buf = &eddsa_keyver_vector.q, PARSER_BIN},
 			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
 	};
 
 	/* search for empty arrays */
-	const struct json_array eddsa_pkvver_test = SET_ARRAY(eddsa_pkvver_test_entries, &eddsa_pkvver_testresult);
+	const struct json_array eddsa_keyver_test = SET_ARRAY(eddsa_keyver_test_entries, &eddsa_keyver_testresult);
 
-	const struct json_entry eddsa_pkvver_testgroup_entries[] = {
-		{"curve",	{.data.largeint = &eddsa_pkvver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
-		{"tests",	{.data.array = &eddsa_pkvver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+	const struct json_entry eddsa_keyver_testgroup_entries[] = {
+		{"curve",	{.data.largeint = &eddsa_keyver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+		{"tests",	{.data.array = &eddsa_keyver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
 	};
-	const struct json_array eddsa_pkvver_testgroup = SET_ARRAY(eddsa_pkvver_testgroup_entries, NULL);
+	const struct json_array eddsa_keyver_testgroup = SET_ARRAY(eddsa_keyver_testgroup_entries, NULL);
 
 	/**********************************************************************
 	 * EDDSA signature generation
@@ -191,6 +191,15 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
 	};
 
+	const struct json_entry eddsa_siggen_testgroup_result_entries[] = {
+		{"q",		{.data.buf = &eddsa_siggen_vector.q, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+	};
+	/*
+	 * The NULL for the function callbacks implies that the qx and qy
+	 * are printed at the same hierarchy level as tgID
+	 */
+	const struct json_testresult eddsa_siggen_testgroup_result = SET_ARRAY(eddsa_siggen_testgroup_result_entries, NULL);
+
 	/* search for empty arrays */
 	const struct json_array eddsa_siggen_test = SET_ARRAY(eddsa_siggen_test_entries, &eddsa_siggen_testresult);
 
@@ -198,7 +207,8 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 		{"curve",	{.data.largeint = &eddsa_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 		{"tests",	{.data.array = &eddsa_siggen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 	};
-	const struct json_array eddsa_siggen_testgroup = SET_ARRAY(eddsa_siggen_testgroup_entries, NULL);
+	const struct json_array eddsa_siggen_testgroup = SET_ARRAY(eddsa_siggen_testgroup_entries,
+								   &eddsa_siggen_testgroup_result);
 
 	/**********************************************************************
 	 * EDDSA signature verification
@@ -233,7 +243,7 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 	 **********************************************************************/
 	const struct json_entry eddsa_testanchor_entries[] = {
 		{"testGroups",	{.data.array = &eddsa_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING},
-		{"testGroups",	{.data.array = &eddsa_pkvver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYVER},
+		{"testGroups",	{.data.array = &eddsa_keyver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYVER},
 		{"testGroups",	{.data.array = &eddsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
 		{"testGroups",	{.data.array = &eddsa_sigver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGVER},
 	};

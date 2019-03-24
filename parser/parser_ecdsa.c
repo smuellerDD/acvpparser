@@ -263,7 +263,7 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 		{"qy",		{.data.buf = &ecdsa_siggen_vector.Qy, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 	};
 	/*
-	 * The NULL for the function callbacks implies that the n and e
+	 * The NULL for the function callbacks implies that the qx and qy
 	 * are printed at the same hierarchy level as tgID
 	 */
 	const struct json_testresult ecdsa_siggen_testgroup_result = SET_ARRAY(ecdsa_siggen_testgroup_result_entries, NULL);

@@ -674,7 +674,7 @@ static int openssl_hmac_generate(struct hmac_data *data)
 {
 	const EVP_MD *md = NULL;
 	unsigned char hmac[EVP_MAX_MD_SIZE];
-	unsigned int taglen = data->mac.len;
+	unsigned int taglen;
 	int mdlen;
 	int ret = 0;
 
@@ -685,14 +685,17 @@ static int openssl_hmac_generate(struct hmac_data *data)
 	CKINT_LOG(alloc_buf(mdlen, &data->mac),
 		  "SHA buffer cannot be allocated\n");
 
-	logger(LOGGER_DEBUG, "taglen = %d", data->mac.len);
+	taglen = data->mac.len;
+
+	logger(LOGGER_DEBUG, "taglen = %u\n", data->mac.len);
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
 	if (!HMAC(md, data->key.buf, data->key.len,
 		 data->msg.buf, data->msg.len,
 		 hmac, &taglen)) {
-		logger(LOGGER_WARN, "HMAC failed\n");
+		logger(LOGGER_WARN, "HMAC failed: %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
 		ret = -EINVAL;
 		goto out;
 	}

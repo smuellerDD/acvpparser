@@ -39,55 +39,59 @@ void json_logger(enum logger_verbosity severity,
  * given type. If key is found and of expected type, return reference to
  * object.
  */
-int json_find_key(struct json_object *inobj, const char *name,
+int json_find_key(const struct json_object *inobj, const char *name,
 		  struct json_object **out, enum json_type type);
 
 /*
  * Get the uint32_t representation of an integer referenced with the given key.
  */
-int json_get_uint(struct json_object *obj, const char *name, uint32_t *integer);
+int json_get_uint(const struct json_object *obj, const char *name,
+		  uint32_t *integer);
 
 /*
  * Get the uint32_t representation of an integer referenced with the given key.
  * If the value of the key contains "random", return 0 which shall be the
  * hint to the caller that a random number shall be used.
  */
-int json_get_uint_random(struct json_object *obj, const char *name,
+int json_get_uint_random(const struct json_object *obj, const char *name,
 			 uint32_t *integer);
 
 /*
  * Get the binary representation of the hex value found at the given key
  */
-int json_get_bin(struct json_object *obj, const char *name, struct buffer *buf);
+int json_get_bin(const struct json_object *obj, const char *name,
+		 struct buffer *buf);
 
 /*
  * Get the binary representation of the hex value of an MPINT at the given key
  */
-int json_get_mpint(struct json_object *obj, const char *name,
+int json_get_mpint(const struct json_object *obj, const char *name,
 		   struct buffer *buf);
 
 /*
  * Get a string that represents a boolean value and turn it into an integer
  * (1 == true, 0 == false)
  */
-int json_get_bool(struct json_object *obj, const char *name, uint32_t *integer);
+int json_get_bool(const struct json_object *obj, const char *name,
+		  uint32_t *integer);
 
 /*
  * Get the string representation of the value found at the given key
  */
-int json_get_string(struct json_object *obj, const char *name,
+int json_get_string(const struct json_object *obj, const char *name,
 		    const char **outbuf);
 
 /*
  * Copy the toplevel identifier data from request to response object
  */
-int json_add_response_data(struct json_object *in, struct json_object *out);
+int json_add_response_data(const struct json_object *in,
+			   struct json_object *out);
 
 /*
  * Copy the reference identifier for each particular test from test request
  * to test response.
  */
-int json_add_test_data(struct json_object *in, struct json_object *out);
+int json_add_test_data(const struct json_object *in, struct json_object *out);
 
 /*
  * Add a JSON string entry with the given key by converting the binary data

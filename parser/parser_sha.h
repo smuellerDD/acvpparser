@@ -28,6 +28,14 @@
  *	  operations specified in sha_backend
  *
  * @param msg [in] Data buffer holding the message to be hashed in binary form.
+ * @param bitllen [in] Size of the message in bits - NOTE the @param msg is a
+ *		       buffer containing the message in full bytes. If the
+ *		       request for message sizes are made that are not full
+ *		       buffers, the @param bitlen field can be consulted to
+ *		       identify the number of rightmost bits to be pulled from
+ *		       @param msg. @param bitlen is per definition at most 7
+ *		       bits smaller than the message buffer in @param msg and
+ *		       never larger.
  * @param mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
@@ -35,6 +43,7 @@
  */
 struct sha_data {
 	struct buffer msg;
+	uint32_t bitlen;
 	struct buffer mac;
 	uint64_t cipher;
 };

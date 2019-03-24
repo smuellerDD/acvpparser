@@ -88,21 +88,26 @@ out:
 
 struct dsa_static_key {
 	void *key;
-	uint32_t L;
-	uint32_t N;
 	struct buffer Y;
+	struct dsa_pqggen_data pqg;
 };
-static struct dsa_static_key dsa_key = { NULL, 0, 0, { NULL, 0 } };
+static struct dsa_static_key dsa_key = { NULL, { NULL, 0 },
+					 { 0, 0, 0, { NULL, 0 }, { NULL, 0 },
+					  { NULL, 0 }} };
 
 static void dsa_key_free(struct dsa_static_key *key)
 {
 	if (key->key)
 		dsa_backend->dsa_free_key(key->key);
 	key->key = NULL;
-	key->L = 0;
-	key->N = 0;
+	key->pqg.L = 0;
+	key->pqg.N = 0;
+	key->pqg.cipher = 0;
 
 	free_buf(&key->Y);
+	free_buf(&key->pqg.P);
+	free_buf(&key->pqg.Q);
+	free_buf(&key->pqg.G);
 }
 
 static void dsa_key_free_static(void)
@@ -121,13 +126,20 @@ out:
 	return ret;
 }
 
-static int dsa_siggen_keygen(struct dsa_siggen_data *data, void **dsa_privkey)
+static int dsa_siggen_keygen(struct dsa_siggen_data *data, void **dsa_privkey,
+			     flags_t parsed_flags)
 {
 	struct dsa_pqggen_data *pqg = &data->pqg;
+	struct dsa_pqggen_data *preserved_pqg = &dsa_key.pqg;
 	int ret = 0;
 
-	if ((dsa_key.N != pqg->N) || (dsa_key.L != pqg->L) || !dsa_key.key) {
+	if ((preserved_pqg->N != pqg->N) || (preserved_pqg->L != pqg->L) ||
+	    (preserved_pqg->cipher != (data->cipher & ACVP_HASHMASK)) ||
+	    !dsa_key.key) {
 		dsa_key_free_static();
+
+		CKINT(dsa_pqggen_helper(&data->pqg, parsed_flags));
+
 		CKINT(dsa_backend->dsa_keygen_en(pqg, &data->Y, &dsa_key.key));
 
 		logger_binary(LOGGER_DEBUG, data->Y.buf, data->Y.len,
@@ -137,12 +149,22 @@ static int dsa_siggen_keygen(struct dsa_siggen_data *data, void **dsa_privkey)
 		atexit(dsa_key_free_static);
 
 		CKINT(dsa_duplicate_buf(&data->Y, &dsa_key.Y));
-		dsa_key.L = pqg->L;
-		dsa_key.N = pqg->N;
+		CKINT(dsa_duplicate_buf(&pqg->P, &preserved_pqg->P));
+		CKINT(dsa_duplicate_buf(&pqg->Q, &preserved_pqg->Q));
+		CKINT(dsa_duplicate_buf(&pqg->G, &preserved_pqg->G));
+		preserved_pqg->L = pqg->L;
+		preserved_pqg->N = pqg->N;
+		preserved_pqg->cipher = (data->cipher & ACVP_HASHMASK);
 	}
 
 	if (!data->Y.len)
 		CKINT(dsa_duplicate_buf(&dsa_key.Y, &data->Y));
+	if (!pqg->P.len)
+		CKINT(dsa_duplicate_buf(&preserved_pqg->P, &pqg->P));
+	if (!pqg->Q.len)
+		CKINT(dsa_duplicate_buf(&preserved_pqg->Q, &pqg->Q));
+	if (!pqg->G.len)
+		CKINT(dsa_duplicate_buf(&preserved_pqg->G, &pqg->G));
 
 	*dsa_privkey = dsa_key.key;
 
@@ -164,10 +186,8 @@ static int dsa_siggen_helper(const struct json_array *processdata,
 	(void)testvector;
 	(void)testresults;
 
-	CKINT(dsa_pqggen_helper(&vector->pqg, parsed_flags));
-
 	if (dsa_backend->dsa_keygen_en && dsa_backend->dsa_free_key) {
-		CKINT(dsa_siggen_keygen(vector, &dsa_privkey));
+		CKINT(dsa_siggen_keygen(vector, &dsa_privkey, parsed_flags));
 	}
 
 	vector->privkey = dsa_privkey;
@@ -341,6 +361,7 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 		{"l",	{.data.integer = &dsa_siggen_vector.pqg.L, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 		{"n",	{.data.integer = &dsa_siggen_vector.pqg.N, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 		{"hashAlg",	{.data.largeint = &dsa_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"hashAlg",	{.data.largeint = &dsa_siggen_vector.pqg.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 		{"tests",	{.data.array = &dsa_siggen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 	};
 	const struct json_array dsa_siggen_testgroup = SET_ARRAY(dsa_siggen_testgroup_entries, &dsa_siggen_testgroup_result);

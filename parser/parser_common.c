@@ -343,7 +343,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(ecdsa_siggen)
 			CB_HANDLER(ecdsa_sigver)
 			CB_HANDLER(eddsa_keygen)
-			CB_HANDLER(eddsa_pkvver)
+			CB_HANDLER(eddsa_keyver)
 			CB_HANDLER(eddsa_siggen)
 			CB_HANDLER(eddsa_sigver)
 			CB_HANDLER(hmac)
@@ -400,7 +400,8 @@ struct parser_flagsconv {
  *		     one flag out of the flags definition array is allowed at
  *		     any given time.
  */
-static void parse_flagblock(struct json_object *obj, flags_t *parsed_flags,
+static void parse_flagblock(const struct json_object *obj,
+			    flags_t *parsed_flags,
 			    const char *jsonkey, enum json_type type,
 			    const struct parser_flagsconv *flagsconv)
 {
@@ -626,7 +627,7 @@ static const struct parser_flagsconv flagsconv_drbg_otherinput[] = {
  *
  * @return 0 on success, < 0 on error
  */
-static int parse_flags(struct json_object *obj, flags_t *parsed_flags)
+static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 {
 	/* Symmetric ciphers */
 	parse_flagblock(obj, parsed_flags, "direction", json_type_string,
@@ -681,11 +682,12 @@ static int parse_flags(struct json_object *obj, flags_t *parsed_flags)
 }
 
 static int parse_all_processdata(const struct json_array *processdata,
-				 struct json_object *json_obj,
+				 const struct json_object *json_obj,
 				 flags_t parsed_flags,
 				 struct json_object *testresults);
 static int parse_array(const struct json_entry *entry,
-		       struct json_object *readdata, flags_t parsed_flags,
+		       const struct json_object *readdata,
+		       flags_t parsed_flags,
 		       struct json_object *testresults)
 {
 	struct json_object *json_nobj;
@@ -734,7 +736,7 @@ out:
 }
 
 static int parse_buffer_array(const struct json_entry *entry,
-			      struct json_object *readdata,
+			      const struct json_object *readdata,
 			      flags_t parsed_flags,
 			      struct json_object *testresults)
 {
@@ -802,7 +804,8 @@ out:
  *	   < 0 on error
  */
 static int parse_one_entry(const struct json_entry *entry,
-			   struct json_object *readdata, flags_t parsed_flags,
+			   const struct json_object *readdata,
+			   flags_t parsed_flags,
 			   struct json_object *testresults)
 {
 	const struct json_data *data = &entry->data;
@@ -945,7 +948,7 @@ out:
  * @return 0 on success, < 0 on error
  */
 static int parse_all_processdata(const struct json_array *processdata,
-				 struct json_object *readdata,
+				 const struct json_object *readdata,
 				 flags_t parsed_flags,
 				 struct json_object *testresults)
 {

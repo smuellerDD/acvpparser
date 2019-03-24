@@ -415,11 +415,18 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 
 		/* Set K3 and handle K1 == K3 or K1 != K3 */
 		if (!memcmp(vector->key.buf, vector->key.buf + (8 * 2), 8)) {
-			for (i = 0, k = 0;
-			     i < vector->data.len && k < vector->key.len - (2*8);
-			     i++, k++)
-				vector->key.buf[(k + (8 * 2))] ^=
-					vector->data.buf[i];
+			if (vector->cipher == ACVP_TDESCFB8 ||
+			    vector->cipher == ACVP_TDESCFB1) {
+				for (k = 0; k < 8; k++)
+					vector->key.buf[(k + (8 * 2))] ^=
+						calc_data.buf[k + 16];
+			} else {
+				for (i = 0, k = 0;
+				     i < vector->data.len && k < vector->key.len - (2*8);
+				     i++, k++)
+					vector->key.buf[(k + (8 * 2))] ^=
+						vector->data.buf[i];
+			}
 		} else {
 			if (!(parsed_flags & FLAG_OP_ENC) &&
 			     (vector->cipher == ACVP_TDESCFB64)) {

@@ -267,11 +267,13 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry sha_test_aft_entries[] = {
 		{"msg",		{.data.buf = &vector.msg, PARSER_BIN},	FLAG_OP_MASK_SHA | FLAG_OP_AFT},
+		{"len",		{.data.integer = &vector.bitlen, PARSER_UINT},	FLAG_OP_MASK_SHA | FLAG_OP_AFT},
 	};
 	const struct json_array sha_test_aft = SET_ARRAY(sha_test_aft_entries, &sha_testresult_aft);
 
 	const struct json_entry sha_test_mct_entries[] = {
 		{"msg",		{.data.buf = &vector.msg, PARSER_BIN},	FLAG_OP_MASK_SHA | FLAG_OP_MCT},
+		{"len",		{.data.integer = &vector.bitlen, PARSER_UINT},	FLAG_OP_MASK_SHA | FLAG_OP_MCT},
 	};
 	const struct json_array sha_test_mct = SET_ARRAY(sha_test_mct_entries, &sha_testresult_mct);
 

@@ -48,7 +48,7 @@ struct eddsa_keygen_data {
  * @param keyver_success [out] Is EDDSA key verification with given parameters
  *			       successful (1) or whether it failed (0).
  */
-struct eddsa_pkvver_data {
+struct eddsa_keyver_data {
 	struct buffer q;
 	uint64_t cipher;
 	uint32_t keyver_success;
@@ -124,7 +124,7 @@ struct eddsa_sigver_data {
  * detected a return code != must be returned.
  *
  * @param eddsa_keygen EDDSA key generation
- * @param eddsa_pkvver EDDSA key verification
+ * @param eddsa_keyver EDDSA key verification
  * @param eddsa_siggen EDDSA signature generation
  * @param eddsa_sigver EDDSA signature verification
  *
@@ -150,7 +150,7 @@ struct eddsa_sigver_data {
 struct eddsa_backend {
 	int (*eddsa_keygen)(struct eddsa_keygen_data *data,
 			    flags_t parsed_flags);
-	int (*eddsa_pkvver)(struct eddsa_pkvver_data *data,
+	int (*eddsa_keyver)(struct eddsa_keyver_data *data,
 			    flags_t parsed_flags);
 	int (*eddsa_siggen)(struct eddsa_siggen_data *data,
 			    flags_t parsed_flags);

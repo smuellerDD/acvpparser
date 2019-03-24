@@ -96,6 +96,9 @@ get_proc_family() {
 REGRESSION_VECTOR_SKIP="
 	mode:keyGen
 	mode:sigGen
+	mode:pqgGen
+	algorithm:KAS-FFC
+	algorithm:KAS-ECC
 	ivGen:internal"
 
 #
@@ -118,6 +121,13 @@ exec_module()
 	local vendordir
 	local i
 	local j
+
+	# If the script name contains "_regression" we switch into regression
+	# mode transparently
+	if $(echo $0 | grep -q "_regression")
+       	then
+	       regression="regression"
+	fi
 
 	if [ -z "$module" ]
 	then
@@ -264,13 +274,14 @@ exec_module()
 
 				$_LIB_EXEC $module $dir/$_LIB_REQ $dir/$_LIB_REGRESSION
 				local ret=$?
-				if [ $ret -ne 0 ]
+				if [ $ret -eq 95 ]	#EOPNOTSUPP
+				then
+					echo_deact "Operation not supported for $dir"
+				elif [ $ret -ne 0 ]
 				then
 					echo_fail "Execution for $dir failed (error code $ret) - executed command:"
 					echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_REGRESSION"
-				fi
-
-				if ! $($_LIB_EXEC -e $dir/$_LIB_REGRESSION $dir/$_LIB_RESP > /dev/null); then
+				elif ! $($_LIB_EXEC -e $dir/$_LIB_REGRESSION $dir/$_LIB_RESP > /dev/null); then
 					echo_fail "Regression testing for $dir"
 				else
 					echo_pass "Regression testing for $dir"
@@ -279,6 +290,20 @@ exec_module()
 			fi
 		done
 	done
+
+	if [ -n "$regression" -a x"$regression" != x"X" ]
+	then
+		echo "=========================================================="
+		if [ $failures -gt 0 ]
+		then
+			echo $(color "red")[FAILED]$(color off) $@ "$failures failures for module $module"
+
+		else
+			echo_pass "no failures for module $module"
+		fi
+	fi
+
+	failures=0
 }
 
 #
@@ -292,14 +317,6 @@ regression_test()
 	shift
 
 	exec_module "$module" "regression" ${@}
-
-	echo "=========================================================="
-	if [ $failures -gt 0 ]
-	then
-		echo_fail "$failures failures for module $module"
-	else
-		echo_pass "no failures for module $module"
-	fi
 }
 
 cleanup()

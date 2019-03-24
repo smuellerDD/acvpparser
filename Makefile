@@ -210,15 +210,19 @@ endif
 ################## CONFIGURE BACKEND BouncyCastle ########
 
 ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
+	BC_DEVEL_DIR := /usr/lib/jvm/java-11-openjdk-11.0.1.13-11.rolling.fc29.x86_64
+	BC_BACKEND_DIR := ${CURDIR}/backend_interfaces/bouncycastle
+	BC_LIB_FILE := /usr/share/java/bcprov.jar
+
+	CFLAGS += -Wno-pedantic -DBC_BACKEND_DIR=\"$(BC_BACKEND_DIR)\" -DBC_LIB_FILE=\"$(BC_LIB_FILE)\"
 	C_SRCS += backends/backend_bouncycastle.c
-	INCLUDE_DIRS += /usr/lib/jvm/java-11-openjdk-11.0.1.13-11.rolling.fc29.x86_64/include
-	LIBRARIES += XXXX
+	INCLUDE_DIRS += $(BC_DEVEL_DIR)/include $(BC_DEVEL_DIR)/include/linux
+	LIBRARY_DIRS += $(BC_DEVEL_DIR)/lib/server
+	LIBRARIES += jvm
 endif
 
 ######################################################
 
-C_OBJS := ${C_SRCS:.c=.o}
-C_OBJS := ${C_SRCS:.c=.o}
 C_OBJS := ${C_SRCS:.c=.o}
 C_ASM := ${C_SRCS:.c=.s}
 OBJS := $(C_OBJS)
@@ -234,7 +238,7 @@ analyze_plists = $(analyze_srcs:%.c=%.plist)
 .PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle default
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan>|bouncycastle")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -256,6 +260,7 @@ libnacl: $(NAME)
 boringssl: $(NAME)
 botan: $(NAME)
 bouncycastle: $(NAME)
+	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)
@@ -281,6 +286,7 @@ clean:
 	@- $(RM) $(wildcard *$(PARSERDIR)/json-c/*.plist)
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.plist)
 	@- $(RM) $(wildcard backends/*.plist)
+	@- $(RM) backend_interfaces/bouncycastle//bc_acvp.class
 
 distclean: clean
 

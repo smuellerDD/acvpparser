@@ -194,7 +194,7 @@ DEF_CALLBACK_TYPE(ecdsa_pkvver)
 DEF_CALLBACK_TYPE(ecdsa_siggen)
 DEF_CALLBACK_TYPE(ecdsa_sigver)
 DEF_CALLBACK_TYPE(eddsa_keygen)
-DEF_CALLBACK_TYPE(eddsa_pkvver)
+DEF_CALLBACK_TYPE(eddsa_keyver)
 DEF_CALLBACK_TYPE(eddsa_siggen)
 DEF_CALLBACK_TYPE(eddsa_sigver)
 DEF_CALLBACK_TYPE(hmac)
@@ -238,7 +238,7 @@ enum {
 	CB_TYPE_ecdsa_siggen,
 	CB_TYPE_ecdsa_sigver,
 	CB_TYPE_eddsa_keygen,
-	CB_TYPE_eddsa_pkvver,
+	CB_TYPE_eddsa_keyver,
 	CB_TYPE_eddsa_siggen,
 	CB_TYPE_eddsa_sigver,
 	CB_TYPE_dsa_pqggen,
@@ -275,7 +275,7 @@ struct json_callback {
 		struct ecdsa_siggen_callback ecdsa_siggen;
 		struct ecdsa_sigver_callback ecdsa_sigver;
 		struct eddsa_keygen_callback eddsa_keygen;
-		struct eddsa_pkvver_callback eddsa_pkvver;
+		struct eddsa_keyver_callback eddsa_keyver;
 		struct eddsa_siggen_callback eddsa_siggen;
 		struct eddsa_sigver_callback eddsa_sigver;
 		struct hmac_callback hmac;

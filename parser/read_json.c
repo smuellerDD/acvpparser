@@ -46,7 +46,7 @@ void json_logger(enum logger_verbosity severity,
 	       json_object_to_json_string_ext(jobj, JSON_C_TO_STRING_PRETTY));
 }
 
-int json_find_key(struct json_object *inobj, const char *name,
+int json_find_key(const struct json_object *inobj, const char *name,
 		  struct json_object **out, enum json_type type)
 {
 	if (!json_object_object_get_ex(inobj, name, out)) {
@@ -69,7 +69,7 @@ int json_find_key(struct json_object *inobj, const char *name,
 	return 0;
 }
 
-int json_get_uint_random(struct json_object *obj, const char *name,
+int json_get_uint_random(const struct json_object *obj, const char *name,
 			 uint32_t *integer)
 {
 	struct json_object *o = NULL;
@@ -105,7 +105,8 @@ int json_get_uint_random(struct json_object *obj, const char *name,
 	return 0;
 }
 
-int json_get_uint(struct json_object *obj, const char *name, uint32_t *integer)
+int json_get_uint(const struct json_object *obj, const char *name,
+		  uint32_t *integer)
 {
 	struct json_object *o = NULL;
 	int32_t tmp;
@@ -125,7 +126,8 @@ int json_get_uint(struct json_object *obj, const char *name, uint32_t *integer)
 	return 0;
 }
 
-int json_get_bin(struct json_object *obj, const char *name, struct buffer *buf)
+int json_get_bin(const struct json_object *obj, const char *name,
+		 struct buffer *buf)
 {
 	struct json_object *o = NULL;
 	const char *hex;
@@ -166,7 +168,7 @@ int json_get_bin(struct json_object *obj, const char *name, struct buffer *buf)
 	return ret;
 }
 
-int json_get_mpint(struct json_object *obj, const char *name,
+int json_get_mpint(const struct json_object *obj, const char *name,
 		   struct buffer *buf)
 {
 	const char *raw;
@@ -225,7 +227,8 @@ int json_get_mpint(struct json_object *obj, const char *name,
 	return ret;
 }
 
-int json_get_bool(struct json_object *obj, const char *name, uint32_t *integer)
+int json_get_bool(const struct json_object *obj, const char *name,
+		  uint32_t *integer)
 {
 	struct json_object *o = NULL;
 	int ret = json_find_key(obj, name, &o, json_type_boolean);
@@ -238,7 +241,7 @@ int json_get_bool(struct json_object *obj, const char *name, uint32_t *integer)
 	return 0;
 }
 
-int json_get_string(struct json_object *obj, const char *name,
+int json_get_string(const struct json_object *obj, const char *name,
 		    const char **outbuf)
 {
 	struct json_object *o = NULL;
@@ -258,7 +261,8 @@ int json_get_string(struct json_object *obj, const char *name,
 	return 0;
 }
 
-int json_add_response_data(struct json_object *in, struct json_object *out)
+int json_add_response_data(const struct json_object *in,
+			   struct json_object *out)
 {
 	struct json_object *vsid;
 	int ret = json_find_key(in, "vsId", &vsid, json_type_int);
@@ -277,7 +281,7 @@ out:
 	return ret;
 }
 
-int json_add_test_data(struct json_object *in, struct json_object *out)
+int json_add_test_data(const struct json_object *in, struct json_object *out)
 {
 	struct json_object *tcid;
 	int ret = json_find_key(in, "tcId", &tcid, json_type_int);
