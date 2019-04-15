@@ -875,7 +875,7 @@ static int sym_tdes_tester(struct json_object *in, struct json_object *out,
 	vector.cipher = cipher;
 
 	/* Process all. */
-	return process_json(&sym_testanchor, "0.5", in, out);
+	return process_json(&sym_testanchor, "1.0", in, out);
 }
 
 static int sym_aes_tester(struct json_object *in, struct json_object *out,
@@ -1010,7 +1010,7 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 	vector.cipher = cipher;
 
 	/* Process all. */
-	return process_json(&sym_testanchor, "0.5", in, out);
+	return process_json(&sym_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester sym_aes =

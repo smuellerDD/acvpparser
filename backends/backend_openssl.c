@@ -32,7 +32,6 @@
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/fips.h>
-#include <openssl/fips_rand.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
@@ -66,6 +65,18 @@ static void openssl_backend_init(void)
 {
 	FIPS_mode_set(1);
 }
+
+/************************************************
+ * Configuration of code
+ ************************************************/
+
+/*
+ * Enable this option to compile the code for the Ubuntu OpenSSL 1.1.x
+ * FIPS code base.
+ *
+ * The default code base works with Fedora 29 / RHEL 8 code base.
+ */
+#undef OPENSSL_UBUNTU
 
 /************************************************
  * Symmetric cipher interface functions
@@ -301,12 +312,13 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 	const EVP_MD *l_type = NULL;
 	const char *algo;
 
-	CKINT(convert_cipher_algo(cipher & (ACVP_HASHMASK | ACVP_HMACMASK),
+	CKINT(convert_cipher_algo(cipher & (ACVP_HASHMASK | ACVP_HMACMASK |
+					    ACVP_SHAKEMASK),
 				  &algo));
 
 	logger(LOGGER_DEBUG, "SHA = %s\n", algo);
 
-	switch (cipher & (ACVP_HASHMASK | ACVP_HMACMASK)) {
+	switch (cipher & (ACVP_HASHMASK | ACVP_HMACMASK | ACVP_SHAKEMASK)) {
 	case ACVP_HMACSHA1:
 	case ACVP_SHA1:
 		l_type = EVP_sha1();
@@ -343,6 +355,13 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 	case ACVP_HMACSHA3_512:
 	case ACVP_SHA3_512:
 		l_type = EVP_sha3_512();
+		break;
+
+	case ACVP_SHAKE128:
+		l_type = EVP_shake128();
+		break;
+	case ACVP_SHAKE256:
+		l_type = EVP_shake256();
 		break;
 
 	default:
@@ -749,14 +768,16 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 
 	CKINT(openssl_md_convert(data->cipher, &md));
 
-	mdlen = EVP_MD_size(md);
+	if (data->cipher & ACVP_SHAKEMASK)
+		mdlen = data->outlen / 8;
+	else
+		mdlen = EVP_MD_size(md);
 
 	CKINT_LOG(alloc_buf(mdlen, &data->mac),
 		  "SHA buffer cannot be allocated\n");
 
 	ctx = EVP_MD_CTX_create();
 	CKNULL(ctx, -ENOMEM);
-
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
 	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed %s\n",
@@ -765,9 +786,15 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 	CKINT_O_LOG(EVP_DigestUpdate(ctx, data->msg.buf, data->msg.len),
 		    "EVP_DigestUpdate() failed\n");
 
-	CKINT_O_LOG(EVP_DigestFinal(ctx, data->mac.buf,
-				    (unsigned int *) &data->mac.len),
-		    "EVP_DigestFinal() failed\n");
+	if (data->cipher & ACVP_SHAKEMASK) {
+		CKINT_O_LOG(EVP_DigestFinalXOF(ctx, data->mac.buf,
+					       data->mac.len),
+			    "EVP_DigestFinalXOF() failed\n");
+	} else {
+		CKINT_O_LOG(EVP_DigestFinal(ctx, data->mac.buf,
+					    (unsigned int *) &data->mac.len),
+			    "EVP_DigestFinal() failed\n");
+	}
 
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "hash");
 
@@ -919,9 +946,9 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 	}
 
 	/* Get the tag */
-	CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, data->tag.len,
-				        data->tag.buf),
-	            "EVP_CIPHER_CTX_ctrl() failed with tag length %u\n",
+	CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG,
+					data->tag.len, data->tag.buf),
+		    "EVP_CIPHER_CTX_ctrl() failed with tag length %u\n",
 		    data->tag.len);
 
 	logger_binary(LOGGER_DEBUG, data->tag.buf, data->tag.len, "tag");
@@ -1178,26 +1205,78 @@ struct openssl_test_ent {
 	struct buffer *nonce;
 };
 
-static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
-			      int entropy, size_t min_len, size_t max_len)
+#ifdef OPENSSL_UBUNTU
+
+# include <openssl/rand_drbg.h>
+
+static int idx;
+
+# define DRBG_ctx        		RAND_DRBG
+# define DRBG_get_data(a)		RAND_DRBG_get_ex_data(a, idx)
+# define DRBG_new(a, b)			RAND_DRBG_new(a,b, NULL)
+# define DRBG_set_callbacks(a, b, c)   					\
+				RAND_DRBG_set_callbacks(a, b, NULL, c, NULL)
+# define DRBG_set_data(a, b)		RAND_DRBG_set_ex_data(a, idx, b)
+# define DRBG_instantiate(a, b, c)	RAND_DRBG_instantiate(a, b, c)
+# define DRBG_reseed(a, b, c)		RAND_DRBG_reseed(a, b, c, 0)
+# define DRBG_generate(a, b, c, d, e, f) RAND_DRBG_generate(a, b, c, d, e, f)
+# define DRBG_uninstantiate(a)		RAND_DRBG_uninstantiate(a)
+# define DRBG_DF_FLAG			1
+
+static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
+			      int entropy, size_t min_len, size_t max_len,
+			      int prediction_resistance)
 {
+	struct openssl_test_ent *t = DRBG_get_data(dctx);
+
 	(void) min_len;
 	(void) max_len;
 	(void) entropy;
-	struct openssl_test_ent *t = FIPS_drbg_get_app_data(dctx);
+	(void) prediction_resistance;
 
 	*pout = (unsigned char *) t->entropy->buf;
 
 	return t->entropy->len;
 }
 
-static size_t openssl_nonce(DRBG_CTX *dctx, unsigned char **pout,
+#else
+
+# include <openssl/fips_rand.h>
+
+# define DRBG_ctx			DRBG_CTX
+# define DRBG_get_data(a)		FIPS_drbg_get_app_data(a)
+# define DRBG_new(a, b)			FIPS_drbg_new(a, b)
+# define DRBG_set_callbacks(a, b, c)					\
+				FIPS_drbg_set_callbacks(a, b, 0, 0, c, 0)
+# define DRBG_set_data(a, b)		FIPS_drbg_set_app_data(a, b)
+# define DRBG_instantiate(a, b, c)	FIPS_drbg_instantiate(a, b, c)
+# define DRBG_reseed(a, b, c)		FIPS_drbg_reseed(a, b, c)
+# define DRBG_generate(a, b, c, d, e, f) FIPS_drbg_generate(a, b, c, d, e, f)
+# define DRBG_uninstantiate(a)		FIPS_drbg_uninstantiate(a)
+# define DRBG_DF_FLAG			(DRBG_FLAG_CTR_USE_DF | DRBG_FLAG_TEST)
+
+static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
+			      int entropy, size_t min_len, size_t max_len)
+{
+	(void) min_len;
+	(void) max_len;
+	(void) entropy;
+	struct openssl_test_ent *t = DRBG_get_data(dctx);
+
+	*pout = (unsigned char *) t->entropy->buf;
+
+	return t->entropy->len;
+}
+
+#endif
+
+static size_t openssl_nonce(DRBG_ctx *dctx, unsigned char **pout,
 			    int entropy, size_t min_len, size_t max_len)
 {
 	(void) min_len;
 	(void) max_len;
 	(void) entropy;
-	struct openssl_test_ent *t = FIPS_drbg_get_app_data(dctx);
+	struct openssl_test_ent *t = DRBG_get_data(dctx);
 
 	*pout = (unsigned char * )t->nonce->buf;
 
@@ -1206,7 +1285,7 @@ static size_t openssl_nonce(DRBG_CTX *dctx, unsigned char **pout,
 
 static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 {
-	DRBG_CTX *ctx = NULL;
+	DRBG_ctx *ctx = NULL;
 	int nid = NID_undef, df = 0, ret = 0;
 	struct openssl_test_ent t;
 
@@ -1241,9 +1320,9 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	}
 
 	if (data->df)
-		df = DRBG_FLAG_CTR_USE_DF;
+		df = DRBG_DF_FLAG;
 
-	ctx = FIPS_drbg_new(nid, df | DRBG_FLAG_TEST);
+	ctx = DRBG_new(nid, df);
 	CKNULL(ctx, -ENOMEM);
 
 	logger_binary(LOGGER_DEBUG, data->entropy.buf, data->entropy.len,
@@ -1253,13 +1332,13 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	logger_binary(LOGGER_DEBUG, data->nonce.buf, data->nonce.len, "nonce");
 	t.nonce = &data->nonce;
 	
-	FIPS_drbg_set_callbacks(ctx, openssl_entropy, 0, 0, openssl_nonce, 0);
-	FIPS_drbg_set_app_data(ctx, &t);
+	DRBG_set_callbacks(ctx, openssl_entropy, openssl_nonce);
+	DRBG_set_data(ctx, &t);
 
 	logger_binary(LOGGER_DEBUG, data->pers.buf, data->pers.len,
 		      "personalization string");
 
-	CKINT_O(FIPS_drbg_instantiate(ctx, data->pers.buf, data->pers.len));
+	CKINT_O(DRBG_instantiate(ctx, data->pers.buf, data->pers.len));
 
 	if (data->entropy_reseed.buffers[0].len) {
 		logger_binary(LOGGER_DEBUG,
@@ -1274,9 +1353,8 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 				      data->addtl_reseed.buffers[0].len,
 				      "addtl reseed");
 		}
-		CKINT_O(FIPS_drbg_reseed(ctx,
-					 data->addtl_reseed.buffers[0].buf,
-					 data->addtl_reseed.buffers[0].len));
+		CKINT_O(DRBG_reseed(ctx, data->addtl_reseed.buffers[0].buf,
+				    data->addtl_reseed.buffers[0].len));
 	}
 
 	if (data->pr) {
@@ -1292,10 +1370,10 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 
 	CKINT(alloc_buf(data->rnd_data_bits_len / 8, &data->random));
 
-	CKINT_O_LOG(FIPS_drbg_generate(ctx, data->random.buf, data->random.len,
-				       data->entropy_generate.buffers[0].len?1:0,
-				       data->addtl_generate.buffers[0].buf,
-				       data->addtl_generate.buffers[0].len),
+	CKINT_O_LOG(DRBG_generate(ctx, data->random.buf, data->random.len,
+				  data->entropy_generate.buffers[0].len?1:0,
+				  data->addtl_generate.buffers[0].buf,
+				  data->addtl_generate.buffers[0].len),
 		    "FIPS_drbg_generate failed\n");
 
 	logger_binary(LOGGER_DEBUG, data->random.buf, data->random.len,
@@ -1312,10 +1390,10 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	logger_binary(LOGGER_DEBUG, data->addtl_generate.buffers[1].buf,
 		      data->addtl_generate.buffers[1].len, "addtl generate 2");
 
-	CKINT_O_LOG(FIPS_drbg_generate(ctx, data->random.buf, data->random.len,
-				       data->entropy_generate.buffers[1].len?1:0,
-				       data->addtl_generate.buffers[1].buf,
-				       data->addtl_generate.buffers[1].len),
+	CKINT_O_LOG(DRBG_generate(ctx, data->random.buf, data->random.len,
+				  data->entropy_generate.buffers[1].len?1:0,
+				  data->addtl_generate.buffers[1].buf,
+				  data->addtl_generate.buffers[1].len),
 		    "FIPS_drbg_generate failed\n");
 
 	logger_binary(LOGGER_DEBUG, data->random.buf, data->random.len,
@@ -1325,7 +1403,7 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 
 out:
 	if (ctx)
-		FIPS_drbg_uninstantiate(ctx);
+		DRBG_uninstantiate(ctx);
 
 	return ret;
 }
@@ -1659,7 +1737,7 @@ static int openssl_rsa_siggen(struct rsa_siggen_data *data,
 #if 0
 	if (saltlen)
 		EVP_MD_CTX_set_flags(&ctx,
-                        EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
+				EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
 
 		EVP_MD_CTX_set_flags(&ctx, EVP_MD_CTX_FLAG_PAD_X931);
 #endif
@@ -1669,12 +1747,12 @@ static int openssl_rsa_siggen(struct rsa_siggen_data *data,
 		goto out;
 	}
 
-        if (!EVP_SignUpdate(ctx, data->msg.buf, data->msg.len)) {
+	if (!EVP_SignUpdate(ctx, data->msg.buf, data->msg.len)) {
 		ret = -EFAULT;
 		goto out;
 	}
 
-        if (!EVP_SignFinal(ctx, data->sig.buf, &siglen, pk)) {
+	if (!EVP_SignFinal(ctx, data->sig.buf, &siglen, pk)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -1736,7 +1814,7 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 #if 0
 	if (saltlen)
 		EVP_MD_CTX_set_flags(&ctx,
-                        EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
+				EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
 
 		EVP_MD_CTX_set_flags(&ctx, EVP_MD_CTX_FLAG_PAD_X931);
 #endif
@@ -2785,12 +2863,12 @@ static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
 		goto out;
 	}
 
-        if (!EVP_SignUpdate(ctx, data->msg.buf, data->msg.len)) {
+	if (!EVP_SignUpdate(ctx, data->msg.buf, data->msg.len)) {
 		ret = -EFAULT;
 		goto out;
 	}
 
-        if (!EVP_SignFinal(ctx, sig_buf, &sig_len, pk)) {
+	if (!EVP_SignFinal(ctx, sig_buf, &sig_len, pk)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -2894,7 +2972,7 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 		goto out;
 	}
 
-        if (!EVP_VerifyUpdate(ctx, data->msg.buf, data->msg.len)) {
+	if (!EVP_VerifyUpdate(ctx, data->msg.buf, data->msg.len)) {
 		ret = -EFAULT;
 		goto out;
 	}

@@ -1,3 +1,8 @@
+v0.5.0
+- Add SHAKE support for OpenSSL
+- Add Ubuntu-specific OpenSSL handling
+- ACVP v1.0 support
+
 v0.4.4:
 - Compile ACVP parser tool with -m32 for 32 bit testing
 - Fix DSA siggen helper to generate PQG and DSA key at the same time

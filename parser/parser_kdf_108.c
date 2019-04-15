@@ -86,7 +86,7 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 	const struct json_array kdf_108_testanchor = SET_ARRAY(kdf_108_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kdf_108_testanchor, "0.5", in, out);
+	return process_json(&kdf_108_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester kdf_108 =

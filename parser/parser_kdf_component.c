@@ -74,7 +74,7 @@ static int kdf_tester_tls(struct json_object *in, struct json_object *out,
 	const struct json_array kdf_tls_testanchor = SET_ARRAY(kdf_tls_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kdf_tls_testanchor, "0.5", in, out);
+	return process_json(&kdf_tls_testanchor, "1.0", in, out);
 }
 
 /******************************************************************************
@@ -128,7 +128,7 @@ static int kdf_tester_ssh(struct json_object *in, struct json_object *out,
 	const struct json_array kdf_ssh_testanchor = SET_ARRAY(kdf_ssh_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kdf_ssh_testanchor, "0.5", in, out);
+	return process_json(&kdf_ssh_testanchor, "1.0", in, out);
 }
 
 /******************************************************************************
@@ -182,7 +182,7 @@ static int kdf_tester_ikev1(struct json_object *in, struct json_object *out,
 	const struct json_array kdf_ikev1_testanchor = SET_ARRAY(kdf_ikev1_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kdf_ikev1_testanchor, "0.5", in, out);
+	return process_json(&kdf_ikev1_testanchor, "1.0", in, out);
 }
 
 /******************************************************************************
@@ -238,7 +238,7 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 	const struct json_array kdf_ikev2_testanchor = SET_ARRAY(kdf_ikev2_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kdf_ikev2_testanchor, "0.5", in, out);
+	return process_json(&kdf_ikev2_testanchor, "1.0", in, out);
 }
 
 /******************************************************************************

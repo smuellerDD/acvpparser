@@ -102,7 +102,7 @@ static int drbg_tester(struct json_object *in, struct json_object *out,
 	drbg_vector.cipher = cipher;
 
 	/* Process all. */
-	return process_json(&drbg_testanchor, "0.5", in, out);
+	return process_json(&drbg_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester drbg =

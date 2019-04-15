@@ -184,7 +184,7 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	vector.cipher = cipher;
 
 	/* Process all. */
-	return process_json(&mac_testanchor, "0.5", in, out);
+	return process_json(&mac_testanchor, "1.0", in, out);
 }
 
 static int cmac_tester(struct json_object *in, struct json_object *out,
@@ -286,7 +286,7 @@ static int cmac_tester(struct json_object *in, struct json_object *out,
 	vector.cipher = cipher;
 
 	/* Process all. */
-	return process_json(&mac_testanchor, "0.5", in, out);
+	return process_json(&mac_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester hmac =

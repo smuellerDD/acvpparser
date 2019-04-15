@@ -270,7 +270,7 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_array ecdh_testanchor = SET_ARRAY(ecdh_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&ecdh_testanchor, "0.5", in, out);
+	return process_json(&ecdh_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester ecdh =

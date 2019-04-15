@@ -489,6 +489,7 @@ static const struct parser_flagsconv flagsconv_testtype[]= {
 	{FLAG_OP_GDT, {.string = "GDT"}, "GDT test type"},
 	{FLAG_OP_VAL, {.string = "VAL"}, "VAL test type"},
 	{FLAG_OP_AFT, {.string = "CTR"}, "CTR test type"},
+	{FLAG_OP_VOT, {.string = "VOT"}, "VOT test type"},
 	{0, {NULL}, NULL}
 };
 

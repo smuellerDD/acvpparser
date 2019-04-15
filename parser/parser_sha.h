@@ -36,6 +36,15 @@
  *		       @param msg. @param bitlen is per definition at most 7
  *		       bits smaller than the message buffer in @param msg and
  *		       never larger.
+ * @param outlen [in] Size of the output message digest to be created in bits.
+ *		      This field is required for variable-sized output message
+ *		      digests, such as SHAKE.
+ * @param minoutlen [in] MinimumOutputLength as defined for the SHAKE MCT. Note,
+ *			 this value is only used for the MCT operation and does
+ *			 not need to be considered by a backend.
+ * @param maxoutlen [in] MaximumOutputLength as defined for the SHAKE MCT. Note,
+ *			 this value is only used for the MCT operation and does
+ *			 not need to be considered by a backend.
  * @param mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
@@ -44,6 +53,9 @@
 struct sha_data {
 	struct buffer msg;
 	uint32_t bitlen;
+	uint32_t outlen;
+	uint32_t minoutlen;
+	uint32_t maxoutlen;
 	struct buffer mac;
 	uint64_t cipher;
 };

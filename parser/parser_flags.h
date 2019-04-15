@@ -47,13 +47,14 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_GDT					(0x0000000000000008ULL)
 /* ECDH validation */
 #define FLAG_OP_VAL					(0x0000000000000010ULL)
-#define FLAG_OP_MASK_BASE				(0x000000000000001fULL)
+#define FLAG_OP_VOT					(0x0000000000000020ULL)
+#define FLAG_OP_MASK_BASE				(0x000000000000003fULL)
 
 /* Symmetric Ciphers: JSON field is expected during enc. */
-#define FLAG_OP_ENC					(0x0000000000000020ULL)
+#define FLAG_OP_ENC					(0x0000000000000040ULL)
 /* Symmetric Ciphers:  JSON field is expected during dec */
-#define FLAG_OP_DEC					(0x0000000000000040ULL)
-#define FLAG_OP_MASK_SYMMETRIC				(0x0000000000000060ULL)
+#define FLAG_OP_DEC					(0x0000000000000080ULL)
+#define FLAG_OP_MASK_SYMMETRIC				(0x00000000000000c0ULL)
 
 /* HMAC: CMAC generate test */
 #define FLAG_OP_CMAC_GEN_TEST				(0x0000000000000100ULL)

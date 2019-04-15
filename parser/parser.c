@@ -59,6 +59,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"AES-CFB128", ACVP_CFB128},
 	{"AES-CFB1", ACVP_CFB1},
 	{"AES-CTR", ACVP_CTR},
+	{"AES-GCM-SIV", ACVP_GCMSIV},
 	{"AES-GCM", ACVP_GCM},
 	{"AES-CCM", ACVP_CCM},
 	{"AES-XTS", ACVP_XTS},
@@ -104,6 +105,8 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"SHA3-256", ACVP_SHA3_256},
 	{"SHA3-384", ACVP_SHA3_384},
 	{"SHA3-512", ACVP_SHA3_512},
+	{"SHAKE-128", ACVP_SHAKE128},
+	{"SHAKE-256", ACVP_SHAKE256},
 	{"SHA2-224", ACVP_SHA224},
 	{"SHA2-256", ACVP_SHA256},
 	{"SHA2-384", ACVP_SHA384},
@@ -293,7 +296,7 @@ static int match_expected(const char *actualfile, const char *expectedfile)
 {
 	struct json_object *actual = NULL, *expobj = NULL;
 	struct json_object *expecteddata, *expectedversion,
-			   *actualdata, *actualversion;;
+			   *actualdata, *actualversion;
 	int ret;
 
 	/* Open and parse expected test result */
