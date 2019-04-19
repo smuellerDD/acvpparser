@@ -406,7 +406,6 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	return process_json(&sha_testanchor, "1.0", in, out);
 }
 
-
 static int shake_tester(struct json_object *in, struct json_object *out,
 			uint64_t cipher)
 {

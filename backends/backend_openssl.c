@@ -78,10 +78,17 @@ static void openssl_backend_init(void)
  */
 #undef OPENSSL_UBUNTU
 
-/************************************************
- * Symmetric cipher interface functions
- ************************************************/
+/*
+ * Enable this option to compile the code for the RHEL 7 OpenSSL 1.0.x
+ * FIPS code base.
+ *
+ * (yet untested code)
+ */
+#undef OPENSSL_RHEL_10X
 
+/************************************************
+ * General helper functions
+ ************************************************/
 static int openssl_cipher(uint64_t cipher, uint32_t keylen,
 			  const EVP_CIPHER **type)
 {
@@ -357,12 +364,14 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 		l_type = EVP_sha3_512();
 		break;
 
+#ifndef OPENSSL_RHEL_10X
 	case ACVP_SHAKE128:
 		l_type = EVP_shake128();
 		break;
 	case ACVP_SHAKE256:
 		l_type = EVP_shake256();
 		break;
+#endif
 
 	default:
 		logger(LOGGER_WARN, "Unknown cipher\n");
@@ -395,6 +404,795 @@ static int openssl_bn2buffer(const BIGNUM *number, struct buffer *buf)
 	return openssl_bn2buf(number, buf, BN_num_bytes(number));
 }
 
+/************************************************
+ * OpenSSL version-specific code
+ ************************************************/
+struct openssl_test_ent {
+	struct buffer *entropy;
+	struct buffer *nonce;
+};
+
+#ifdef OPENSSL_UBUNTU
+
+# include <openssl/rand_drbg.h>
+
+static int idx;
+
+# define DRBG_ctx        		RAND_DRBG
+# define DRBG_get_data(a)		RAND_DRBG_get_ex_data(a, idx)
+# define DRBG_new(a, b)			RAND_DRBG_new(a,b, NULL)
+# define DRBG_set_callbacks(a, b, c)   					\
+				RAND_DRBG_set_callbacks(a, b, NULL, c, NULL)
+# define DRBG_set_data(a, b)		RAND_DRBG_set_ex_data(a, idx, b)
+# define DRBG_instantiate(a, b, c)	RAND_DRBG_instantiate(a, b, c)
+# define DRBG_reseed(a, b, c)		RAND_DRBG_reseed(a, b, c, 0)
+# define DRBG_generate(a, b, c, d, e, f) RAND_DRBG_generate(a, b, c, d, e, f)
+# define DRBG_uninstantiate(a)		RAND_DRBG_uninstantiate(a)
+# define DRBG_DF_FLAG			1
+
+static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
+			      int entropy, size_t min_len, size_t max_len,
+			      int prediction_resistance)
+{
+	struct openssl_test_ent *t = DRBG_get_data(dctx);
+
+	(void) min_len;
+	(void) max_len;
+	(void) entropy;
+	(void) prediction_resistance;
+
+	*pout = (unsigned char *) t->entropy->buf;
+
+	return t->entropy->len;
+}
+
+#else
+
+# include <openssl/fips_rand.h>
+
+# define DRBG_ctx			DRBG_CTX
+# define DRBG_get_data(a)		FIPS_drbg_get_app_data(a)
+# define DRBG_new(a, b)			FIPS_drbg_new(a, b)
+# define DRBG_set_callbacks(a, b, c)					\
+				FIPS_drbg_set_callbacks(a, b, 0, 0, c, 0)
+# define DRBG_set_data(a, b)		FIPS_drbg_set_app_data(a, b)
+# define DRBG_instantiate(a, b, c)	FIPS_drbg_instantiate(a, b, c)
+# define DRBG_reseed(a, b, c)		FIPS_drbg_reseed(a, b, c)
+# define DRBG_generate(a, b, c, d, e, f) FIPS_drbg_generate(a, b, c, d, e, f)
+# define DRBG_uninstantiate(a)		FIPS_drbg_uninstantiate(a)
+# define DRBG_DF_FLAG			(DRBG_FLAG_CTR_USE_DF | DRBG_FLAG_TEST)
+
+static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
+			      int entropy, size_t min_len, size_t max_len)
+{
+	(void) min_len;
+	(void) max_len;
+	(void) entropy;
+	struct openssl_test_ent *t = DRBG_get_data(dctx);
+
+	*pout = (unsigned char *) t->entropy->buf;
+
+	return t->entropy->len;
+}
+
+#endif
+
+#ifdef OPENSSL_RHEL_10X
+static inline const unsigned char *openssl_get_iv(EVP_CIPHER_CTX *ctx)
+{
+	return ctx->iv;
+}
+
+static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
+{
+	return -EOPNOTSUPP;
+}
+
+int
+private_tls1_PRF(long digest_mask,
+		 const void *seed1, int seed1_len,
+		 const void *seed2, int seed2_len,
+		 const void *seed3, int seed3_len,
+		 const void *seed4, int seed4_len,
+		 const void *seed5, int seed5_len,
+		 const unsigned char *sec, int slen,
+		 unsigned char *out1,
+		 unsigned char *out2,
+		 int olen);
+
+# define SSL_HANDSHAKE_MAC_MD5 0x10
+# define SSL_HANDSHAKE_MAC_SHA 0x20
+# define SSL_HANDSHAKE_MAC_GOST94 0x40
+# define SSL_HANDSHAKE_MAC_SHA256 0x80
+# define SSL_HANDSHAKE_MAC_SHA384 0x100
+# define SSL_HANDSHAKE_MAC_DEFAULT (SSL_HANDSHAKE_MAC_MD5 | SSL_HANDSHAKE_MAC_SHA)
+
+# define TLS1_PRF_DGST_SHIFT 10
+# define TLS1_PRF_MD5 (SSL_HANDSHAKE_MAC_MD5 << TLS1_PRF_DGST_SHIFT)
+# define TLS1_PRF_SHA1 (SSL_HANDSHAKE_MAC_SHA << TLS1_PRF_DGST_SHIFT)
+# define TLS1_PRF_SHA256 (SSL_HANDSHAKE_MAC_SHA256 << TLS1_PRF_DGST_SHIFT)
+# define TLS1_PRF_SHA384 (SSL_HANDSHAKE_MAC_SHA384 << TLS1_PRF_DGST_SHIFT)
+# define TLS1_PRF_GOST94 (SSL_HANDSHAKE_MAC_GOST94 << TLS1_PRF_DGST_SHIFT)
+# define TLS1_PRF (TLS1_PRF_MD5 | TLS1_PRF_SHA1)
+
+#define TLS_MASTER_SECRET_LEN 384/8
+
+static int tls1_PRF(const EVP_MD *md,
+		    const void *seed1, int seed1_len,
+		    const void *seed2, int seed2_len,
+		    const void *seed3, int seed3_len,
+		    const void *seed4, int seed4_len,
+		    const void *seed5, int seed5_len,
+		    const unsigned char *sec, int slen,
+		    unsigned char *out, int olen)
+{
+	unsigned char tmp[TLS_MASTER_SECRET_LEN];
+
+	return private_tls1_PRF(md,
+				seed1, seed1_len,
+				seed2, seed2_len,
+				seed3, seed3_len,
+				seed4, seed4_len,
+				seed5, seed5_len,
+				sec, slen,
+				out, tmp, olen);
+}
+
+static int openssl_rsa_set0_factors(RSA *r, BIGNUM *p, BIGNUM *q)
+{
+	r->p = p;
+	r->q = q;
+	return 1;
+}
+
+static int openssl_rsa_set0_key(RSA *r, BIGNUM *n, BIGNUM *e, BIGNUM *d)
+{
+	r->n = n;
+	r->e = e;
+	r->d = d;
+	return 1;
+}
+
+static void openssl_rsa_get0_key(const RSA *r, const BIGNUM **n,
+				 const BIGNUM **e, const BIGNUM **d)
+{
+	*n = r->n;
+	*e = r->e;
+	*d = r->d;
+}
+static void openssl_rsa_get0_factors(const RSA *r, const BIGNUM **p,
+				     const BIGNUM **q)
+{
+	*p = r->p;
+	*q = r->q;
+}
+
+void openssl_dsa_get0_pqg(const DSA *d, const BIGNUM **p,
+			  const BIGNUM **q, const BIGNUM **g)
+{
+	*p = d->p;
+	*q = d->q;
+	*g = d->g;
+}
+
+static int openssl_dsa_set0_pqg(DSA *d, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+	d->p = p;
+	d->q = q;
+	d->g = g;
+	return 1;
+}
+
+static int _openssl_dsa_pqg_gen(struct buffer *P,
+				struct buffer *Q,
+				struct buffer *G,
+				struct buffer *firstseed,
+				uint32_t *counter,
+				uint32_t L, uint32_t N, uint64_t cipher)
+{
+	int ret = 0;
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	BN_CTX *ctx = NULL;
+	const EVP_MD *md = NULL;
+
+	ctx = BN_CTX_new();
+	CKNULL_LOG(ctx, 1, "BN_CTX_new() failed");
+
+	logger(LOGGER_DEBUG, "L = %u\n", L);
+	logger(LOGGER_DEBUG, "N = %u\n", N);
+
+	logger(LOGGER_DEBUG, "hash = %lu\n", cipher);
+	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
+
+	if (1 != RAND_bytes(data->domain_param_seed.buf,
+			   data->domain_param_seed.len))
+		CKINT(1, "RAND_bytes() failed");
+
+	logger_binary(LOGGER_DEBUG, data->domain_param_seed.buf,
+		      data->domain_param_seed.len, "domain_param_seed");
+
+	CKINT_O_LOG(FIPS_dsa_generate_pq(ctx, data->L, data->N,
+					 md, data->domain_param_seed.buf,
+					 data->domain_param_seed.len,
+					 &p, &q,
+					 (int *) &data->counter, NULL),
+		    "FIPS_dsa_generate_pq() failed");
+
+	CKINT_O_LOG(FIPS_dsa_generate_g(ctx, p, q, &g,
+					(unsigned long *) data->h.buf, NULL),
+		    "FIPS_dsa_generate_g() failed");
+
+	CKINT(openssl_bn2buffer(p, P));
+	CKINT(openssl_bn2buffer(q, Q));
+	CKINT(openssl_bn2buffer(g, G));
+
+out:
+	BN_CTX_free(ctx);
+	BN_free(p);
+	BN_free(q);
+	BN_free(g);
+
+	return ret;
+}
+
+static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	BN_CTX *ctx = NULL;
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	ctx = BN_CTX_new();
+	CKNULL_LOG(ctx, 1, "BN_CTX_new() failed")
+
+	p = BN_bin2bn((const unsigned char *) data->P.buf, data->P.len, p);
+	q = BN_bin2bn((const unsigned char *) data->Q.buf, data->Q.len, q);
+
+	CKNULL_LOG(p, 1, "BN_bin2bn() failed");
+	CKNULL_LOG(q, 1, "BN_bin2bn() failed");
+
+	if (1 != FIPS_dsa_generate_g(ctx, p, q, &g,
+				    (unsigned long *) data->h.buf, NULL))
+		CKINT(1, "FIPS_dsa_generate_g() failed");
+
+	CKINT(openssl_bn2buffer(g_gen, &data->G));
+	CKNULL_LOG(g, 1, "BN_bn2bin() failed")
+
+out:
+	BN_free(p);
+	BN_free(q);
+	BN_free(g);
+	BN_CTX_free(ctx);
+
+	return ret;
+}
+
+static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	BIGNUM *p = NULL, *q = NULL, *g = NULL, *rem = NULL;
+	BN_CTX *ctx = NULL;
+	DSA *dsa = NULL;
+	int counter2 = 0;
+	unsigned long *h2 = NULL;
+	int ret = 0;
+
+	ctx = BN_CTX_new();
+	CKNULL_LOG(ctx, 1, "BN_CTX_new()");
+
+	dsa = DSA_new();
+	CKNULL_LOG(dsa, 1, "DSA_new()");
+
+	rem = BN_new();
+	CKNULL_LOG(rem, 1, "BN_new()");
+
+	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
+	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
+	logger_binary(LOGGER_DEBUG, data->G.buf, data->G.len, "G");
+	logger_binary(LOGGER_DEBUG, data->pq_prob_domain_param_seed.buf,
+		      data->pq_prob_domain_param_seed.len,
+		      "Domain parameter seed");
+	logger(LOGGER_DEBUG, "Counter = %u\n", data->pq_prob_counter);
+
+	p = BN_bin2bn((const unsigned char *)data->P.buf, data->P.len, NULL);
+	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+	q = BN_bin2bn((const unsigned char *)data->Q.buf, data->Q.len, NULL);
+	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+	if (data->G.len)
+		g = BN_bin2bn((const unsigned char *)data->G.buf, data->G.len,
+			      NULL);
+	else
+		g = BN_new();
+	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+
+	if ((unsigned int) BN_num_bits(p) != data->L) {
+		logger(LOGGER_ERR, "BN_num_bits(p) != data->L");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if ((unsigned int) BN_num_bits(q) != data->N) {
+		logger(LOGGER_ERR, "BN_num_bits(p) != data->N");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	CKINT_O_LOG(BN_is_prime_ex(p, BN_prime_checks, ctx, NULL),
+		    "BN_is_prime_ex() failed on p");
+
+	CKINT_O_LOG(BN_is_prime_ex(q, BN_prime_checks, ctx, NULL),
+		    "BN_is_prime_ex() failed on q");
+
+	CKINT_O_LOG(FIPS_dsa_builtin_paramgen(dsa, data->L, data->N, NULL,
+					   data->pq_prob_domain_param_seed.buf,
+					   data->pq_prob_domain_param_seed.len,
+					   &counter2,
+					   h2, NULL),
+		    "FIPS_dsa_builtin_paramgen() failed");
+
+	if (BN_cmp(dsa->p, p) || BN_cmp(dsa->q, q) ||
+	    ((int) data->counter != counter2)) {
+		logger(LOGGER_ERR, "p, q, g, counter or h mismatch");
+		ret = -EFAULT;
+		goto out;
+	}
+
+out:
+	BN_free(p);
+	BN_free(q);
+	BN_free(g);
+	BN_free(rem);
+
+	return ret;
+}
+
+#if OPENSSL_VERSION_NUMBER >= 0x100020
+int dsa_paramgen_check_g(DSA *dsa);
+#else
+/* Not changing the indentation because directly copied from OpenSSL */
+static int dsa_paramgen_check_g(DSA *dsa)
+{
+    BN_CTX *ctx;
+    BIGNUM *tmp;
+    BN_MONT_CTX *mont = NULL;
+    int rv = -1;
+    ctx = BN_CTX_new();
+    if (!ctx)
+        return -1;
+    BN_CTX_start(ctx);
+    if (BN_cmp(dsa->g, BN_value_one()) <= 0)
+        return 0;
+    if (BN_cmp(dsa->g, dsa->p) >= 0)
+        return 0;
+    tmp = BN_CTX_get(ctx);
+    if (!tmp)
+        goto err;
+    if ((mont = BN_MONT_CTX_new()) == NULL)
+        goto err;
+    if (!BN_MONT_CTX_set(mont, dsa->p, ctx))
+        goto err;
+    /* Work out g^q mod p */
+    if (!BN_mod_exp_mont(tmp, dsa->g, dsa->q, dsa->p, ctx, mont))
+        goto err;
+    if (!BN_cmp(tmp, BN_value_one()))
+        rv = 1;
+    else
+        rv = 0;
+ err:
+    BN_CTX_end(ctx);
+    if (mont)
+        BN_MONT_CTX_free(mont);
+    BN_CTX_free(ctx);
+    return rv;
+
+}
+#endif
+static int FIPS_dsa_paramgen_check_g(DSA *dsa)
+{
+	return dsa_paramgen_check_g(dsa);
+}
+
+static void openssl_dsa_get0_key(const DSA *d, const BIGNUM **pub_key,
+				 const BIGNUM **priv_key)
+{
+	*pub_key = d->pub_key;
+	*priv_key = d->priv_key;
+}
+
+static void openssl_dsa_SIG_get0(const DSA_SIG *sig, const BIGNUM **pr,
+				 const BIGNUM **ps)
+{
+	*pr = sig->r;
+	*ps = sig->s;
+}
+
+static int openssl_dsa_SIG_set0(DSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	sig->r = r;
+	sig->s = s;
+	return 1;
+}
+
+static int openssl_dsa_set0_key(DSA *d, BIGNUM *pub_key, BIGNUM *priv_key)
+{
+	d->pub_key = pub_key;
+	d->priv_key = priv_key;
+	return 1;
+}
+
+static void openssl_ecdsa_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr,
+				   const BIGNUM **ps)
+{
+	*pr = sig->r;
+	*ps = sig->s;
+}
+
+static int openssl_ecdsa_SIG_set0(ECDSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	sig->r = r;
+	sig->s = s;
+	return 1;
+}
+
+static int openssl_dh_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+	dh->p = p
+	dh->q = q
+	dh->g = g;
+	return 1;
+}
+
+#else
+
+static inline const unsigned char *openssl_get_iv(EVP_CIPHER_CTX *ctx)
+{
+	return EVP_CIPHER_CTX_iv(ctx);
+}
+
+static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
+{
+	return EVP_DigestFinalXOF(ctx, md, size);
+}
+
+/* Copy from ssl/t1_enc.c */
+static int tls1_PRF(const EVP_MD *md,
+		    const void *seed1, int seed1_len,
+		    const void *seed2, int seed2_len,
+		    const void *seed3, int seed3_len,
+		    const void *seed4, int seed4_len,
+		    const void *seed5, int seed5_len,
+		    const unsigned char *sec, int slen,
+		    unsigned char *out, int olen)
+{
+	EVP_PKEY_CTX *pctx = NULL;
+	int ret = -EFAULT;
+	size_t outlen = olen;
+
+	if (md == NULL)
+		return -EINVAL;
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
+	if (pctx == NULL || EVP_PKEY_derive_init(pctx) <= 0
+		|| EVP_PKEY_CTX_set_tls1_prf_md(pctx, md) <= 0
+		|| EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, sec, slen) <= 0)
+		goto err;
+
+	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed1, seed1_len) <= 0)
+		goto err;
+	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed2, seed2_len) <= 0)
+		goto err;
+	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed3, seed3_len) <= 0)
+		goto err;
+	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed4, seed4_len) <= 0)
+		goto err;
+	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed5, seed5_len) <= 0)
+		goto err;
+
+	if (EVP_PKEY_derive(pctx, out, &outlen) <= 0)
+		goto err;
+	ret = 0;
+
+err:
+	EVP_PKEY_CTX_free(pctx);
+	return ret;
+}
+
+static int openssl_rsa_set0_factors(RSA *r, BIGNUM *p, BIGNUM *q)
+{
+	return RSA_set0_factors(r, p, q);
+}
+
+static int openssl_rsa_set0_key(RSA *r, BIGNUM *n, BIGNUM *e, BIGNUM *d)
+{
+	return RSA_set0_key(r, n, e, d);
+}
+
+static void openssl_rsa_get0_key(const RSA *r, const BIGNUM **n,
+				 const BIGNUM **e, const BIGNUM **d)
+{
+	RSA_get0_key(r, n, e, d);
+}
+
+static void openssl_rsa_get0_factors(const RSA *r, const BIGNUM **p,
+				     const BIGNUM **q)
+{
+	RSA_get0_factors(r, p, q);
+}
+
+void openssl_dsa_get0_pqg(const DSA *d, const BIGNUM **p,
+			  const BIGNUM **q, const BIGNUM **g)
+{
+	DSA_get0_pqg(d, p, q, g);
+}
+
+static int openssl_dsa_set0_pqg(DSA *d, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+	return DSA_set0_pqg(d, p, q, g);
+}
+
+static int _openssl_dsa_pqg_gen(struct buffer *P,
+				struct buffer *Q,
+				struct buffer *G,
+				struct buffer *firstseed,
+				uint32_t *counter,
+				uint32_t L, uint32_t N, uint64_t cipher)
+{
+	DSA *dsa = NULL;
+	int ret = 0;
+	const EVP_MD *md = NULL;
+	const BIGNUM *p, *q, *g;
+	unsigned long h;
+	unsigned char seed[1024];
+
+	dsa = DSA_new();
+	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed");
+
+	logger(LOGGER_DEBUG, "L = %u\n", L);
+	logger(LOGGER_DEBUG, "N = %u\n", N);
+
+	logger(LOGGER_DEBUG, "hash = %lu\n", cipher);
+	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
+
+	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, L, N, md, NULL, 0,
+					       0, seed, (int *)counter,
+					       &h, NULL),
+		    "FIPS_dsa_builtin_paramgen2() failed\n");
+
+	openssl_dsa_get0_pqg(dsa, &p, &q, &g);
+	CKINT(openssl_bn2buffer(p, P));
+	CKINT(openssl_bn2buffer(q, Q));
+	CKINT(openssl_bn2buffer(g, G));
+
+	if (firstseed) {
+		CKINT(alloc_buf(EVP_MD_size(md), firstseed));
+		memcpy(firstseed->buf, seed, firstseed->len);
+	}
+
+	logger_binary(LOGGER_DEBUG, P->buf, P->len, "P");
+	logger_binary(LOGGER_DEBUG, Q->buf, Q->len, "Q");
+	logger_binary(LOGGER_DEBUG, G->buf, G->len, "G");
+	logger(LOGGER_DEBUG, "PQG gen counter: %u\n", *counter);
+
+out:
+	if (dsa)
+		DSA_free(dsa);
+
+	return ret;
+}
+
+static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	DSA *dsa = NULL;
+	int ret = 0, pqg_consumed = 0;
+	const EVP_MD *md = NULL;
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	const BIGNUM *g_gen;
+	unsigned long h;
+	int counter;
+	unsigned char seed[1024];
+
+	(void)parsed_flags;
+
+	dsa = DSA_new();
+	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed\n");
+
+	CKINT(left_pad_buf(&data->P, data->L / 8));
+	CKINT(left_pad_buf(&data->Q, data->N / 8));
+
+	logger(LOGGER_DEBUG, "L = %u\n", data->L);
+	logger(LOGGER_DEBUG, "N = %u\n", data->N);
+
+	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
+	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
+
+	p = BN_bin2bn((const unsigned char *)data->P.buf, data->P.len, NULL);
+	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+	q = BN_bin2bn((const unsigned char *)data->Q.buf, data->Q.len, NULL);
+	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+	g = BN_new();
+	CKNULL_LOG(g, -ENOMEM, "BN_new() failed\n");
+
+	CKINT_O_LOG(openssl_dsa_set0_pqg(dsa, p, q, g),
+		    "DSA_set0_pqg failed\n");
+	pqg_consumed = 1;
+
+	logger(LOGGER_DEBUG, "hash = %lu\n", data->cipher);
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
+					       NULL, 0, 0, seed, &counter, &h,
+					       NULL),
+		    "FIPS_dsa_generate_pq() failed\n");
+
+	openssl_dsa_get0_pqg(dsa, NULL, NULL, &g_gen);
+	CKINT(openssl_bn2buffer(g_gen, &data->G));
+
+	logger_binary(LOGGER_DEBUG, data->G.buf, data->G.len, "G");
+
+	ret = 0;
+
+out:
+	if (dsa)
+		DSA_free(dsa);
+	if (!pqg_consumed && p)
+		BN_free(p);
+	if (!pqg_consumed && q)
+		BN_free(q);
+	if (!pqg_consumed && g)
+		BN_free(g);
+
+	return ret;
+}
+
+static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	DSA *dsa = NULL;
+	int ret = 0;
+	const EVP_MD *md = NULL;
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	const BIGNUM *gen_p, *gen_q, *gen_g;
+	unsigned long h = 0;
+	int counter = 5;
+	unsigned char seed[1024];
+
+	(void)parsed_flags;
+
+	dsa = DSA_new();
+	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed\n");
+
+	CKINT(left_pad_buf(&data->P, data->L / 8));
+	CKINT(left_pad_buf(&data->Q, data->N / 8));
+	CKINT(left_pad_buf(&data->pq_prob_domain_param_seed, data->N / 8));
+
+	logger(LOGGER_DEBUG, "L = %u\n", data->L);
+	logger(LOGGER_DEBUG, "N = %u\n", data->N);
+
+	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
+	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
+	logger_binary(LOGGER_DEBUG, data->pq_prob_domain_param_seed.buf,
+		      data->pq_prob_domain_param_seed.len,
+		      "Domain parameter seed");
+	logger(LOGGER_DEBUG, "Counter = %u\n", data->pq_prob_counter);
+
+	p = BN_bin2bn((const unsigned char *)data->P.buf, data->P.len, NULL);
+	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+	q = BN_bin2bn((const unsigned char *)data->Q.buf, data->Q.len, NULL);
+	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+	if (data->G.len)
+		g = BN_bin2bn((const unsigned char *)data->G.buf, data->G.len,
+			      NULL);
+	else
+		g = BN_new();
+	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
+					data->pq_prob_domain_param_seed.buf,
+					data->pq_prob_domain_param_seed.len,
+					data->pq_prob_counter,
+					seed, &counter, &h, NULL),
+		    "FIPS_dsa_builtin_paramgen2() failed\n");
+
+	openssl_dsa_get0_pqg(dsa, &gen_p, &gen_q, &gen_g);
+
+	data->pqgver_success = 1;
+	if (BN_cmp(gen_p, p)) {
+		BUFFER_INIT(gen_p_buf);
+
+		CKINT(openssl_bn2buffer(gen_p, &gen_p_buf));
+		logger(LOGGER_DEBUG, "P comparision failed\n");
+		logger_binary(LOGGER_DEBUG, gen_p_buf.buf, gen_p_buf.len,
+			      "gen P");
+		free_buf(&gen_p_buf);
+		data->pqgver_success = 0;
+	}
+	if (BN_cmp(gen_q, q)) {
+		BUFFER_INIT(gen_q_buf);
+
+		CKINT(openssl_bn2buffer(gen_q, &gen_q_buf));
+		logger(LOGGER_DEBUG, "Q comparision failed\n");
+		logger_binary(LOGGER_DEBUG, gen_q_buf.buf, gen_q_buf.len,
+			      "gen Q");
+		free_buf(&gen_q_buf);
+		data->pqgver_success = 0;
+	}
+	if (data->G.len) {
+		if (BN_cmp(gen_g, g)) {
+			logger(LOGGER_DEBUG, "G comparision failed\n");
+			data->pqgver_success = 0;
+		}
+	}
+	if ((uint32_t)counter != data->pq_prob_counter) {
+		logger(LOGGER_DEBUG,
+		       "Counter mismatch (expected %u, generated %d)\n",
+		       data->pq_prob_counter, counter);
+		data->pqgver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (dsa)
+		DSA_free(dsa);
+	if (p)
+		BN_free(p);
+	if (q)
+		BN_free(q);
+	if (g)
+		BN_free(g);
+
+	return ret;
+}
+
+static void openssl_dsa_get0_key(const DSA *d, const BIGNUM **pub_key,
+				 const BIGNUM **priv_key)
+{
+	DSA_get0_key(d, pub_key, priv_key);
+}
+
+static void openssl_dsa_SIG_get0(const DSA_SIG *sig, const BIGNUM **pr,
+				 const BIGNUM **ps)
+{
+	DSA_SIG_get0(sig, pr, ps);
+}
+
+static int openssl_dsa_SIG_set0(DSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	return DSA_SIG_set0(sig, r, s);
+}
+
+static int openssl_dsa_set0_key(DSA *d, BIGNUM *pub_key, BIGNUM *priv_key)
+{
+	return DSA_set0_key(d, pub_key, priv_key);
+}
+
+static void openssl_ecdsa_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr,
+				   const BIGNUM **ps)
+{
+	ECDSA_SIG_get0(sig, pr, ps);
+}
+
+static int openssl_ecdsa_SIG_set0(ECDSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	return ECDSA_SIG_set0(sig, r, s);
+}
+
+static int openssl_dh_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+	return DH_set0_pqg(dh, p, q, g);
+}
+#endif
+
+/************************************************
+ * Symmetric cipher interface functions
+ ************************************************/
 static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
 {
 	EVP_CIPHER_CTX *ctx = NULL;
@@ -499,7 +1297,7 @@ static int openssl_tdes_get_last_iv(struct sym_data *data, struct buffer *iv,
 		return -EINVAL;
 	}
 
-	memcpy(iv->buf, EVP_CIPHER_CTX_iv(ctx), iv->len);
+	memcpy(iv->buf, openssl_get_iv(ctx), iv->len);
 
 	return 0;
 }
@@ -787,8 +1585,8 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 		    "EVP_DigestUpdate() failed\n");
 
 	if (data->cipher & ACVP_SHAKEMASK) {
-		CKINT_O_LOG(EVP_DigestFinalXOF(ctx, data->mac.buf,
-					       data->mac.len),
+		CKINT_O_LOG(openssl_shake_cb(ctx, data->mac.buf,
+					     data->mac.len),
 			    "EVP_DigestFinalXOF() failed\n");
 	} else {
 		CKINT_O_LOG(EVP_DigestFinal(ctx, data->mac.buf,
@@ -1199,77 +1997,6 @@ static void openssl_aead_backend(void)
 /************************************************
  * DRBG cipher interface functions
  ************************************************/
-
-struct openssl_test_ent {
-	struct buffer *entropy;
-	struct buffer *nonce;
-};
-
-#ifdef OPENSSL_UBUNTU
-
-# include <openssl/rand_drbg.h>
-
-static int idx;
-
-# define DRBG_ctx        		RAND_DRBG
-# define DRBG_get_data(a)		RAND_DRBG_get_ex_data(a, idx)
-# define DRBG_new(a, b)			RAND_DRBG_new(a,b, NULL)
-# define DRBG_set_callbacks(a, b, c)   					\
-				RAND_DRBG_set_callbacks(a, b, NULL, c, NULL)
-# define DRBG_set_data(a, b)		RAND_DRBG_set_ex_data(a, idx, b)
-# define DRBG_instantiate(a, b, c)	RAND_DRBG_instantiate(a, b, c)
-# define DRBG_reseed(a, b, c)		RAND_DRBG_reseed(a, b, c, 0)
-# define DRBG_generate(a, b, c, d, e, f) RAND_DRBG_generate(a, b, c, d, e, f)
-# define DRBG_uninstantiate(a)		RAND_DRBG_uninstantiate(a)
-# define DRBG_DF_FLAG			1
-
-static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
-			      int entropy, size_t min_len, size_t max_len,
-			      int prediction_resistance)
-{
-	struct openssl_test_ent *t = DRBG_get_data(dctx);
-
-	(void) min_len;
-	(void) max_len;
-	(void) entropy;
-	(void) prediction_resistance;
-
-	*pout = (unsigned char *) t->entropy->buf;
-
-	return t->entropy->len;
-}
-
-#else
-
-# include <openssl/fips_rand.h>
-
-# define DRBG_ctx			DRBG_CTX
-# define DRBG_get_data(a)		FIPS_drbg_get_app_data(a)
-# define DRBG_new(a, b)			FIPS_drbg_new(a, b)
-# define DRBG_set_callbacks(a, b, c)					\
-				FIPS_drbg_set_callbacks(a, b, 0, 0, c, 0)
-# define DRBG_set_data(a, b)		FIPS_drbg_set_app_data(a, b)
-# define DRBG_instantiate(a, b, c)	FIPS_drbg_instantiate(a, b, c)
-# define DRBG_reseed(a, b, c)		FIPS_drbg_reseed(a, b, c)
-# define DRBG_generate(a, b, c, d, e, f) FIPS_drbg_generate(a, b, c, d, e, f)
-# define DRBG_uninstantiate(a)		FIPS_drbg_uninstantiate(a)
-# define DRBG_DF_FLAG			(DRBG_FLAG_CTR_USE_DF | DRBG_FLAG_TEST)
-
-static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
-			      int entropy, size_t min_len, size_t max_len)
-{
-	(void) min_len;
-	(void) max_len;
-	(void) entropy;
-	struct openssl_test_ent *t = DRBG_get_data(dctx);
-
-	*pout = (unsigned char *) t->entropy->buf;
-
-	return t->entropy->len;
-}
-
-#endif
-
 static size_t openssl_nonce(DRBG_ctx *dctx, unsigned char **pout,
 			    int entropy, size_t min_len, size_t max_len)
 {
@@ -1422,48 +2149,6 @@ static void openssl_drbg_backend(void)
 /************************************************
  * TLS cipher interface functions
  ************************************************/
-/* Copy from ssl/t1_enc.c */
-static int tls1_PRF(const EVP_MD *md,
-                    const void *seed1, int seed1_len,
-                    const void *seed2, int seed2_len,
-                    const void *seed3, int seed3_len,
-                    const void *seed4, int seed4_len,
-                    const void *seed5, int seed5_len,
-                    const unsigned char *sec, int slen,
-                    unsigned char *out, int olen)
-{
-	EVP_PKEY_CTX *pctx = NULL;
-	int ret = -EFAULT;
-	size_t outlen = olen;
-
-	if (md == NULL)
-		return -EINVAL;
-
-	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
-	if (pctx == NULL || EVP_PKEY_derive_init(pctx) <= 0
-		|| EVP_PKEY_CTX_set_tls1_prf_md(pctx, md) <= 0
-		|| EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, sec, slen) <= 0)
-		goto err;
-
-	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed1, seed1_len) <= 0)
-		goto err;
-	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed2, seed2_len) <= 0)
-		goto err;
-	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed3, seed3_len) <= 0)
-		goto err;
-	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed4, seed4_len) <= 0)
-		goto err;
-	if (EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, seed5, seed5_len) <= 0)
-		goto err;
-
-	if (EVP_PKEY_derive(pctx, out, &outlen) <= 0)
-		goto err;
-	ret = 0;
-
-err:
-	EVP_PKEY_CTX_free(pctx);
-	return ret;
-}
 
 static int openssl_kdf_tls_op(struct kdf_tls_data *data, flags_t parsed_flags)
 {
@@ -1533,6 +2218,7 @@ static void openssl_kdf_tls_backend(void)
 /************************************************
  * RSA interface functions
  ************************************************/
+
 static int openssl_rsa_keygen_prime(struct rsa_keygen_prime_data *data,
 				    flags_t parsed_flags)
 {
@@ -1567,7 +2253,7 @@ static int openssl_rsa_keygen_prime(struct rsa_keygen_prime_data *data,
 	if (BN_is_zero(q))
 		BN_one(q);
 
-	CKINT_O_LOG(RSA_set0_factors(rsa, p, q), "P/Q cannot be set\n");
+	CKINT_O_LOG(openssl_rsa_set0_factors(rsa, p, q), "P/Q cannot be set\n");
 
 	ret = RSA_generate_key_ex(rsa, data->modulus, e, NULL);
 	if (ret == 1) {
@@ -1645,8 +2331,8 @@ static int openssl_rsa_keygen_internal(struct buffer *ebuf, uint32_t modulus,
 		    "RSA_generate_key_ex() failed: %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
 
-	RSA_get0_key(rsa, &n, &egen, &d);
-	RSA_get0_factors(rsa, &p, &q);
+	openssl_rsa_get0_key(rsa, &n, &egen, &d);
+	openssl_rsa_get0_factors(rsa, &p, &q);
 
 	free_buf(ebuf);
 	CKINT(openssl_bn2buffer(egen, ebuf));
@@ -1800,7 +2486,7 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 	rsa = RSA_new();
 	CKNULL(rsa, -ENOMEM);
 
-	CKINT_O_LOG(RSA_set0_key(rsa, n, e, NULL),
+	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, NULL),
 		    "Assembly of RSA key failed\n");
 
 	pk = EVP_PKEY_new();
@@ -1877,55 +2563,6 @@ static void openssl_rsa_backend(void)
  * DSA interface functions
  ************************************************/
 
-static int _openssl_dsa_pqg_gen(struct buffer *P,
-				struct buffer *Q,
-				struct buffer *G,
-				struct buffer *firstseed,
-				uint32_t *counter,
-				uint32_t L, uint32_t N, uint64_t cipher)
-{
-	DSA *dsa = NULL;
-	int ret = 0;
-	const EVP_MD *md = NULL;
-	const BIGNUM *p, *q, *g;
-	unsigned long h;
-	unsigned char seed[1024];
-
-	dsa = DSA_new();
-	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed");
-
-	logger(LOGGER_DEBUG, "L = %u\n", L);
-	logger(LOGGER_DEBUG, "N = %u\n", N);
-
-	logger(LOGGER_DEBUG, "hash = %lu\n", cipher);
-	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
-
-	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, L, N, md, NULL, 0, 0, seed,
-					       (int *)counter, &h, NULL),
-		    "FIPS_dsa_builtin_paramgen2() failed\n");
-
-	DSA_get0_pqg(dsa, &p, &q, &g);
-	CKINT(openssl_bn2buffer(p, P));
-	CKINT(openssl_bn2buffer(q, Q));
-	CKINT(openssl_bn2buffer(g, G));
-
-	if (firstseed) {
-		CKINT(alloc_buf(EVP_MD_size(md), firstseed));
-		memcpy(firstseed->buf, seed, firstseed->len);
-	}
-
-	logger_binary(LOGGER_DEBUG, P->buf, P->len, "P");
-	logger_binary(LOGGER_DEBUG, Q->buf, Q->len, "Q");
-	logger_binary(LOGGER_DEBUG, G->buf, G->len, "G");
-	logger(LOGGER_DEBUG, "PQG gen counter: %u\n", *counter);
-
-out:
-	if (dsa)
-		DSA_free(dsa);
-
-	return ret;
-}
-
 static int openssl_dsa_pqggen(struct dsa_pqggen_data *data,
 			      flags_t parsed_flags)
 {
@@ -1951,174 +2588,6 @@ static int openssl_dsa_pq_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
 				    &data->pq_prob_domain_param_seed,
 				    &data->pq_prob_counter,
 				    data->L, data->N, data->cipher);
-}
-
-static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
-{
-	DSA *dsa = NULL;
-	int ret = 0, pqg_consumed = 0;
-	const EVP_MD *md = NULL;
-	BIGNUM *p = NULL, *q = NULL, *g = NULL;
-	const BIGNUM *g_gen;
-	unsigned long h;
-	int counter;
-	unsigned char seed[1024];
-
-	(void)parsed_flags;
-
-	dsa = DSA_new();
-	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed\n");
-
-	CKINT(left_pad_buf(&data->P, data->L / 8));
-	CKINT(left_pad_buf(&data->Q, data->N / 8));
-
-	logger(LOGGER_DEBUG, "L = %u\n", data->L);
-	logger(LOGGER_DEBUG, "N = %u\n", data->N);
-
-	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
-	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
-
-	p = BN_bin2bn((const unsigned char *)data->P.buf, data->P.len, NULL);
-	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
-
-	q = BN_bin2bn((const unsigned char *)data->Q.buf, data->Q.len, NULL);
-	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
-
-	g = BN_new();
-	CKNULL_LOG(g, -ENOMEM, "BN_new() failed\n");
-
-	CKINT_O_LOG(DSA_set0_pqg(dsa, p, q, g), "DSA_set0_pqg failed\n");
-	pqg_consumed = 1;
-
-	logger(LOGGER_DEBUG, "hash = %lu\n", data->cipher);
-	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
-
-	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
-					       NULL, 0, 0, seed, &counter, &h,
-					       NULL),
-		    "FIPS_dsa_generate_pq() failed\n");
-
-	DSA_get0_pqg(dsa, NULL, NULL, &g_gen);
-	CKINT(openssl_bn2buffer(g_gen, &data->G));
-
-	logger_binary(LOGGER_DEBUG, data->G.buf, data->G.len, "G");
-
-	ret = 0;
-
-out:
-	if (dsa)
-		DSA_free(dsa);
-	if (!pqg_consumed && p)
-		BN_free(p);
-	if (!pqg_consumed && q)
-		BN_free(q);
-	if (!pqg_consumed && g)
-		BN_free(g);
-
-	return ret;
-}
-
-static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
-{
-	DSA *dsa = NULL;
-	int ret = 0;
-	const EVP_MD *md = NULL;
-	BIGNUM *p = NULL, *q = NULL, *g = NULL;
-	const BIGNUM *gen_p, *gen_q, *gen_g;
-	unsigned long h = 0;
-	int counter = 5;
-	unsigned char seed[1024];
-
-	(void)parsed_flags;
-
-	dsa = DSA_new();
-	CKNULL_LOG(dsa, -ENOMEM, "DSA_new() failed\n");
-
-	CKINT(left_pad_buf(&data->P, data->L / 8));
-	CKINT(left_pad_buf(&data->Q, data->N / 8));
-	CKINT(left_pad_buf(&data->pq_prob_domain_param_seed, data->N / 8));
-
-	logger(LOGGER_DEBUG, "L = %u\n", data->L);
-	logger(LOGGER_DEBUG, "N = %u\n", data->N);
-
-	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
-	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
-	logger_binary(LOGGER_DEBUG, data->pq_prob_domain_param_seed.buf,
-		      data->pq_prob_domain_param_seed.len,
-		      "Domain parameter seed");
-	logger(LOGGER_DEBUG, "Counter = %u\n", data->pq_prob_counter);
-
-	p = BN_bin2bn((const unsigned char *)data->P.buf, data->P.len, NULL);
-	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
-
-	q = BN_bin2bn((const unsigned char *)data->Q.buf, data->Q.len, NULL);
-	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
-
-	if (data->G.len)
-		g = BN_bin2bn((const unsigned char *)data->G.buf, data->G.len,
-			      NULL);
-	else
-		g = BN_new();
-	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
-
-	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
-
-	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
-					data->pq_prob_domain_param_seed.buf,
-					data->pq_prob_domain_param_seed.len,
-					data->pq_prob_counter,
-					seed, &counter, &h, NULL),
-		    "FIPS_dsa_builtin_paramgen2() failed\n");
-
-	DSA_get0_pqg(dsa, &gen_p, &gen_q, &gen_g);
-
-	data->pqgver_success = 1;
-	if (BN_cmp(gen_p, p)) {
-		BUFFER_INIT(gen_p_buf);
-
-		CKINT(openssl_bn2buffer(gen_p, &gen_p_buf));
-		logger(LOGGER_DEBUG, "P comparision failed\n");
-		logger_binary(LOGGER_DEBUG, gen_p_buf.buf, gen_p_buf.len,
-			      "gen P");
-		free_buf(&gen_p_buf);
-		data->pqgver_success = 0;
-	}
-	if (BN_cmp(gen_q, q)) {
-		BUFFER_INIT(gen_q_buf);
-
-		CKINT(openssl_bn2buffer(gen_q, &gen_q_buf));
-		logger(LOGGER_DEBUG, "Q comparision failed\n");
-		logger_binary(LOGGER_DEBUG, gen_q_buf.buf, gen_q_buf.len,
-			      "gen Q");
-		free_buf(&gen_q_buf);
-		data->pqgver_success = 0;
-	}
-	if (data->G.len) {
-		if (BN_cmp(gen_g, g)) {
-			logger(LOGGER_DEBUG, "G comparision failed\n");
-			data->pqgver_success = 0;
-		}
-	}
-	if ((uint32_t)counter != data->pq_prob_counter) {
-		logger(LOGGER_DEBUG,
-		       "Counter mismatch (expected %u, generated %d)\n",
-		       data->pq_prob_counter, counter);
-		data->pqgver_success = 0;
-	}
-
-	ret = 0;
-
-out:
-	if (dsa)
-		DSA_free(dsa);
-	if (p)
-		BN_free(p);
-	if (q)
-		BN_free(q);
-	if (g)
-		BN_free(g);
-
-	return ret;
 }
 
 static int openssl_dsa_pqg_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
@@ -2152,7 +2621,8 @@ static int openssl_dsa_pqg_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	g = BN_bin2bn((const unsigned char *)data->G.buf, data->G.len, NULL);
 	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
 
-	CKINT_O_LOG(DSA_set0_pqg(dsa, p, q, g), "DSA_set0_pqg failed\n");
+	CKINT_O_LOG(openssl_dsa_set0_pqg(dsa, p, q, g),
+		    "DSA_set0_pqg failed\n");
 	pqg_consumed = 1;
 
 	if (1 == FIPS_dsa_paramgen_check_g(dsa)) {
@@ -2264,12 +2734,13 @@ static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
 	g = BN_bin2bn((const unsigned char *)G->buf, G->len, NULL);
 	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
 
-	CKINT_O_LOG(DSA_set0_pqg(*dsa, p, q, g), "DSA_set0_pqg failed\n");
+	CKINT_O_LOG(openssl_dsa_set0_pqg(*dsa, p, q, g),
+		    "DSA_set0_pqg failed\n");
 	pqg_consumed = 1;
 
 	CKINT_O_LOG(DSA_generate_key(*dsa), "DSA_generate_key() failed\n");
 
-	DSA_get0_key(*dsa, &y, &x);
+	openssl_dsa_get0_key(*dsa, &y, &x);
 
 	CKINT(openssl_bn2buffer(x, X));
 	CKINT(openssl_bn2buffer(y, Y));
@@ -2351,13 +2822,15 @@ static int openssl_dsa_sigver(struct dsa_sigver_data *data,
 	s = BN_bin2bn((const unsigned char *) data->S.buf, data->S.len, s);
 	CKNULL(s, -ENOMEM);
 
-	CKINT_O_LOG(DSA_set0_pqg(dsa, p, q, g), "DSA_set0_pqg failed\n");
+	CKINT_O_LOG(openssl_dsa_set0_pqg(dsa, p, q, g),
+		    "DSA_set0_pqg failed\n");
 	pqg_consumed = 1;
 
-	CKINT_O_LOG(DSA_set0_key(dsa, y, NULL), "DSA_set0_key failed\n");
+	CKINT_O_LOG(openssl_dsa_set0_key(dsa, y, NULL),
+		    "DSA_set0_key failed\n");
 	key_consumed = 1;
 
-	CKINT_O_LOG(DSA_SIG_set0(sig, r, s), "DSA_SIG_set0 failed\n");
+	CKINT_O_LOG(openssl_dsa_SIG_set0(sig, r, s), "DSA_SIG_set0 failed\n");
 	sig_consumed = 1;
 
 	logger_binary(LOGGER_DEBUG, pqg->P.buf, pqg->P.len, "P");
@@ -2519,7 +2992,7 @@ static int openssl_dsa_siggen(struct dsa_siggen_data *data,
 
 	d2i_DSA_SIG(&sig, &sig_buf_p, sig_len);
 
-	DSA_SIG_get0(sig, &r, &s);
+	openssl_dsa_SIG_get0(sig, &r, &s);
 
 	CKINT(openssl_bn2buf(r, &data->R, pqg->N / 8));
 	CKINT(openssl_bn2buf(s, &data->S, pqg->N / 8));
@@ -2875,7 +3348,7 @@ static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
 
 	d2i_ECDSA_SIG(&sig, &sig_buf_p, sig_len);
 
-	ECDSA_SIG_get0(sig, &R, &S);
+	openssl_ecdsa_SIG_get0(sig, &R, &S);
 
 	ecdsa_get_bufferlen(data->cipher, &dbufferlen, &xbufferlen,
 			    &ybufferlen);
@@ -2929,7 +3402,7 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 	S = BN_bin2bn((const unsigned char *) data->S.buf, data->S.len, NULL);
 	CKNULL(S, -EFAULT);
 
-	if (1 != ECDSA_SIG_set0(sig, R, S)) {
+	if (1 != openssl_ecdsa_SIG_set0(sig, R, S)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -3129,7 +3602,7 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	g = BN_bin2bn((const unsigned char *)G->buf, G->len, NULL);
 	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
 
-	if (1 != DH_set0_pqg(dh, p, q, g)) {
+	if (1 != openssl_dh_set0_pqg(dh, p, q, g)) {
 		logger(LOGGER_WARN, "DH_set0_pqg failed\n");
 		ret = -EFAULT;
 		goto out;
