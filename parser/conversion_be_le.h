@@ -55,7 +55,7 @@ static inline uint32_t _bswap32(uint32_t x)
 
 static inline uint64_t _bswap64(uint64_t x)
 {
-	return ((uint64_t)_bswap32(x) << 32) | (_bswap32(x >> 32));
+	return ((uint64_t)_bswap32((uint32_t)x) << 32) | (_bswap32(x >> 32));
 }
 
 #define GCC_VERSION (__GNUC__ * 10000		\

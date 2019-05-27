@@ -308,7 +308,7 @@ struct dsa_sigver_data {
  *			@param privkey [out] Provide the pointer to the RSA
  *				        private key.
  * @param dsa_free_key This function is required if dsa_keygen_en is registered.
- *		       This function is intended to free the private RSA key
+ *		       This function is intended to free the private DSA key
  *		       handle created with dsa_keygen_en.
  */
 struct dsa_backend {

@@ -145,7 +145,7 @@ struct eddsa_sigver_data {
  *				        private key.
  * @param eddsa_free_key This function is required if eddsa_keygen_en is
  *			 registered. This function is intended to free the
- *			 private RSA key handle created with eddsa_keygen_en.
+ *			 private EdDSA key handle created with eddsa_keygen_en.
  */
 struct eddsa_backend {
 	int (*eddsa_keygen)(struct eddsa_keygen_data *data,

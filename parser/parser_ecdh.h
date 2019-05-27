@@ -59,8 +59,7 @@ struct ecdh_ss_data {
  * @param Qyloc [in] affine Y coordinate of local pubkey
  * @param hashzz [in] hashed shared secret / raw shared secret for ECC CDH
  * @param validity_success [out] Does the generated shared secret match with
- *				 @param hashzz (1) or whether it does not match
- *				 (0).
+ *				 @param hashzz (true - 1) or not (false - 0).
  */
 struct ecdh_ss_ver_data {
 	uint64_t cipher;

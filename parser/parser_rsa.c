@@ -264,6 +264,8 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
 		{"modulo",	{.data.integer = &rsa_keygen_vector.modulus, PARSER_UINT},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES},
+		{"fixedPubExp",	{.data.buf = &rsa_keygen_vector.e, PARSER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OPTIONAL},
 		{"modulo",	{.data.integer = &rsa_keygen_prime_vector.modulus, PARSER_UINT},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
 

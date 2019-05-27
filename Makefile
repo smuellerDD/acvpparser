@@ -287,6 +287,7 @@ clean:
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.plist)
 	@- $(RM) $(wildcard backends/*.plist)
 	@- $(RM) backend_interfaces/bouncycastle//bc_acvp.class
+	@- $(RM) acvpcert9.db acvpkey4.db
 
 distclean: clean
 

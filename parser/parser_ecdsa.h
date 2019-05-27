@@ -176,7 +176,7 @@ struct ecdsa_sigver_data {
  *				        private key.
  * @param ecdsa_free_key This function is required if ecdsa_keygen_en is
  * 			 registered. This function is intended to free the
- *			 private RSA key handle created with ecdsa_keygen_en.
+ *			 private ECDSA key handle created with ecdsa_keygen_en.
  */
 struct ecdsa_backend {
 	int (*ecdsa_keygen)(struct ecdsa_keygen_data *data,

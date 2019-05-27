@@ -71,12 +71,15 @@ static void openssl_backend_init(void)
  ************************************************/
 
 /*
- * Enable this option to compile the code for the Ubuntu OpenSSL 1.1.x
- * FIPS code base.
+ * Enable this option to compile the code for the OpenSSL 1.1.x
+ * FIPS code base using the upstream CTR DRBG.
  *
- * The default code base works with Fedora 29 / RHEL 8 code base.
+ * The default code base works with Fedora 29 / RHEL 8 code base with
+ * the add-on CTR / HMAC / Hash DRBG.
  */
-#undef OPENSSL_UBUNTU
+#ifndef OPENSSL_DRBG_10X
+# define OPENSSL_11X_UPSTREAM_DRBG
+#endif
 
 /*
  * Enable this option to compile the code for the RHEL 7 OpenSSL 1.0.x
@@ -84,7 +87,7 @@ static void openssl_backend_init(void)
  *
  * (yet untested code)
  */
-#undef OPENSSL_RHEL_10X
+#undef OPENSSL_10X_RHEL
 
 /************************************************
  * General helper functions
@@ -364,7 +367,7 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 		l_type = EVP_sha3_512();
 		break;
 
-#ifndef OPENSSL_RHEL_10X
+#ifndef OPENSSL_10X_RHEL
 	case ACVP_SHAKE128:
 		l_type = EVP_shake128();
 		break;
@@ -412,7 +415,7 @@ struct openssl_test_ent {
 	struct buffer *nonce;
 };
 
-#ifdef OPENSSL_UBUNTU
+#ifdef OPENSSL_11X_UPSTREAM_DRBG
 
 # include <openssl/rand_drbg.h>
 
@@ -420,7 +423,7 @@ static int idx;
 
 # define DRBG_ctx        		RAND_DRBG
 # define DRBG_get_data(a)		RAND_DRBG_get_ex_data(a, idx)
-# define DRBG_new(a, b)			RAND_DRBG_new(a,b, NULL)
+# define DRBG_new(a, b)			RAND_DRBG_new(a, b, NULL)
 # define DRBG_set_callbacks(a, b, c)   					\
 				RAND_DRBG_set_callbacks(a, b, NULL, c, NULL)
 # define DRBG_set_data(a, b)		RAND_DRBG_set_ex_data(a, idx, b)
@@ -428,7 +431,8 @@ static int idx;
 # define DRBG_reseed(a, b, c)		RAND_DRBG_reseed(a, b, c, 0)
 # define DRBG_generate(a, b, c, d, e, f) RAND_DRBG_generate(a, b, c, d, e, f)
 # define DRBG_uninstantiate(a)		RAND_DRBG_uninstantiate(a)
-# define DRBG_DF_FLAG			1
+# define DRBG_DF_FLAG			0
+# define DRBG_NO_DF_FLAG		RAND_DRBG_FLAG_CTR_NO_DF
 
 static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
 			      int entropy, size_t min_len, size_t max_len,
@@ -461,6 +465,7 @@ static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
 # define DRBG_generate(a, b, c, d, e, f) FIPS_drbg_generate(a, b, c, d, e, f)
 # define DRBG_uninstantiate(a)		FIPS_drbg_uninstantiate(a)
 # define DRBG_DF_FLAG			(DRBG_FLAG_CTR_USE_DF | DRBG_FLAG_TEST)
+# define DRBG_NO_DF_FLAG		0
 
 static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
 			      int entropy, size_t min_len, size_t max_len)
@@ -477,7 +482,7 @@ static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
 
 #endif
 
-#ifdef OPENSSL_RHEL_10X
+#ifdef OPENSSL_10X_RHEL
 static inline const unsigned char *openssl_get_iv(EVP_CIPHER_CTX *ctx)
 {
 	return ctx->iv;
@@ -1884,7 +1889,7 @@ static int openssl_ccm_encrypt(struct aead_data *data, flags_t parsed_flags)
 	if (data->assoc.len) {
 		CKINT_LOG(EVP_Cipher(ctx, NULL, data->assoc.buf,
 				     data->assoc.len),
-			  "EVP_EncryptUpdate() AAD failed\n");
+			  "EVP_EncryptUpdate() encrypt AAD failed\n");
 	}
 
 	if (EVP_Cipher(ctx, data->data.buf, data->data.buf, data->data.len) !=
@@ -1960,7 +1965,7 @@ static int openssl_ccm_decrypt(struct aead_data *data, flags_t parsed_flags)
 	if (data->assoc.len != 0) {
 		CKINT_LOG(EVP_Cipher(ctx, NULL, data->assoc.buf,
 				     data->assoc.len),
-			  "EVP_EncryptUpdate() AAD failed\n");
+			  "EVP_EncryptUpdate() decrypt AAD failed\n");
 	}
 
 	data->integrity_error = 0;
@@ -2048,6 +2053,8 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 
 	if (data->df)
 		df = DRBG_DF_FLAG;
+	else
+		df = DRBG_NO_DF_FLAG;
 
 	ctx = DRBG_new(nid, df);
 	CKNULL(ctx, -ENOMEM);
@@ -2065,7 +2072,9 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	logger_binary(LOGGER_DEBUG, data->pers.buf, data->pers.len,
 		      "personalization string");
 
-	CKINT_O(DRBG_instantiate(ctx, data->pers.buf, data->pers.len));
+	CKINT_O_LOG(DRBG_instantiate(ctx, data->pers.buf, data->pers.len),
+		    "DRBG instantiation failed: %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	if (data->entropy_reseed.buffers[0].len) {
 		logger_binary(LOGGER_DEBUG,
@@ -3845,6 +3854,9 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 							       localQx,
 							       localQy);
 		if (ret != 1) {
+			logger(LOGGER_DEBUG,
+			       "EC_KEY_set_public_key_affine_coordinates failed: %s\n",
+			       ERR_error_string(ERR_get_error(), NULL));
 			ret = -EOPNOTSUPP;
 			goto out;
 		}

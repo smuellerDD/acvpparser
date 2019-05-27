@@ -30,7 +30,7 @@
 
 struct sha_backend *sha_backend = NULL;
 
-#define min(x, y)	((x < y) ? x : y)
+#define min(x, y)	(((size_t)x < (size_t)y) ? x : y)
 
 static int shake_mct_helper(const struct json_array *processdata,
 			    flags_t parsed_flags,
@@ -70,7 +70,8 @@ static int shake_mct_helper(const struct json_array *processdata,
 
 	for (i = 0; i < 100; i++) {
 		uint32_t range;
-		unsigned int j = 0, read_outbits;
+		unsigned int j = 0;
+		size_t read_outbits;
 		uint16_t outbits = 0;
 		struct json_object *single_mct_result;
 
@@ -115,7 +116,7 @@ static int shake_mct_helper(const struct json_array *processdata,
 		CKINT(json_add_bin2hex(single_mct_result, "md",
 				       &vector->mac));
 		CKINT(json_object_object_add(single_mct_result, "outLen",
-				json_object_new_int(vector->mac.len * 8)));
+				json_object_new_int((int)vector->mac.len * 8)));
 
 		/* hash becomes new message */
 		memcpy(vector->msg.buf, vector->mac.buf,

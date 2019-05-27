@@ -48,7 +48,7 @@
  * @param mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
- * @param cipher [in] Cipher specification as defined in parser.h
+ * @param cipher [in] Cipher specification as defined in cipher_definitions.h
  */
 struct sha_data {
 	struct buffer msg;

@@ -36,7 +36,7 @@
  *		    size before storing data in it. The parser frees the memory.
  * @param verify_result [disregard] Please disregard this variable, it is used
  *				    by the parser.
- * @param cipher [in] Cipher specification as defined in parser.h
+ * @param cipher [in] Cipher specification as defined in cipher_definitions.h
  */
 struct hmac_data {
 	struct buffer key;

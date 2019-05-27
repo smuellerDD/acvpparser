@@ -33,7 +33,7 @@
  * @param iv [in] IV for the cipher operation in binary form. It may be empty
  *		  for ciphers that do not support IVs (like AES-ECB or AES-KW).
  *		  Note, for XTS, this buffer contains the tweak value.
- * @param cipher [in] Cipher specification as defined in parser.h
+ * @param cipher [in] Cipher specification as defined in cipher_definitions.h
  * @param data [in/out] Buffer with input data that is also expected to hold
  *			the result data. Note, if the buffer size needs to be
  *			different for the output data than for the input
@@ -97,7 +97,7 @@ struct sym_data {
  * @param mct_update Perform a crypto operation on the cipher handle and
  *		     return the result of the crypto operation.
  * @param mct_fini Free all resources pertaining the cipher operation.
- * @param mct_get_last_iv TDES OFB specific heroin.
+ * @param mct_get_last_iv OFB and CFB specific heroin.
  */
 struct sym_backend {
 	int (*encrypt)(struct sym_data *data, flags_t parsed_flags);

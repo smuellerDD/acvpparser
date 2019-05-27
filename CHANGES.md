@@ -1,3 +1,9 @@
+v0.5.1
+- OpenSSL add support for upstream CTR DRBG
+- Add support for AES-CBC-CS*
+- add color-coded logging
+- fix some documentation
+
 v0.5.0
 - Add SHAKE support for OpenSSL
 - Add Ubuntu-specific OpenSSL handling

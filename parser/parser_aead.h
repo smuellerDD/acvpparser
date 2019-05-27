@@ -45,7 +45,7 @@
  * @param taglen [in] For encryption, this value specifies the size of the
  *		      tag that shall be created. The value is in bits. This
  *		      value is irrelevant for decryption.
- * @param cipher [in] Cipher specification as defined in parser.h
+ * @param cipher [in] Cipher specification as defined in cipher_definitions.h
  * @param ptlen [in] Length of plaintext (for decryption, this is the expected)
  *		     data length.
  * @param data [in/out] Buffer with input data that is also expected to hold

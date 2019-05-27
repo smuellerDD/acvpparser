@@ -26,6 +26,7 @@
 
 #include "binhexbin.h"
 #include "logger.h"
+#include "term_colors.h"
 
 static enum logger_verbosity logger_verbosity_level = LOGGER_NONE;
 
@@ -58,6 +59,7 @@ void logger(enum logger_verbosity severity, const char *fmt, ...)
 	time_t now;
 	struct tm now_detail;
 	va_list args;
+	int(* fprintf_color)(FILE *stream, const char *format, ...) = &fprintf;
 	char msg[4096];
 	char sev[10];
 
@@ -73,9 +75,30 @@ void logger(enum logger_verbosity severity, const char *fmt, ...)
 	now = time(NULL);
 	localtime_r(&now, &now_detail);
 
-	fprintf(stderr, "ACVPParser (%.2d:%.2d:%.2d) %s: %s",
-		now_detail.tm_hour, now_detail.tm_min, now_detail.tm_sec,
-	        sev, msg);
+	switch (severity) {
+	case LOGGER_DEBUG2:
+		fprintf_color = &fprintf_cyan;
+		break;
+	case LOGGER_DEBUG:
+		fprintf_color = &fprintf_blue;
+		break;
+	case LOGGER_VERBOSE:
+		fprintf_color = &fprintf_green;
+		break;
+	case LOGGER_WARN:
+		fprintf_color = &fprintf_yellow;
+		break;
+	case LOGGER_ERR:
+		fprintf_color = &fprintf_red;
+		break;
+	default:
+		fprintf_color = &fprintf;
+	}
+
+	fprintf_color(stderr, "ACVPParser (%.2d:%.2d:%.2d) %s: ",
+		      now_detail.tm_hour, now_detail.tm_min, now_detail.tm_sec,
+		      sev);
+	fprintf(stderr, "%s", msg);
 }
 
 void logger_status(const char *fmt, ...)
@@ -96,9 +119,10 @@ void logger_status(const char *fmt, ...)
 	now = time(NULL);
 	localtime_r(&now, &now_detail);
 
-	fprintf(stderr, "ACVPParser (%.2d:%.2d:%.2d) Status: %s",
-		now_detail.tm_hour, now_detail.tm_min, now_detail.tm_sec,
-	        msg);
+	fprintf_magenta(stderr, "ACVPParser (%.2d:%.2d:%.2d) Status: ",
+			now_detail.tm_hour, now_detail.tm_min,
+			now_detail.tm_sec);
+	fprintf(stderr, "%s", msg);
 }
 
 void logger_binary(enum logger_verbosity severity,

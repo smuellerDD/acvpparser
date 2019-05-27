@@ -569,9 +569,15 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 		const struct json_entry *entry;
 		uint8_t cfb_byte_for_next_round = 0;
 
-		if (vector->cipher != ACVP_ECB)
-			memcpy(calc_data.buf + calc_data.len - vector->iv.len,
-			       vector->iv.buf, vector->iv.len);
+		if (vector->cipher == ACVP_CBC_CS1 ||
+		    vector->cipher == ACVP_CBC_CS2 ||
+		    vector->cipher == ACVP_CBC_CS3) {
+			memcpy(calc_data.buf, vector->iv.buf, vector->iv.len);
+		} else if (vector->cipher != ACVP_ECB) {
+			/* Only for CFB1/8 the calc_data is longer than IV */
+ 			memcpy(calc_data.buf + calc_data.len - vector->iv.len,
+ 			       vector->iv.buf, vector->iv.len);
+		}
 
 		if (!sym_backend->mct_init ||
 		    sym_backend->mct_init(vector, parsed_flags))
@@ -584,7 +590,6 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 		single_mct_result = json_object_new_object();
 		CKNULL(single_mct_result, ENOMEM);
 
-		//CKINT(json_uint(single_mct_result, "count", oloop));
 		CKINT(json_add_bin2hex(single_mct_result, "key", &vector->key));
 		CKINT(json_add_bin2hex(single_mct_result,
 				       (parsed_flags & FLAG_OP_ENC) ?
@@ -599,6 +604,17 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 				goto out;
 			logger_binary(LOGGER_DEBUG, vector->data.buf,
 				      vector->data.len, "MCT calculated data");
+
+			/* Append MSB(CT) for PT[j+1] */
+			if (vector->cipher == ACVP_CBC_CS1 ||
+			    vector->cipher == ACVP_CBC_CS2 ||
+			    vector->cipher == ACVP_CBC_CS3) {
+				if (iloop == 0) {
+					memcpy(calc_data.buf + vector->iv.len,
+					       vector->data.buf,
+					       calc_data.len - vector->iv.len);
+				}
+			}
 
 			if (vector->cipher == ACVP_CFB8) {
 				uint8_t tmp = calc_data.buf[calc_data.len - 16];
@@ -687,6 +703,8 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 			memcpy(vector->iv.buf, vector->data.buf, vector->iv.len);
 			memcpy(vector->data.buf, calc_data.buf, vector->data.len);
 		}
+
+
 	}
 
 	json_object_object_add(testresult, "resultsArray", resultsarray);

@@ -39,11 +39,16 @@ EXEC_TYPES="_64_bit___ _32_bit___"
 EXEC_TYPES__64_bit___=""
 EXEC_TYPES__32_bit___="CFLAGS=-m32 LDFLAGS=-m32"
 
+EXEC_TYPES_DRBG10X__64_bit___="CFLAGS=-DOPENSSL_DRBG_10X"
+EXEC_TYPES_DRBG10X__32_bit___="CFLAGS=\"-m32 -DOPENSSL_DRBG_10X\" LDFLAGS=-m32"
+
 EXEC="TDES_C
       AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM
       AESASM AESASM_AVX AESASM_CLMULNI AESASM_ASM
       BAES_CTASM BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM
       SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM SHA3_AVX2 SHA3_ASM SHA3_AVX512"
+
+EXEC_DRBG10X="AESNI AESASM BAES_CTASM SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM"
 
 # Assembler cipher and C block chaining modes
 CIPHER_CALL_TDES_C=""
@@ -93,5 +98,26 @@ do_test() {
 	done
 }
 
+do_test_drbg10x() {
+	PATH=.:$PATH
+
+	for type in $EXEC_TYPES; do
+		eval BUILD_FLAGS=\$EXEC_TYPES_DRBG10X_$type
+
+		eval "$BUILD_FLAGS build_tool ${TARGET}"
+
+		for exec in $EXEC_DRBG10X; do
+			eval CIPHER_CALL=\$CIPHER_CALL_$exec
+
+			local modulename="${MODULE_PREFIX}${type}DRBG_10X_${exec}${MODULE_POSTFIX}"
+
+			eval "$CIPHER_CALL exec_module ${modulename}"
+		done
+
+		make clean
+	done
+}
+
 do_test
+do_test_drbg10x
 exit $failures
