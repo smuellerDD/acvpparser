@@ -261,6 +261,35 @@ int json_get_string(const struct json_object *obj, const char *name,
 	return 0;
 }
 
+int json_get_string_buf(const struct json_object *obj, const char *name,
+		    	struct buffer *buf)
+{
+	struct json_object *o = NULL;
+	size_t len;
+	const char *string;
+	int ret = json_find_key(obj, name, &o, json_type_string);
+
+	if (ret)
+		return ret;
+
+	string = json_object_get_string(o);
+
+	logger(LOGGER_DEBUG, "Found string data %s with value %s\n", name,
+	       string);
+
+	len = strlen(string);
+	if (len > INT_MAX)
+		return -EINVAL;
+
+	ret = alloc_buf(len + 1, buf);
+	if (ret)
+		return ret;
+
+	strncpy((char *)buf->buf, string, buf->len);
+
+	return 0;
+}
+
 int json_add_response_data(const struct json_object *in,
 			   struct json_object *out)
 {

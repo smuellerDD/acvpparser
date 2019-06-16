@@ -77,6 +77,7 @@ static void vector_free_entry(const struct json_entry *entry)
 	switch (data->datatype) {
 	case PARSER_BIN:
 	case PARSER_MPINT:
+	case PARSER_STRING:
 	case WRITER_BIN:
 	case WRITER_BIN_ALWAYS:
 		logger(LOGGER_DEBUG, "Freeing entry %s with data type %d\n",
@@ -352,6 +353,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kdf_ikev1)
 			CB_HANDLER(kdf_ikev2)
 			CB_HANDLER(kdf_108)
+			CB_HANDLER(pbkdf)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -918,6 +920,10 @@ static int parse_one_entry(const struct json_entry *entry,
 		break;
 	case PARSER_MPINT:
 		ret = json_get_mpint(readdata, entry->name, data->data.buf);
+		break;
+	case PARSER_STRING:
+		ret = json_get_string_buf(readdata, entry->name,
+					  data->data.buf);
 		break;
 	default:
 		logger(LOGGER_ERR, "Unknown data type %u to be parsed\n",

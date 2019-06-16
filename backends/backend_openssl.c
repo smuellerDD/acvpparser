@@ -63,7 +63,7 @@
 ACVP_DEFINE_CONSTRUCTOR(openssl_backend_init)
 static void openssl_backend_init(void)
 {
-	FIPS_mode_set(1);
+	//FIPS_mode_set(1);
 }
 
 /************************************************
@@ -3951,4 +3951,49 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_ecdh_backend)
 static void openssl_ecdh_backend(void)
 {
 	register_ecdh_impl(&openssl_ecdh);
+}
+
+/************************************************
+ * SP800-132 PBKDF cipher interface functions
+ ************************************************/
+static int openssl_pbkdf_generate(struct pbkdf_data *data,
+				  flags_t parsed_flags)
+{
+	const EVP_MD *md = NULL;
+	uint32_t derived_key_bytes = data->derived_key_length / 8;
+	int ret;
+
+	(void)parsed_flags;
+
+	if (data->derived_key_length % 8) {
+		logger(LOGGER_WARN, "Derived key must be byte-aligned\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	CKINT(openssl_md_convert(data->hash & ACVP_HASHMASK, &md));
+
+	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
+
+	CKINT_O_LOG(PKCS5_PBKDF2_HMAC((const char *)data->password.buf,
+				      data->password.len - 1,
+				      data->salt.buf, data->salt.len,
+				      data->iteration_count,
+				      md, data->derived_key.len,
+				      data->derived_key.buf), "PBKDF failed\n");
+
+out:
+	return ret;
+}
+
+
+static struct pbkdf_backend openssl_pbkdf =
+{
+	openssl_pbkdf_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_pbkdf_backend)
+static void openssl_pbkdf_backend(void)
+{
+	register_pbkdf_impl(&openssl_pbkdf);
 }

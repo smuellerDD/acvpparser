@@ -1,3 +1,6 @@
+v0.5.2
+- add PBKDF2 support for OpenSSL
+
 v0.5.1
 - OpenSSL add support for upstream CTR DRBG
 - Add support for AES-CBC-CS*

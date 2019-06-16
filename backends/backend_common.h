@@ -40,6 +40,7 @@
 #include "parser_kdf_ikev1.h"
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
+#include "parser_pbkdf.h"
 #include "parser_rsa.h"
 #include "parser_sha.h"
 #include "parser_sym.h"

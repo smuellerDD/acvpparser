@@ -80,6 +80,8 @@ int json_get_bool(const struct json_object *obj, const char *name,
  */
 int json_get_string(const struct json_object *obj, const char *name,
 		    const char **outbuf);
+int json_get_string_buf(const struct json_object *obj, const char *name,
+		    	struct buffer *buf);
 
 /*
  * Copy the toplevel identifier data from request to response object

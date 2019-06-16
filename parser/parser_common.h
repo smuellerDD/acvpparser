@@ -41,6 +41,7 @@
 #include "parser_kdf_ikev1.h"
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
+#include "parser_pbkdf.h"
 
 struct json_array;
 
@@ -104,6 +105,7 @@ enum json_data_type {
 	PARSER_ARRAY,
 	PARSER_ARRAY_BUFFERARRAY,
 	PARSER_MPINT,
+	PARSER_STRING,
 	WRITER_BIN,
 	WRITER_BIN_ALWAYS,
 	WRITER_UINT,
@@ -203,6 +205,7 @@ DEF_CALLBACK_TYPE(kdf_ssh)
 DEF_CALLBACK_TYPE(kdf_ikev1)
 DEF_CALLBACK_TYPE(kdf_ikev2)
 DEF_CALLBACK_TYPE(kdf_108)
+DEF_CALLBACK_TYPE(pbkdf)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -249,6 +252,7 @@ enum {
 	CB_TYPE_kdf_ikev1,
 	CB_TYPE_kdf_ikev2,
 	CB_TYPE_kdf_108,
+	CB_TYPE_pbkdf,
 };
 struct json_callback {
 	union {
@@ -284,6 +288,7 @@ struct json_callback {
 		struct kdf_ikev1_callback kdf_ikev1;
 		struct kdf_ikev2_callback kdf_ikev2;
 		struct kdf_108_callback kdf_108;
+		struct pbkdf_callback pbkdf;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

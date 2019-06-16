@@ -21,6 +21,7 @@
 #include "stringhelper.h"
 #include "binhexbin.h"
 #include "logger.h"
+#include "read_json.h"
 
 #include "parser_common.h"
 
@@ -242,129 +243,88 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 }
 
 /******************************************************************************
- * KDF generic parser definitions
+ * PBKDF callback definitions
  ******************************************************************************/
-static void kdf_tester_copy_array(struct json_object *src,
-				  struct json_object *dst, bool version_copied)
+struct pbkdf_backend *pbkdf_backend = NULL;
+
+static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
+			    uint64_t cipher)
 {
-	unsigned int i;
+	(void)cipher;
 
-	for (i = 0; i < (uint32_t)json_object_array_length(src); i++) {
-		struct json_object *entry =
-			json_object_array_get_idx(src, i);
+	/**********************************************************************
+	 * PBKDF operation
+	 **********************************************************************/
+	DEF_CALLBACK(pbkdf, pbkdf, FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT);
 
-		if (!entry)
-			continue;
+	const struct json_entry pbkdf_testresult_entries[] = {
+		{"derivedKey",		{.data.buf = &pbkdf_vector.derived_key, WRITER_BIN},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+	};
+	const struct json_testresult pbkdf_testresult =
+		SET_ARRAY(pbkdf_testresult_entries, &pbkdf_callbacks);
 
-		/* Do not copy version information again */
-		if (version_copied &&
-		    json_object_object_get_ex(entry, "version", NULL))
-			continue;
+	const struct json_entry pbkdf_test_entries[] = {
+		{"keyLength",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT},FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"salt",		{.data.buf = &pbkdf_vector.salt, PARSER_BIN},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"password",		{.data.buf = &pbkdf_vector.password, PARSER_STRING},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"iterationCount",	{.data.integer = &pbkdf_vector.iteration_count, PARSER_UINT},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+	};
 
-		json_object_array_add(dst, entry);
-		json_object_get(entry);
-	}
+	/* search for empty arrays */
+	const struct json_array pbkdf_test = SET_ARRAY(pbkdf_test_entries, &pbkdf_testresult);
+
+	const struct json_entry pbkdf_testgroup_entries[] = {
+		{"hashAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"tests",		{.data.array = &pbkdf_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+	};
+	const struct json_array pbkdf_testgroup = SET_ARRAY(pbkdf_testgroup_entries, NULL);
+
+	/**********************************************************************
+	 * KDF common test group
+	 **********************************************************************/
+	const struct json_entry pbkdf_testanchor_entries[] = {
+		{"testGroups",			{.data.array = &pbkdf_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_PBKDF},
+	};
+	const struct json_array pbkdf_testanchor = SET_ARRAY(pbkdf_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&pbkdf_testanchor, "1.0", in, out);
 }
 
-#include "read_json.h"
+/******************************************************************************
+ * KDF generic parser definitions
+ ******************************************************************************/
 static int kdf_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)
 {
 	int ret = 0;
-	unsigned int executed = 0;
-	struct json_object *tmp, *acvpdata, *versiondata, *testgroups;
-	bool version_copied = false;
+	struct json_object *acvpdata, *versiondata;
+	const char *mode;
+	bool executed = false;
 
-	if (kdf_ssh_backend) {
-		tmp = json_object_new_array();
-		CKNULL(tmp, -ENOMEM);
+	/* Get version and ACVP test vector data */
+	CKINT(json_split_version(in, &acvpdata, &versiondata));
+	CKINT(json_get_string(acvpdata, "mode", &mode));
 
-		CKINT(kdf_tester_ssh(in, tmp, cipher));
-
-		/* Did we receive any data? */
-		CKINT(json_split_version(tmp, &acvpdata, &versiondata));
-		CKINT(json_find_key(acvpdata, "testGroups", &testgroups,
-				    json_type_array));
-		if (json_object_array_length(tmp) <= 1)
-			goto exec;
-
-		if ((json_object_array_length(testgroups) > 0) && !ret) {
-			kdf_tester_copy_array(tmp, out, version_copied);
-			version_copied = true;
-		}
-		json_object_put(tmp);
-		if (ret < 0)
-			goto out;
-
-		executed = 1;
+	if (kdf_ssh_backend && !strncmp(mode, "ssh", 3)) {
+		CKINT(kdf_tester_ssh(in, out, cipher));
+		executed = true;
 	}
-	if (kdf_tls_backend) {
-		tmp = json_object_new_array();
-		CKNULL(tmp, -ENOMEM);
-
-		CKINT(kdf_tester_tls(in, tmp, cipher));
-
-		/* Did we receive any data? */
-		CKINT(json_split_version(tmp, &acvpdata, &versiondata));
-		CKINT(json_find_key(acvpdata, "testGroups", &testgroups,
-				    json_type_array));
-		if (json_object_array_length(testgroups) <= 1)
-			goto exec;
-
-		if ((json_object_array_length(testgroups) > 0) && !ret) {
-			kdf_tester_copy_array(tmp, out, version_copied);
-			version_copied = true;
-		}
-		json_object_put(tmp);
-		if (ret < 0)
-			goto out;
-
-		executed = 1;
+	if (kdf_tls_backend && !strncmp(mode, "tls", 3)) {
+		CKINT(kdf_tester_tls(in, out, cipher));
+		executed = true;
 	}
-	if (kdf_ikev1_backend) {
-		tmp = json_object_new_array();
-		CKNULL(tmp, -ENOMEM);
-
-		CKINT(kdf_tester_ikev1(in, tmp, cipher));
-
-		/* Did we receive any data? */
-		CKINT(json_split_version(tmp, &acvpdata, &versiondata));
-		CKINT(json_find_key(acvpdata, "testGroups", &testgroups,
-				    json_type_array));
-		if (json_object_array_length(tmp) <= 1)
-			goto exec;
-
-		if ((json_object_array_length(testgroups) > 0) && !ret) {
-			kdf_tester_copy_array(tmp, out, version_copied);
-			version_copied = true;
-		}
-		json_object_put(tmp);
-		if (ret < 0)
-			goto out;
-
-		executed = 1;
+	if (kdf_ikev1_backend && !strncmp(mode, "ikev1", 5)) {
+		CKINT(kdf_tester_ikev1(in, out, cipher));
+		executed = true;
 	}
-	if (kdf_ikev2_backend) {
-		tmp = json_object_new_array();
-		CKNULL(tmp, -ENOMEM);
-
-		CKINT(kdf_tester_ikev2(in, tmp, cipher));
-
-		/* Did we receive any data? */
-		CKINT(json_split_version(tmp, &acvpdata, &versiondata));
-		CKINT(json_find_key(acvpdata, "testGroups", &testgroups,
-				    json_type_array));
-		if (json_object_array_length(tmp) <= 1)
-			goto exec;
-
-		if ((json_object_array_length(testgroups) > 0) && !ret) {
-			kdf_tester_copy_array(tmp, out, version_copied);
-		}
-		json_object_put(tmp);
-		if (ret < 0)
-			goto out;
-
-		executed = 1;
+	if (kdf_ikev2_backend && !strncmp(mode, "ikev2", 5)) {
+		CKINT(kdf_tester_ikev2(in, out, cipher));
+		executed = true;
+	}
+	if (pbkdf_backend && !strncmp(mode, "pbkdf", 5)) {
+		CKINT(kdf_tester_pbkdf(in, out, cipher));
+		executed = true;
 	}
 
 	/*
@@ -373,7 +333,6 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 	 * If executed, then we have at least one successful run and data
 	 * -> clear out any -EOPNOTSUPP.
 	 */
-exec:
 	if (!executed)
 		ret = -EOPNOTSUPP;
 	else
@@ -414,4 +373,9 @@ void register_kdf_ikev1_impl(struct kdf_ikev1_backend *implementation)
 void register_kdf_ikev2_impl(struct kdf_ikev2_backend *implementation)
 {
 	register_backend(kdf_ikev2_backend, implementation, "KDF_IKEv2");
+}
+
+void register_pbkdf_impl(struct pbkdf_backend *implementation)
+{
+	register_backend(pbkdf_backend, implementation, "PBKDF");
 }
