@@ -55,15 +55,15 @@ a violation of the basic concept.
 
 The parser consists of 3 layers:
 
-. parser.c implements a linked list where all parsers with usable
-  callbacks are registered. Each parser must register with a particular cipher
-  identifier. When a JSON file is parsed, the cipher identifier is searched for
-  and the respective parser handler is called if a match is found.
+1. parser.c implements a linked list where all parsers with usable
+   callbacks are registered. Each parser must register with a particular cipher
+   identifier. When a JSON file is parsed, the cipher identifier is searched for
+   and the respective parser handler is called if a match is found.
 
-. parser_*.c implement the register functions registering with parser.c
-  In addition, they implement the handler function that is triggered when
-  parser.c is finished. The idea now is that the respective parser is invoked
-  with the JSON file it can handle. The parser now implements all logic to:
+2. parser_*.c implement the register functions registering with parser.c
+   In addition, they implement the handler function that is triggered when
+   parser.c is finished. The idea now is that the respective parser is invoked
+   with the JSON file it can handle. The parser now implements all logic to:
 
 	* parse the JSON file
 
@@ -75,11 +75,11 @@ The parser consists of 3 layers:
 
 	* create the JSON response file with the correct format.
 
-. backend_*.c implement the backend that uses the parser data structure to
-  invoke a specific crypto library. The backend is not needed to implement all
-  backend functions of all parsers. If a callback from a parser is not
-  supported, it must be marked as NULL. If a parser identifies a NULL handler,
-  it returns with an error such that the JSON file cannot be processed.
+3. backend_*.c implement the backend that uses the parser data structure to
+   invoke a specific crypto library. The backend is not needed to implement all
+   backend functions of all parsers. If a callback from a parser is not
+   supported, it must be marked as NULL. If a parser identifies a NULL handler,
+   it returns with an error such that the JSON file cannot be processed.
 
 ## Backend Selection
 
@@ -199,55 +199,55 @@ The backend is unrelated to any formatting or other CAVS/ACVP logic.
 
 A backend implementation is achieved with the following steps:
 
-. Include `backend_common.h` from the parser. There are no other header files
-  from the parser needed. The `backend_common.h includes the various header
-  files of the different parsers for the cipher implementations.
+1. Include `backend_common.h` from the parser. There are no other header files
+   from the parser needed. The `backend_common.h includes the various header
+   files of the different parsers for the cipher implementations.
 
-. Select which cipher implementations the backend shall handle. For each
-  cipher implementation, there is a `parser_*.h` header that defines the
-  data structure(s) used to exchange data between the parser and the backend
-  as well as the interface functions that need to be implemented by the
-  backend. For the following example, a SHA hash implementation shall be
-  tested. The corresponding header file is `parser_sha.h` which contains
-  the `struct sha_data` definition. The documentation explains which member
-  variables are provided by the parser and which data is expected to be
-  returned by the backend. Furthermore, the `parser_sha.h` header defines
-  the `struct sha_backend` function pointer data structure that must be
-  filled by the backend.
+2. Select which cipher implementations the backend shall handle. For each
+   cipher implementation, there is a `parser_*.h` header that defines the
+   data structure(s) used to exchange data between the parser and the backend
+   as well as the interface functions that need to be implemented by the
+   backend. For the following example, a SHA hash implementation shall be
+   tested. The corresponding header file is `parser_sha.h` which contains
+   the `struct sha_data` definition. The documentation explains which member
+   variables are provided by the parser and which data is expected to be
+   returned by the backend. Furthermore, the `parser_sha.h` header defines
+   the `struct sha_backend` function pointer data structure that must be
+   filled by the backend.
 
-. The backend implements the functions defined by the function pointer data
-  structure. In case of SHA, the `hash_generate` function must be implemented
-  following the definition of the function in `parser_sha.h`.
+3. The backend implements the functions defined by the function pointer data
+   structure. In case of SHA, the `hash_generate` function must be implemented
+   following the definition of the function in `parser_sha.h`.
 
-. The backend must now register its implementation by defining the function
-  pointer data structure and registering it with the register call found
-  in `parser_sha.h`. The function pointer data structure instance must
-  be marked with the `ACVP_DEFINE_CONSTRUCTOR` macro to ensure that it is
-  invoked by the operating system loader during load time of the executable.
-  The following example illustrates this registering:
+4. The backend must now register its implementation by defining the function
+   pointer data structure and registering it with the register call found
+   in `parser_sha.h`. The function pointer data structure instance must
+   be marked with the `ACVP_DEFINE_CONSTRUCTOR` macro to ensure that it is
+   invoked by the operating system loader during load time of the executable.
+   The following example illustrates this registering:
 
-  ```
-  static int backend_sha_generate(struct sha_data *data, flags_t parsed_flags)
-  {
-  ...
-          <invoke the backend's SHA function>;
-  ....
-  }
+   ```
+   static int backend_sha_generate(struct sha_data *data, flags_t parsed_flags)
+   {
+   ...
+           <invoke the backend's SHA function>;
+   ....
+   }
 
-  static struct sha_backend backend_sha =
-  {
-          backend_sha_generate,
-  };
+   static struct sha_backend backend_sha =
+   {
+           backend_sha_generate,
+   };
 
-  ACVP_DEFINE_CONSTRUCTOR(backend_sha_backend)
-  static void backend_sha_backend(void)
-  {
-           register_sha_impl(&backend_sha);
-  }
-  ```
+   ACVP_DEFINE_CONSTRUCTOR(backend_sha_backend)
+   static void backend_sha_backend(void)
+   {
+            register_sha_impl(&backend_sha);
+   }
+   ```
 
-. Ensure that the C file(s) implementing the backend is compiled when compiling
-  the parser.
+5. Ensure that the C file(s) implementing the backend is compiled when compiling
+   the parser.
 
 The example outlines that apart from including the `backend_common.h`, no
 further change is needed to link the backend implementation with the parser.

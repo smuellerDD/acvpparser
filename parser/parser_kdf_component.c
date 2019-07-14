@@ -105,7 +105,7 @@ static int kdf_tester_ssh(struct json_object *in, struct json_object *out,
 		SET_ARRAY(kdf_ssh_testresult_entries, &kdf_ssh_callbacks);
 
 	const struct json_entry kdf_ssh_test_entries[] = {
-		{"k",		{.data.buf = &kdf_ssh_vector.k, PARSER_MPINT},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SSH},
+		{"k",		{.data.buf = &kdf_ssh_vector.k, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SSH},
 		{"h",		{.data.buf = &kdf_ssh_vector.h, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SSH},
 		{"sessionId",	{.data.buf = &kdf_ssh_vector.session_id, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SSH},
 	};

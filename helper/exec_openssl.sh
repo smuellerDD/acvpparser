@@ -94,7 +94,7 @@ do_test() {
 			eval "$CIPHER_CALL exec_module ${modulename}"
 		done
 
-		make clean
+		clean_tool
 	done
 }
 
@@ -114,7 +114,7 @@ do_test_drbg10x() {
 			eval "$CIPHER_CALL exec_module ${modulename}"
 		done
 
-		make clean
+		clean_tool
 	done
 }
 

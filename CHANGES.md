@@ -1,3 +1,11 @@
+v0.5.3
+- reenable OpenSSL FIPS mode
+- add new TLS KDF and SSH KDF implementations to OpenSSL
+- add OpenSSL 1.0.x support
+- add AES GMAC support
+- rename test case references from Common to "Generic C" to be compliant with
+  ACVP Proxy
+
 v0.5.2
 - add PBKDF2 support for OpenSSL
 

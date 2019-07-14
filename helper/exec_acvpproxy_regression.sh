@@ -33,10 +33,10 @@ TARGET="acvpproxy"
 
 build_tool ${TARGET}
 
-MODULE_PREFIX="ACVPProxy__"
+MODULE_PREFIX="Crypto_for_ACVPProxy__"
 MODULE_POSTFIX="_"
 
-EXEC="Common"
+EXEC="Generic_C"
 
 ################### Heavy Lifting #######################
 

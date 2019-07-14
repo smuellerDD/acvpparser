@@ -94,7 +94,6 @@ static int aead_tester(struct json_object *in, struct json_object *out,
 		       struct aead_data *vector,
 		       const struct json_callbacks *callbacks)
 {
-
 	if (!aead_backend) {
 		logger(LOGGER_ERR,
 		       "No backend implementation for AEAD ciphers available\n");
@@ -152,6 +151,69 @@ static int aead_tester(struct json_object *in, struct json_object *out,
 
 		{"tagLen",	{.data.integer = &vector->taglen, PARSER_UINT},	FLAG_OP_DEC | FLAG_OP_AFT},
 		{"payloadLen",	{.data.integer = &vector->ptlen, PARSER_UINT},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"ivLen",	{.data.integer = &vector->ivlen, PARSER_UINT},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"tests",	{.data.array = &aead_test, PARSER_ARRAY},	FLAG_OP_DEC | FLAG_OP_AFT}
+	};
+	const struct json_array aead_testgroup = SET_ARRAY(aead_testgroup_entries, NULL);
+
+	/*
+	 * Define the anchor of the tests in the highest level of the JSON
+	 * input data. For example:
+	 * {
+	 *   "acvVersion": "0.2",
+	 *   "vsId": 1564,
+	 *   "algorithm": "AES-GCM",
+	 *   "direction": "encrypt",
+	 *   "testGroups": [
+	 */
+	const struct json_entry aead_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &aead_testgroup, PARSER_ARRAY}, 0 }
+	};
+	const struct json_array aead_testanchor = SET_ARRAY(aead_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&aead_testanchor, "1.0", in, out);
+}
+
+
+static int aead_gmac_tester(struct json_object *in, struct json_object *out,
+			    struct aead_data *vector,
+			    const struct json_callbacks *callbacks)
+{
+	if (!aead_backend) {
+		logger(LOGGER_ERR,
+		       "No backend implementation for AEAD ciphers available\n");
+		return EOPNOTSUPP;
+	}
+
+	/*
+	 * Define which test result data should be written to the test result
+	 * JSON file.
+	 */
+	const struct json_entry aead_testresult_entries[] = {
+		{"tag",		{.data.buf = &vector->tag, WRITER_BIN},		FLAG_OP_ENC | FLAG_OP_AFT},
+		{"testPassed",	{.data.integer = &vector->integrity_error, WRITER_BOOL_TRUE_TO_FALSE},	FLAG_OP_DEC | FLAG_OP_AFT},
+	};
+	const struct json_testresult aead_testresult = SET_ARRAY(aead_testresult_entries, callbacks);
+
+	const struct json_entry aead_test_entries[] = {
+		{"iv",		{.data.buf = &vector->iv, PARSER_BIN},		 FLAG_OP_ENC | FLAG_OP_AFT},
+		{"key",		{.data.buf = &vector->key, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"aad",		{.data.buf = &vector->assoc, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_AFT},
+
+		{"iv",		{.data.buf = &vector->iv, PARSER_BIN}, 		FLAG_OP_DEC | FLAG_OP_AFT},
+		{"key",		{.data.buf = &vector->key, PARSER_BIN},		FLAG_OP_DEC | FLAG_OP_AFT},
+		{"aad",		{.data.buf = &vector->assoc, PARSER_BIN},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"tag",		{.data.buf = &vector->tag, PARSER_BIN},		FLAG_OP_DEC | FLAG_OP_AFT},
+	};
+	const struct json_array aead_test = SET_ARRAY(aead_test_entries, &aead_testresult);
+
+	const struct json_entry aead_testgroup_entries[] = {
+		{"tagLen",	{.data.integer = &vector->taglen, PARSER_UINT},	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"ivLen",	{.data.integer = &vector->ivlen, PARSER_UINT},	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"tests",	{.data.array = &aead_test, PARSER_ARRAY},	FLAG_OP_ENC | FLAG_OP_AFT},
+
+		{"tagLen",	{.data.integer = &vector->taglen, PARSER_UINT},	FLAG_OP_DEC | FLAG_OP_AFT},
 		{"ivLen",	{.data.integer = &vector->ivlen, PARSER_UINT},	FLAG_OP_DEC | FLAG_OP_AFT},
 		{"tests",	{.data.array = &aead_test, PARSER_ARRAY},	FLAG_OP_DEC | FLAG_OP_AFT}
 	};
@@ -277,6 +339,9 @@ static int gcm_tester(struct json_object *in, struct json_object *out,
 
 	if (cipher == ACVP_GCMSIV)
 		return aead_siv_tester(in, out, &vector, &gcm_callbacks);
+
+	if (cipher == ACVP_GMAC)
+		return aead_gmac_tester(in, out, &vector, &gcm_callbacks);
 
 	return aead_tester(in, out, &vector, &gcm_callbacks);
 }
@@ -404,7 +469,7 @@ static int ccm_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester gcm =
 {
-	ACVP_GCM | ACVP_GCMSIV,
+	ACVP_GCM | ACVP_GCMSIV | ACVP_GMAC,
 	gcm_tester,	/* process_req */
 	NULL
 };

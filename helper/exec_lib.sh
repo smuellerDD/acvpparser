@@ -3,7 +3,14 @@
 # Execution helper library
 #
 
-_LIB_EXEC="./acvp-parser"
+CURDIR=$(basename $PWD)
+
+if [ x"$CURDIR" = x"tests" ]
+then
+	_LIB_EXEC="../acvp-parser"
+else
+	_LIB_EXEC="./acvp-parser"
+fi
 _LIB_IUT="testvectors"
 _LIB_REQ="testvector-request.json"
 _LIB_RESP="testvector-response.json"
@@ -11,6 +18,7 @@ _LIB_RESP="testvector-response.json"
 _LIB_REGRESSION="${_LIB_RESP}.regression.$$"
 
 failures=0
+local_failures=0
 
 color()
 {
@@ -46,6 +54,7 @@ echo_fail()
 {
 	echo $(color "red")[FAILED]$(color off) $@
 	failures=$(($failures+1))
+	local_failures=$(($local_failures+1))
 }
 
 echo_deact()
@@ -63,12 +72,34 @@ build_tool()
 		return
 	fi
 
-	make clean
-	make -s $target
+	if [ x"$CURDIR" = x"tests" ]
+	then
+		make -C ../ clean
+		make -C ../ -s $target
+	else
+		make clean
+		make -s $target
+	fi
 	ret=$?
 	if [ $ret -ne 0 ]
 	then
 		echo "Build failed"
+		exit $ret
+	fi
+}
+
+clean_tool()
+{
+	if [ x"$CURDIR" = x"tests" ]
+	then
+		make -C ../ clean
+	else
+		make clean
+	fi
+	ret=$?
+	if [ $ret -ne 0 ]
+	then
+		echo "Cleaning failed"
 		exit $ret
 	fi
 }
@@ -294,16 +325,16 @@ exec_module()
 	if [ -n "$regression" -a x"$regression" != x"X" ]
 	then
 		echo "=========================================================="
-		if [ $failures -gt 0 ]
+		if [ $local_failures -gt 0 ]
 		then
-			echo $(color "red")[FAILED]$(color off) $@ "$failures failures for module $module"
+			echo $(color "red")[FAILED]$(color off) $@ "$local_failures failures for module $module"
 
 		else
 			echo_pass "no failures for module $module"
 		fi
 	fi
 
-	failures=0
+	local_failures=0
 }
 
 #
@@ -322,7 +353,7 @@ regression_test()
 cleanup()
 {
 	find $_LIB_IUT -name "$_LIB_REGRESSION" | xargs rm -f
-	make clean
+	clean_tool
 }
 
-trap "cleanup; exit" 0 1 2 3 15
+trap "cleanup; exit $failures" 0 1 2 3 15

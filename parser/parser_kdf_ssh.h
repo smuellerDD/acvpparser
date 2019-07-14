@@ -75,7 +75,7 @@
  *		goto out;
  *	}
  *
- * @param k [in] Shared secret buffer
+ * @param k [in] Shared secret buffer - note, this is in MPINT format
  * @param h [in] Hash data buffer
  * @param session_id [in] Session ID buffer
  * @param initial_iv_client [out] IV to be used by client

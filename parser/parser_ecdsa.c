@@ -65,7 +65,8 @@ out:
 	return ret;
 }
 
-static int ecdsa_siggen_keygen(struct ecdsa_siggen_data *data, void **ecdsa_privkey)
+static int ecdsa_siggen_keygen(struct ecdsa_siggen_data *data,
+			       void **ecdsa_privkey)
 {
 	int ret = 0;
 

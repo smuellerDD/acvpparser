@@ -168,6 +168,40 @@ int json_get_bin(const struct json_object *obj, const char *name,
 	return ret;
 }
 
+int mpint2bin(const char *mpi, uint32_t mpilen, struct buffer *buf)
+{
+	int ret = 0;
+
+	if (mpilen < 8) {
+		logger(LOGGER_WARN, "Incomplete MPINT value\n");
+		return -EINVAL;
+	} else if (mpilen == 8) {
+		logger(LOGGER_DEBUG, "Found empty MPINT value\n");
+		return 0;
+	} else {
+		const struct mpint *mpint = (const struct mpint *)mpi;
+		const char *ptr = mpint->value;
+
+		/* Reduce the length of the string by the header */
+		mpilen -= sizeof(mpint->len);
+
+		/* Remove leading zero byte */
+		if (mpilen > 2 && mpint->value[0] == 60 &&
+			mpint->value[1] == 60) {
+			ptr += 2;
+			mpilen -= 2;
+		}
+
+		ret = hex2bin_alloc(ptr, mpilen, &buf->buf, &buf->len);
+
+		logger(LOGGER_DEBUG,
+			"Found binary data with length %u with value %s\n",
+			mpilen, mpint->value);
+	}
+
+	return ret;
+}
+
 int json_get_mpint(const struct json_object *obj, const char *name,
 		   struct buffer *buf)
 {
@@ -191,39 +225,13 @@ int json_get_mpint(const struct json_object *obj, const char *name,
 	if (raw) {
 		uint32_t hexlen = (uint32_t)strlen(raw);
 
-		if (hexlen < 8) {
-			logger(LOGGER_WARN,
-			       "Incomplete MPINT value for key %s\n", name);
-			return -EINVAL;
-		} else if (hexlen == 8) {
-			logger(LOGGER_DEBUG,
-			       "Found empty MPINT value for key %s\n", name);
-			return 0;
-		} else {
-			const struct mpint *mpint = (const struct mpint *)raw;
-			const char *ptr = mpint->value;
-
-			/* Reduce the length of the string by the header */
-			hexlen -= sizeof(mpint->len);
-
-			/* Remove leading zero byte */
-			if (hexlen > 2 && mpint->value[0] == 60 &&
-			    mpint->value[1] == 60) {
-				ptr += 2;
-				hexlen -= 2;
-			}
-
-			ret = hex2bin_alloc(ptr, hexlen, &buf->buf, &buf->len);
-
-			logger(LOGGER_DEBUG,
-			       "Found binary data for key %s with length %u with value %s\n",
-			       name, hexlen, mpint->value);
-		}
+		CKINT(mpint2bin(raw, hexlen, buf));
 	} else {
 		ret = -EFAULT;
 		logger(LOGGER_WARN, "Fetching entry for key %s failed\n", name);
 	}
 
+out:
 	return ret;
 }
 

@@ -63,6 +63,10 @@ int json_get_bin(const struct json_object *obj, const char *name,
 		 struct buffer *buf);
 
 /*
+ * Convert MPINT to binary
+ */
+int mpint2bin(const char *mpi, uint32_t mpilen, struct buffer *buf);
+/*
  * Get the binary representation of the hex value of an MPINT at the given key
  */
 int json_get_mpint(const struct json_object *obj, const char *name,
