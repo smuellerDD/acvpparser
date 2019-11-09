@@ -26,20 +26,20 @@
 /**
  * @brief PBKDF data structure
  *
- * @param hash [in] hash to be used for the KDF - note, the backend must
+ * @var hash [in] hash to be used for the KDF - note, the backend must
  *		    use the hash to initialize the HMAC cipher as required by
  *		    the PBKDF specification.
- * @param derived_key_length [in] Length of the derived key material to be
+ * @var derived_key_length [in] Length of the derived key material to be
  *				  produced by the KDF in bits.
- * @param iteration_count [in] Number of iterations to be performed by PBKDF
- * @param password [in] Password to derive key from - note, the buffer contains
+ * @var iteration_count [in] Number of iterations to be performed by PBKDF
+ * @var password [in] Password to derive key from - note, the buffer contains
  *			the password string (i.e. ASCII-printable characters).
  *			The password->len value contains the size of the
  *			password including the terminating zero. If you need
  *			the size of the string, use strlen(password->buf) or
  *			password->len - 1.
- * @param salt [in] Salt required for PBKDF.
- * @param derived_key [out] The derived keying material output.
+ * @var salt [in] Salt required for PBKDF.
+ * @var derived_key [out] The derived keying material output.
  */
 struct pbkdf_data {
 	uint64_t hash;
@@ -55,7 +55,7 @@ struct pbkdf_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param pbkdf Perform a PBKDF key derivation
+ * @var pbkdf Perform a PBKDF key derivation
  */
 struct pbkdf_backend {
 	int (*pbkdf)(struct pbkdf_data *data, flags_t parsed_flags);

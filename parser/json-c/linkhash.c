@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <limits.h>
@@ -55,10 +56,10 @@ json_global_set_string_hash(const int h)
 static unsigned long lh_ptr_hash(const void *k)
 {
 	/* CAW: refactored to be 64bit nice */
-	return (unsigned long)((((ptrdiff_t)k * LH_PRIME) >> 4) & ULONG_MAX);
+	return (unsigned long)((((unsigned long)((ptrdiff_t)k) * LH_PRIME) >> 4) & ULONG_MAX);
 }
 
-int lh_ptr_equal(const void *k1, const void *k2)
+static int lh_ptr_equal(const void *k1, const void *k2)
 {
 	return (k1 == k2);
 }
@@ -436,7 +437,7 @@ static unsigned long lh_perllike_str_hash(const void *k)
     unsigned hashval = 1;
 
     while (*rkey)
-        hashval = hashval * 33 + *rkey++;
+        hashval = hashval * 33 + (unsigned int)(*rkey++);
 
     return hashval;
 }
@@ -473,10 +474,10 @@ static unsigned long lh_char_hash(const void *k)
 #endif
 	}
 
-	return hashlittle((const char*)k, strlen((const char*)k), random_seed);
+	return hashlittle((const char*)k, strlen((const char*)k), (uint32_t)random_seed);
 }
 
-int lh_char_equal(const void *k1, const void *k2)
+static int lh_char_equal(const void *k1, const void *k2)
 {
 	return (strcmp((const char*)k1, (const char*)k2) == 0);
 }
@@ -495,7 +496,7 @@ struct lh_table* lh_table_new(int size,
 
 	t->count = 0;
 	t->size = size;
-	t->table = (struct lh_entry*)calloc(size, sizeof(struct lh_entry));
+	t->table = (struct lh_entry*)calloc((unsigned long)size, sizeof(struct lh_entry));
 	if (!t->table)
 	{
 		free(t);
@@ -571,7 +572,7 @@ int lh_table_insert_w_hash(struct lh_table *t, const void *k, const void *v, con
 		if (lh_table_resize(t, t->size * 2) != 0)
 			return -1;
 
-	n = h % t->size;
+	n = h % (unsigned long)t->size;
 
 	while( 1 ) {
 		if(t->table[n].k == LH_EMPTY || t->table[n].k == LH_FREED) break;
@@ -603,7 +604,7 @@ int lh_table_insert(struct lh_table *t, const void *k, const void *v)
 
 struct lh_entry* lh_table_lookup_entry_w_hash(struct lh_table *t, const void *k, const unsigned long h)
 {
-	unsigned long n = h % t->size;
+	unsigned long n = h % (unsigned long)t->size;
 	int count = 0;
 
 	while( count < t->size ) {

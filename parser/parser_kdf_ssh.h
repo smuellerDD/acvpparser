@@ -26,7 +26,7 @@
 /**
  * @brief SSH PRF testing context
  *
- * @param cipher [in] Hash algorithm to be used for PRF as well as symmetric
+ * @var cipher [in] Hash algorithm to be used for PRF as well as symmetric
  *		      cipher reference which is to be used to determine the
  *		      key and IV length for the output. For the symmetric
  *		      cipher, use the following code to parse it:
@@ -75,18 +75,18 @@
  *		goto out;
  *	}
  *
- * @param k [in] Shared secret buffer - note, this is in MPINT format
- * @param h [in] Hash data buffer
- * @param session_id [in] Session ID buffer
- * @param initial_iv_client [out] IV to be used by client
- * @param encryptiion_key_client [out] Symmetric encryption key to be used by
+ * @var k [in] Shared secret buffer - note, this is in MPINT format
+ * @var h [in] Hash data buffer
+ * @var session_id [in] Session ID buffer
+ * @var initial_iv_client [out] IV to be used by client
+ * @var encryptiion_key_client [out] Symmetric encryption key to be used by
  *				 client
- * @param integrity_key_client [out] Key for integrity mechanism to be used by
+ * @var integrity_key_client [out] Key for integrity mechanism to be used by
  *			       client
- * @param initial_iv_server [out] IV to be used by server
- * @param encryptiion_key_server [out] Symmetric encryption key to be used by
+ * @var initial_iv_server [out] IV to be used by server
+ * @var encryptiion_key_server [out] Symmetric encryption key to be used by
  *				 server
- * @param integrity_key_server [out] Key for integrity mechanism to be used by
+ * @var integrity_key_server [out] Key for integrity mechanism to be used by
  *			       server
  */
 struct kdf_ssh_data {
@@ -107,7 +107,7 @@ struct kdf_ssh_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param kdf_ssh Invoke the SSH PRF testing.
+ * @var kdf_ssh Invoke the SSH PRF testing.
  */
 
 struct kdf_ssh_backend {

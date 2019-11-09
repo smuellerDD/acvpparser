@@ -1,0 +1,190 @@
+/*
+ * Copyright (C) 2019, Stephan Mueller <smueller@chronox.de>
+ *
+ * License: see LICENSE file in root directory
+ *
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
+ * WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ */
+
+#include <errno.h>
+#include <string.h>
+
+#include "cipher_definitions.h"
+#include "logger.h"
+#include "algorithms.h"
+
+static const struct { char *algo; uint64_t cipher; } conv[] = {
+	{"ACVP-AES-ECB", ACVP_ECB},
+	{"ACVP-AES-CBC", ACVP_CBC},
+	{"ACVP-AES-OFB", ACVP_OFB},
+	{"ACVP-AES-CFB8", ACVP_CFB8},
+	{"ACVP-AES-CFB128", ACVP_CFB128},
+	{"ACVP-AES-CFB1", ACVP_CFB1},
+	{"ACVP-AES-CTR", ACVP_CTR},
+	{"ACVP-AES-GCM-SIV", ACVP_GCMSIV},
+	{"ACVP-AES-GCM", ACVP_GCM},
+	{"ACVP-AES-GMAC", ACVP_GMAC},
+	{"ACVP-AES-CCM", ACVP_CCM},
+	{"ACVP-AES-XTS", ACVP_XTS},
+	{"ACVP-AES-KWP", ACVP_KWP},
+	{"ACVP-AES-KW", ACVP_KW},
+	{"AES-128", ACVP_AES128},
+	{"AES-192", ACVP_AES192},
+	{"AES-256", ACVP_AES256},
+
+	{"ACVP-TDES-ECB", ACVP_TDESECB},
+	{"ACVP-TDES-CBC", ACVP_TDESCBC},
+	{"ACVP-TDES-OFB", ACVP_TDESOFB},
+	{"ACVP-TDES-CFB1", ACVP_TDESCFB1},
+	{"ACVP-TDES-CFB8", ACVP_TDESCFB8},
+	{"ACVP-TDES-CFB64", ACVP_TDESCFB64},
+	{"ACVP-TDES-CTR", ACVP_TDESCTR},
+	{"ACVP-TDES-KW", ACVP_TDESKW},
+	/* CTR DRBG */
+	{"3keyTDEA", ACVP_TDESCTR},
+
+	{"CMAC-AES", ACVP_AESCMAC},
+	{"CMAC-TDES", ACVP_TDESCMAC},
+	{"HMAC-SHA-1", ACVP_HMACSHA1},
+	{"HMAC-SHA2-224", ACVP_HMACSHA2_224},
+	{"HMAC-SHA2-256", ACVP_HMACSHA2_256},
+	{"HMAC-SHA2-384", ACVP_HMACSHA2_384},
+	{"HMAC-SHA2-512", ACVP_HMACSHA2_512},
+	{"HMAC-SHA2-512/224", ACVP_HMACSHA2_512224},
+	{"HMAC-SHA2-512/256", ACVP_HMACSHA2_512256},
+	{"HMAC-SHA3-224", ACVP_HMACSHA3_224},
+	{"HMAC-SHA3-256", ACVP_HMACSHA3_256},
+	{"HMAC-SHA3-384", ACVP_HMACSHA3_384},
+	{"HMAC-SHA3-512", ACVP_HMACSHA3_512},
+
+	{"RSA", ACVP_RSA},
+	{"ECDSA", ACVP_ECDSA},
+	{"EDDSA", ACVP_EDDSA},
+	{"DSA", ACVP_DSA},
+
+	{"SHA-1", ACVP_SHA1},
+
+	{"SHA3-224", ACVP_SHA3_224},
+	{"SHA3-256", ACVP_SHA3_256},
+	{"SHA3-384", ACVP_SHA3_384},
+	{"SHA3-512", ACVP_SHA3_512},
+	{"SHAKE-128", ACVP_SHAKE128},
+	{"SHAKE-256", ACVP_SHAKE256},
+	{"SHA2-224", ACVP_SHA224},
+	{"SHA2-256", ACVP_SHA256},
+	{"SHA2-384", ACVP_SHA384},
+	{"SHA2-512", ACVP_SHA512},
+	{"SHA2-512/224", ACVP_SHA512224},
+	{"SHA2-512/256", ACVP_SHA512256},
+	{"ctrDRBG", ACVP_DRBGCTR},
+	{"hashDRBG", ACVP_DRBGHASH},
+	{"hmacDRBG", ACVP_DRBGHMAC},
+
+	{"KAS-ECC", ACVP_ECDH},
+	{"KAS-FFC", ACVP_DH},
+	{"KAS-ED", ACVP_ECDH_ED},
+
+	{"kdf-components", ACVP_KDF_COMPONENT},
+	{"HKDF", ACVP_HKDF},
+	{"KDF", ACVP_KDF_800_108},
+	{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
+	{"feedback", ACVP_KDF_108_FEEDBACK},
+	{"counter", ACVP_KDF_108_COUNTER},
+	{"after fixed data", ACVP_KDF_108_AFTER_FIXED},
+	{"before fixed data", ACVP_KDF_108_BEFORE_FIXED},
+	{"middle fixed data", ACVP_KDF_108_MIDDLE_FIXED},
+	{"before iterator", ACVP_KDF_108_BEFORE_ITERATOR},
+
+	{"P-224", ACVP_NISTP224},
+	{"P-256", ACVP_NISTP256},
+	{"P-384", ACVP_NISTP384},
+	{"P-521", ACVP_NISTP521},
+	{"K-233", ACVP_NISTK233},
+	{"K-283", ACVP_NISTK283},
+	{"K-409", ACVP_NISTK409},
+	{"K-571", ACVP_NISTK571},
+	{"B-233", ACVP_NISTB233},
+	{"B-283", ACVP_NISTB283},
+	{"B-409", ACVP_NISTB409},
+	{"B-571", ACVP_NISTB571},
+
+	{"ED-25519", ACVP_ED25519},
+	{"ED-448", ACVP_ED448},
+
+	/* SSH */
+	{"TDES", ACVP_TDESECB},
+
+	/* Conversion from uint64_t back to a name */
+	{"ctrDRBG_AES128", (ACVP_DRBGCTR | ACVP_AES128)},
+	{"ctrDRBG_AES192", ACVP_DRBGCTR | ACVP_AES192},
+	{"ctrDRBG_AES256", ACVP_DRBGCTR | ACVP_AES256},
+	{"hashDRBG_SHA-1", ACVP_DRBGHASH | ACVP_SHA1},
+	{"hashDRBG_SHA-224", ACVP_DRBGHASH | ACVP_SHA224},
+	{"hashDRBG_SHA-256", ACVP_DRBGHASH | ACVP_SHA256},
+	{"hashDRBG_SHA-384", ACVP_DRBGHASH | ACVP_SHA384},
+	{"hashDRBG_SHA-512", ACVP_DRBGHASH | ACVP_SHA512},
+	{"hashDRBG_SHA-512224", ACVP_DRBGHASH | ACVP_SHA512224},
+	{"hashDRBG_SHA-512256", ACVP_DRBGHASH | ACVP_SHA512256},
+	{"hmacDRBG_SHA-1", ACVP_DRBGHMAC | ACVP_SHA1},
+	{"hmacDRBG_SHA-224", ACVP_DRBGHMAC | ACVP_SHA224},
+	{"hmacDRBG_SHA-256", ACVP_DRBGHMAC | ACVP_SHA256},
+	{"hmacDRBG_SHA-384", ACVP_DRBGHMAC | ACVP_SHA384},
+	{"hmacDRBG_SHA-512", ACVP_DRBGHMAC | ACVP_SHA512},
+	{"hmacDRBG_SHA-512224", ACVP_DRBGHMAC | ACVP_SHA512224},
+	{"hmacDRBG_SHA-512256", ACVP_DRBGHMAC | ACVP_SHA512256},
+};
+
+uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
+{
+	uint64_t p_res = 0;
+	unsigned int i;
+
+	logger(LOGGER_DEBUG, "Convert cipher %s into internal representation\n",
+	       algo);
+
+	if (!algo) return ACVP_UNKNOWN;
+
+	for (i = 0; i < ARRAY_SIZE(conv); i++) {
+		if (strstr(algo, conv[i].algo)) {
+			p_res = conv[i].cipher;
+			break;
+		}
+	}
+	if (p_res == 0)
+		return ACVP_UNKNOWN;
+
+	return (cipher | p_res);
+}
+
+int convert_cipher_algo(uint64_t cipher, const char **algo)
+{
+	unsigned int i;
+	unsigned int found = 0;
+
+	if (!algo)
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(conv); i++) {
+		if (cipher == conv[i].cipher) {
+			*algo = conv[i].algo;
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found)
+		return -EINVAL;
+
+	return 0;
+}

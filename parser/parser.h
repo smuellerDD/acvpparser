@@ -24,11 +24,12 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include <json-c/json.h>
+#include "json-c/json.h"
 
 #include "binhexbin.h"
 #include "cipher_definitions.h"
 #include "constructor.h"
+#include "algorithms.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -41,11 +42,11 @@ extern "C"
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 5   /* API compatible, ABI may change,
+#define MINVERSION 6   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
-#define PATCHLEVEL 3   /* API / ABI compatible, no functional
+#define PATCHLEVEL 0   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
 
@@ -83,11 +84,13 @@ struct cavs_tester {
 	struct cavs_tester *next;
 };
 
-void register_tester(struct cavs_tester *curr_tester, const char *log);
-uint64_t convert_algo_cipher(const char *algo, uint64_t cipher);
-int convert_cipher_algo(uint64_t cipher, const char **algo);
+struct main_extension {
+	int (*main)(int argc, char *argv[]);
+	void (*usage)(void);
+};
+void register_main_extension(struct main_extension *extension);
 
-#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
+void register_tester(struct cavs_tester *curr_tester, const char *log);
 
 #ifdef __cplusplus
 }

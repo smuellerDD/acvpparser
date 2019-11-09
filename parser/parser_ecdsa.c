@@ -28,7 +28,7 @@
 #define ECDSA_DEF_CALLBACK_HELPER(name, flags, helper)			       \
 				DEF_CALLBACK_HELPER(ecdsa, name, flags, helper)
 
-struct ecdsa_backend *ecdsa_backend = NULL;
+static struct ecdsa_backend *ecdsa_backend = NULL;
 
 struct ecdsa_static_key {
 	void *key;

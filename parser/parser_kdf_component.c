@@ -28,7 +28,7 @@
 /******************************************************************************
  * KDF TLS callback definitions
  ******************************************************************************/
-struct kdf_tls_backend *kdf_tls_backend = NULL;
+static struct kdf_tls_backend *kdf_tls_backend = NULL;
 
 static int kdf_tester_tls(struct json_object *in, struct json_object *out,
 			  uint64_t cipher)
@@ -81,7 +81,7 @@ static int kdf_tester_tls(struct json_object *in, struct json_object *out,
 /******************************************************************************
  * KDF SSH callback definitions
  ******************************************************************************/
-struct kdf_ssh_backend *kdf_ssh_backend = NULL;
+static struct kdf_ssh_backend *kdf_ssh_backend = NULL;
 
 static int kdf_tester_ssh(struct json_object *in, struct json_object *out,
 			  uint64_t cipher)
@@ -135,7 +135,7 @@ static int kdf_tester_ssh(struct json_object *in, struct json_object *out,
 /******************************************************************************
  * KDF IKEV1 callback definitions
  ******************************************************************************/
-struct kdf_ikev1_backend *kdf_ikev1_backend = NULL;
+static struct kdf_ikev1_backend *kdf_ikev1_backend = NULL;
 
 static int kdf_tester_ikev1(struct json_object *in, struct json_object *out,
 			  uint64_t cipher)
@@ -189,7 +189,7 @@ static int kdf_tester_ikev1(struct json_object *in, struct json_object *out,
 /******************************************************************************
  * KDF IKEV2 callback definitions
  ******************************************************************************/
-struct kdf_ikev2_backend *kdf_ikev2_backend = NULL;
+static struct kdf_ikev2_backend *kdf_ikev2_backend = NULL;
 
 static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 			  uint64_t cipher)
@@ -245,7 +245,7 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 /******************************************************************************
  * PBKDF callback definitions
  ******************************************************************************/
-struct pbkdf_backend *pbkdf_backend = NULL;
+static struct pbkdf_backend *pbkdf_backend = NULL;
 
 static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 			    uint64_t cipher)
@@ -264,7 +264,7 @@ static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 		SET_ARRAY(pbkdf_testresult_entries, &pbkdf_callbacks);
 
 	const struct json_entry pbkdf_test_entries[] = {
-		{"keyLength",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT},FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"keyLen",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT},FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
 		{"salt",		{.data.buf = &pbkdf_vector.salt, PARSER_BIN},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
 		{"password",		{.data.buf = &pbkdf_vector.password, PARSER_STRING},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
 		{"iterationCount",	{.data.integer = &pbkdf_vector.iteration_count, PARSER_UINT},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
@@ -274,7 +274,7 @@ static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 	const struct json_array pbkdf_test = SET_ARRAY(pbkdf_test_entries, &pbkdf_testresult);
 
 	const struct json_entry pbkdf_testgroup_entries[] = {
-		{"hashAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"hmacAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
 		{"tests",		{.data.array = &pbkdf_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
 	};
 	const struct json_array pbkdf_testgroup = SET_ARRAY(pbkdf_testgroup_entries, NULL);

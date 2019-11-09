@@ -26,27 +26,27 @@
 /**
  * @brief SP800-108 KDF data structure
  *
- * @param mac [in] HMAC / CMAC to be used for the KDF
- * @param kdfmode [in] Mode of the KDF of one of the following flags:
+ * @var mac [in] HMAC / CMAC to be used for the KDF
+ * @var kdfmode [in] Mode of the KDF of one of the following flags:
  *		       ACVP_KDF_108_DOUBLE_PIPELINE
  *		       ACVP_KDF_108_FEEDBACK
  *		       ACVP_KDF_108_COUNTER
- * @param counter_location [in] Location of the counter specified with one
+ * @var counter_location [in] Location of the counter specified with one
  *				of the following flags:
  *				ACVP_KDF_108_AFTER_FIXED
  *				ACVP_KDF_108_BEFORE_FIXED
  *				ACVP_KDF_108_MIDDLE_FIXED
  *				ACVP_KDF_108_BEFORE_ITERATOR
- * @param counter_length [in] Length of counter to be used in bits
- * @param derived_key_length [in] Length of the derived key material to be
+ * @var counter_length [in] Length of counter to be used in bits
+ * @var derived_key_length [in] Length of the derived key material to be
  *				  produced by the KDF in bits.
- * @param key [in] Key derivation key
- * @param iv [in] For feedback mode KDF, use this IV.
- * @param fixed_data [out] Fixed input data string - this can be an arbitrary
+ * @var key [in] Key derivation key
+ * @var iv [in] For feedback mode KDF, use this IV.
+ * @var fixed_data [out] Fixed input data string - this can be an arbitrary
  *			   string that is used as label/counter input. The
  *			   backend / IUT must generate that string and return
  *			   it.
- * @param derived_key [out] The derived keying material output.
+ * @var derived_key [out] The derived keying material output.
  */
 struct kdf_108_data {
 	uint64_t mac;
@@ -65,7 +65,7 @@ struct kdf_108_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param kdf_108 Perform an SP800-108 key derivation
+ * @var kdf_108 Perform an SP800-108 key derivation
  */
 struct kdf_108_backend {
 	int (*kdf_108)(struct kdf_108_data *data, flags_t parsed_flags);

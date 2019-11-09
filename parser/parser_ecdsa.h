@@ -29,10 +29,10 @@
  *	  for FIPS 186-4 B.4.2 (ECDSA key generation with testing candiates)
  *	  tests as specified in the ECDSA CAVS specification.
  *
- * @param d [out] ECDSA private key point
- * @param Qx [out] ECDSA affine x coordinate of public point Q
- * @param Qy [out] ECDSA affine y coordinate of public point Q
- * @param cipher [in] Cipher pointing to the curve
+ * @var d [out] ECDSA private key point
+ * @var Qx [out] ECDSA affine x coordinate of public point Q
+ * @var Qy [out] ECDSA affine y coordinate of public point Q
+ * @var cipher [in] Cipher pointing to the curve
  */
 struct ecdsa_keygen_data {
 	struct buffer d;
@@ -47,10 +47,10 @@ struct ecdsa_keygen_data {
  *	  for FIPS 186-4 B.4.1 (ECDSA key generation with extra entropy)
  *	  tests as specified in the ECDSA CAVS specification.
  *
- * @param d [out] ECDSA private key point
- * @param Qx [out] ECDSA affine x coordinate of public point Q
- * @param Qy [out] ECDSA affine y coordinate of public point Q
- * @param cipher [in] Cipher pointing to the curve
+ * @var d [out] ECDSA private key point
+ * @var Qx [out] ECDSA affine x coordinate of public point Q
+ * @var Qy [out] ECDSA affine y coordinate of public point Q
+ * @var cipher [in] Cipher pointing to the curve
  */
 struct ecdsa_keygen_extra_data {
 	struct buffer d;
@@ -63,10 +63,10 @@ struct ecdsa_keygen_extra_data {
  * @brief ECDSA key verification data structure holding the data for the cipher
  *	  operations specified in ecdsa_pkvver.
  *
- * @param Qx [in] ECDSA affine x coordinate of public point Q
- * @param Qy [in] ECDSA affine y coordinate of public point Q
- * @param cipher [in] Cipher pointing to the curve
- * @param keyver_success [out] Is ECDSA key verification with given parameters
+ * @var Qx [in] ECDSA affine x coordinate of public point Q
+ * @var Qy [in] ECDSA affine y coordinate of public point Q
+ * @var cipher [in] Cipher pointing to the curve
+ * @var keyver_success [out] Is ECDSA key verification with given parameters
  *			       successful (1) or whether it failed (0).
  */
 struct ecdsa_pkvver_data {
@@ -82,25 +82,25 @@ struct ecdsa_pkvver_data {
  *	  CAVS specification.
  *
  * NOTE: You MUST use the very same private key for the same curve. That means
- *	 you generate a new ECDSA key when a new curve in @param cipher value is
+ *	 you generate a new ECDSA key when a new curve in @var cipher value is
  *	 provided. If the Qx and Qy values of the data structure below are not
  *	 filled, you must copy the Qx and Qy from you used key. To simplify the
  *	 entire key handling, you may implement the helper functions
- *	 registered with @param ecdsa_keygen_en and @param ecdsa_free_key below.
+ *	 registered with @var ecdsa_keygen_en and @var ecdsa_free_key below.
  *	 When using these functions, you must ensure that the ECDSA signature
  *	 generation is invoked single-threaded because the generated
  *	 ECDSA key and the Qx and Qy parameter are stored in a global variable.
  *
- * @param msg [in] Plaintext message to be signed.
- * @param Qx [in/out] ECDSA affine x coordinate of public point Q that was used
+ * @var msg [in] Plaintext message to be signed.
+ * @var Qx [in/out] ECDSA affine x coordinate of public point Q that was used
  *		      to sign the message
- * @param Qy [in/out] ECDSA affine y coordinate of public point Q that was used
+ * @var Qy [in/out] ECDSA affine y coordinate of public point Q that was used
  *		      to sign the message
- * @param R [out] R part of the generated ECDSA signature
- * @param S [out] S part of the generated ECDSA signature
- * @param cipher [in] Curve and hash algorithm to be used for ECDSA signature
+ * @var R [out] R part of the generated ECDSA signature
+ * @var S [out] S part of the generated ECDSA signature
+ * @var cipher [in] Curve and hash algorithm to be used for ECDSA signature
  *		      generation.
- * @param privkey [in] ECDSA private key to be used for signature generation.
+ * @var privkey [in] ECDSA private key to be used for signature generation.
  *		  This variable is only set if ecdsa_keygen_en callback
  *		  provided.
  */
@@ -119,16 +119,16 @@ struct ecdsa_siggen_data {
  *	  signature verification operation. This test is specified in the ECDSA
  *	  CAVS specification.
  *
- * @param msg [in] Plaintext message to be signature verified.
- * @param Qx [in] ECDSA affine x coordinate of public point Q that was used to
+ * @var msg [in] Plaintext message to be signature verified.
+ * @var Qx [in] ECDSA affine x coordinate of public point Q that was used to
  *		  sign the message
- * @param Qy [in] ECDSA affine y coordinate of public point Q that was used to
+ * @var Qy [in] ECDSA affine y coordinate of public point Q that was used to
  *		  sign the message
- * @param R [in] R part of the ECDSA signature to be verified
- * @param S [in] S part of the ECDSA signature to be verified
- * @param cipher [in] Curve and hash algorithm to be used for ECDSA signature
+ * @var R [in] R part of the ECDSA signature to be verified
+ * @var S [in] S part of the ECDSA signature to be verified
+ * @var cipher [in] Curve and hash algorithm to be used for ECDSA signature
  *		      generation.
- * @param sigver_success [out] Is ECDSA signature verification with given
+ * @var sigver_success [out] Is ECDSA signature verification with given
  *			       parameters successful (1) or whether it
  *			       failed (0).
  */
@@ -148,20 +148,20 @@ struct ecdsa_sigver_data {
  *	  shall be tested.
  *
  * All functions return 0 on success or != 0 on error. Note, a failure in the
- * ECDSA key verification @param ecdsa_pkvver due to problematic input
+ * ECDSA key verification @var ecdsa_pkvver due to problematic input
  * parameters is expected. In such cases, an ECDSA key verification error is
  * still considered to be a successful operation and the return code should be
- * 0. Similarly, the signature verification callback @param ecdsa_sigver shall
+ * 0. Similarly, the signature verification callback @var ecdsa_sigver shall
  * return 0 if the signature verification fails. Only if some general error is
  * detected a return code != must be returned.
  *
- * @param ecdsa_keygen ECDSA key generation for B.4.2 testing candidates
- * @param ecdsa_keygen_extra ECDSA key generation for B.4.1 with extra entropy
- * @param ecdsa_pkvver ECDSA key verification
- * @param ecdsa_siggen ECDSA signature generation
- * @param ecdsa_sigver ECDSA signature verification
+ * @var ecdsa_keygen ECDSA key generation for B.4.2 testing candidates
+ * @var ecdsa_keygen_extra ECDSA key generation for B.4.1 with extra entropy
+ * @var ecdsa_pkvver ECDSA key verification
+ * @var ecdsa_siggen ECDSA signature generation
+ * @var ecdsa_sigver ECDSA signature verification
  *
- * @param ecdsa_keygen_en This is an optional helper call to reduce the amount
+ * @var ecdsa_keygen_en This is an optional helper call to reduce the amount
  *			of code in the backend for signature generation. The
  *			ACVP protocol requires that the same ECDSA key is used
  *			for multiple signature generation operation. Yet,
@@ -169,12 +169,12 @@ struct ecdsa_sigver_data {
  *			ACVP Parser to manage the ECDSA key and invoke the
  *			ECDSA key generation, you may provide this function with
  *			the following parameters:
- *			@param curve [in] Curve of the ECDSA key to generate.
- *			@param qx [out] Qx affine parameter of ECDSA key
- *			@param qx [out] Qy affine parameter of ECDSA key
- *			@param privkey [out] Provide the pointer to the ECDSA
+ *			@var curve [in] Curve of the ECDSA key to generate.
+ *			@var qx [out] Qx affine parameter of ECDSA key
+ *			@var qx [out] Qy affine parameter of ECDSA key
+ *			@var privkey [out] Provide the pointer to the ECDSA
  *				        private key.
- * @param ecdsa_free_key This function is required if ecdsa_keygen_en is
+ * @var ecdsa_free_key This function is required if ecdsa_keygen_en is
  * 			 registered. This function is intended to free the
  *			 private ECDSA key handle created with ecdsa_keygen_en.
  */

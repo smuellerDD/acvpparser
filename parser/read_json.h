@@ -20,6 +20,7 @@
 #ifndef _READ_JSON_H
 #define _READ_JSON_H
 
+#include "bool.h"
 #include "parser.h"
 #include "logger.h"
 
@@ -124,6 +125,11 @@ int json_add_uint2hex(struct json_object *dst, const char *key, uint32_t val);
 void json_print_data(struct json_object *jobj, FILE *stream);
 
 /*
+ * Write the JSON object to a file
+ */
+int json_write_data(struct json_object *jobj, const char *filename);
+
+/*
  * Read the JSON data from file and parse it.
  */
 int json_read_data(const char *filename, struct json_object **inobj);
@@ -141,13 +147,25 @@ int json_read_data(const char *filename, struct json_object **inobj);
  *   }
  * ]
  *
- * @full_json: [in] JSON object containing fully parsed ACVP response
- * @inobj: [out] JSON object that contains the real data
- * @versionobj: [out] JSON object that contains the version part
+ * @param full_json [in] JSON object containing fully parsed ACVP response
+ * @param inobj [out] JSON object that contains the real data
+ * @param versionobj [out] JSON object that contains the version part
  */
 int json_split_version(struct json_object *full_json,
 		       struct json_object **inobj,
 		       struct json_object **versionobj);
+
+/**
+ * Check that the ACVP server version matches an expected version.
+ *
+ * @param in [in] JSON object containing the version information (e.g. the
+ *		  @var versionobj variable from json_split_version)
+ * @param exp_version [in] Expected version
+ * @param out [in] JSON object that the version information should be written
+ *		   to in case a match is found - it may be NULL
+ */
+int json_check_acvversion(struct json_object *in, const char *exp_version,
+			  struct json_object *out);
 
 enum json_validate_res {
 	JSON_VAL_RES_FAIL,
@@ -160,12 +178,30 @@ enum json_validate_res {
 
 /**
  * Validate the actual test result provided with @param actualfile with an
- * expected result found in @param expectedfile.
+ * expected result found in @param expectedfile .
  *
  * It is permissible that the expected file is not present.
  */
 enum json_validate_res json_validate_result(const char *actualfile,
 					    const char *expectedfile);
+
+/**
+ * Generate a JSON structure compliant to the ACVP request test vectors. This
+ * function can be invoked multiple times:
+ * (1) It will always generate the vector structure.
+ * (2) If @param test is NULL, it will generate the test structure for the
+ *     tests array.
+ * (3) If @param testgroup is null, it will generate the full_json
+ *     and testgroup structure.
+ */
+int json_acvp_generate(struct json_object **full_json,
+		       struct json_object **testdef,
+		       struct json_object **testgroup,
+		       struct json_object **test,
+		       struct json_object **vectors,
+		       const char *version,
+		       const char *algorithm,
+		       bool issample);
 
 /*
  * The return value is treated as a flags array:

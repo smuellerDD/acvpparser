@@ -29,7 +29,7 @@ static inline uint32_t rol(uint32_t x, int n)
 
 static inline uint16_t rol16(uint16_t x, int n)
 {
-	return ( (x << (n&(16-1))) | (x >> ((16-n)&(16-1))) );
+	return (uint16_t)( (x << (n&(16-1))) | (x >> ((16-n)&(16-1))) );
 }
 
 static inline uint32_t ror(uint32_t x, int n)
@@ -39,23 +39,24 @@ static inline uint32_t ror(uint32_t x, int n)
 
 static inline uint16_t ror16(uint16_t x, int n)
 {
-	return ( (x >> (n&(16-1))) | (x << ((16-n)&(16-1))) );
+	return (uint16_t)( (x >> (n&(16-1))) | (x << ((16-n)&(16-1))) );
 }
 
 /* Byte swap for 16-bit, 32-bit and 64-bit integers. */
 static inline uint16_t _bswap16(uint16_t x)
 {
-	return ((rol16(x, 8) & 0x00ff) | (ror16(x, 8) & 0xff00));
+	return (uint16_t)((rol16(x, 8) & 0x00ff) | (ror16(x, 8) & 0xff00));
 }
 
 static inline uint32_t _bswap32(uint32_t x)
 {
-	return ((rol(x, 8) & 0x00ff00ffL) | (ror(x, 8) & 0xff00ff00L));
+	return (uint32_t)((rol(x, 8) & 0x00ff00ffL) | (ror(x, 8) & 0xff00ff00L));
 }
 
 static inline uint64_t _bswap64(uint64_t x)
 {
-	return ((uint64_t)_bswap32((uint32_t)x) << 32) | (_bswap32(x >> 32));
+	return ((uint64_t)_bswap32((uint32_t)x) << 32) |
+		((uint64_t)_bswap32((uint32_t)x) >> 32);
 }
 
 #define GCC_VERSION (__GNUC__ * 10000		\

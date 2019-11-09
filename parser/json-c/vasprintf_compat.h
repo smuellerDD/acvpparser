@@ -29,7 +29,7 @@ static int _vasprintf(char **buf, const char *fmt, va_list ap)
 	if(chars < 0) { chars *= -1; } /* CAW: old glibc versions have this problem */
 #endif /* defined(WIN32) */
 
-	b = (char*)malloc(sizeof(char)*chars);
+	b = (char*)malloc((sizeof(char)*(unsigned long)chars));
 	if(!b) { return -1; }
 
 	if((chars = vsprintf(b, fmt, ap)) < 0)

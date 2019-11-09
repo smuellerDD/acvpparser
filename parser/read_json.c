@@ -22,6 +22,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -183,7 +184,7 @@ int mpint2bin(const char *mpi, uint32_t mpilen, struct buffer *buf)
 		const char *ptr = mpint->value;
 
 		/* Reduce the length of the string by the header */
-		mpilen -= sizeof(mpint->len);
+		mpilen -= (uint32_t)sizeof(mpint->len);
 
 		/* Remove leading zero byte */
 		if (mpilen > 2 && mpint->value[0] == 60 &&
@@ -244,7 +245,7 @@ int json_get_bool(const struct json_object *obj, const char *name,
 	if (ret)
 		return ret;
 
-	*integer = json_object_get_boolean(o);
+	*integer = (uint32_t)json_object_get_boolean(o);
 
 	return 0;
 }
@@ -292,6 +293,8 @@ int json_get_string_buf(const struct json_object *obj, const char *name,
 	ret = alloc_buf(len + 1, buf);
 	if (ret)
 		return ret;
+
+	buf->len--;
 
 	strncpy((char *)buf->buf, string, buf->len);
 
@@ -401,6 +404,30 @@ void json_print_data(struct json_object *jobj, FILE *stream)
 	fprintf(stream, "%s\n", string ? string : "(null)");
 }
 
+int json_write_data(struct json_object *jobj, const char *filename)
+{
+	FILE *outfile;
+
+	if (!jobj)
+		return 0;
+
+	outfile = fopen(filename, "w");
+
+	if (!outfile) {
+		int errsv = -errno;
+
+		logger(LOGGER_ERR,
+		       "Cannot open output file %s for writing: %d\n",
+		       filename, errsv);
+		return errsv;
+	}
+	json_print_data(jobj, outfile);
+
+	fclose(outfile);
+
+	return 0;
+}
+
 int json_read_data(const char *filename, struct json_object **inobj)
 {
 	struct json_object *o =  json_object_from_file(filename);
@@ -477,6 +504,26 @@ out:
 	return ret;
 }
 
+/*
+ * Prune any auxiliary data in the first level of the test results - this is
+ * needed to match with the ACVP-server-provided expected files which contain
+ * additional data not produced by the ACVP Parser.
+ */
+static void json_prune_data(struct json_object *in)
+{
+	json_object_object_foreach(in, key, child) {
+		(void)child;
+		if (strncmp(key, "vsId", 4) &&
+		    strncmp(key, "testGroups", 10))
+			json_object_object_del(in, key);
+	}
+}
+
+static int json_strncasecmp(const void *s1, const void *s2, size_t n)
+{
+	return strncasecmp(s1, s2, n);
+}
+
 enum json_validate_res json_validate_result(const char *actualfile,
 					    const char *expectedfile)
 {
@@ -484,8 +531,9 @@ enum json_validate_res json_validate_result(const char *actualfile,
 			   *expecteddata, *expectedversion,
 			   *actualdata, *actualversion;
 	struct stat statbuf;
+	enum json_validate_res rc = JSON_VAL_RES_FAIL_EXPECTED;
 	int ret;
-
+    
 	/*
 	 * If file not found, do not return an error, user does not
 	 * want to have result validated.
@@ -503,21 +551,133 @@ enum json_validate_res json_validate_result(const char *actualfile,
 	/* Open and parse expected test result */
 	CKINT(json_read_data(expectedfile, &expected));
 	CKINT(json_split_version(expected, &expecteddata, &expectedversion));
+	json_prune_data(expecteddata);
 
 	/* Open and parse actual test result */
 	CKINT(json_read_data(actualfile, &actual));
 	CKINT(json_split_version(actual, &actualdata, &actualversion));
+	json_prune_data(actualdata);
 
-	ret = json_object_equal(expecteddata, actualdata);
+	ret = json_object_equal(expecteddata, actualdata, &json_strncasecmp);
 	if (ret)
-		ret = JSON_VAL_RES_PASS_EXPECTED;
+		rc = JSON_VAL_RES_PASS_EXPECTED;
 	else
-		ret = JSON_VAL_RES_FAIL_EXPECTED;
+		rc = JSON_VAL_RES_FAIL_EXPECTED;
 
 out:
 	if (expected)
 		json_object_put(expected);
 	if (actual)
 		json_object_put(actual);
-	return (ret < 0) ? JSON_VAL_RES_FAIL_EXPECTED : ret;
+	return (ret < 0) ? JSON_VAL_RES_FAIL_EXPECTED : rc;
 }
+
+int json_check_acvversion(struct json_object *in, const char *exp_version,
+			  struct json_object *out)
+{
+	struct json_object *o = NULL;
+	const char *ver;
+	int ret = json_find_key(in, "acvVersion", &o, json_type_string);
+
+	if (ret) {
+		json_logger(LOGGER_DEBUG, in, "Used JSON object");
+		return ret;
+	}
+
+	ver = json_object_to_json_string(o);
+	if (strstr(ver, exp_version)) {
+		logger(LOGGER_DEBUG, "Expected JSON file version %s found\n",
+		       ver);
+		if (out)
+			json_object_object_add(out, "acvVersion",
+					json_object_new_string(exp_version));
+		return 0;
+	} else {
+		logger(LOGGER_ERR,
+		       "Unexpected JSON file version %s (expected %s)\n",
+		       ver, exp_version);
+		return -EOPNOTSUPP;
+	}
+}
+
+int json_acvp_generate(struct json_object **full_json,
+		       struct json_object **testdef,
+		       struct json_object **testgroup,
+		       struct json_object **test,
+		       struct json_object **vectors,
+		       const char *version,
+		       const char *algorithm,
+		       bool issample)
+{
+	struct json_object *json = NULL, *td, *tmp, *testgroups, *v;
+	int ret;
+
+	if (!*test) {
+		if (!*testgroup) {
+			json = json_object_new_array();
+			CKNULL(json, -ENOMEM);
+
+			/* Version array member */
+			tmp = json_object_new_object();
+			CKNULL(tmp, -ENOMEM);
+			CKINT(json_object_array_add(json, tmp));
+			CKINT(json_object_object_add(tmp, "acvVersion",
+						json_object_new_string(version)));
+
+			/* Actual data - first level */
+			td = json_object_new_object();
+			CKNULL(td, -ENOMEM);
+			CKINT(json_object_array_add(json, td));
+			CKINT(json_object_object_add(td, "vsId",
+						json_object_new_int(INT_MAX)));
+			CKINT(json_object_object_add(td, "algorithm",
+						json_object_new_string(algorithm)));
+			CKINT(json_object_object_add(td, "revision",
+						json_object_new_string("1.0")));
+			CKINT(json_object_object_add(td, "isSample",
+						json_object_new_boolean(issample)));
+
+			/* Test groups */
+			testgroups = json_object_new_array();
+			CKNULL(tmp, -ENOMEM);
+			CKINT(json_object_object_add(td, "testGroups", testgroups));
+		} else {
+			json = *full_json;
+			td = *testdef;
+			testgroups = *testgroup;
+		}
+
+		/* One test group */
+		tmp = json_object_new_object();
+		CKNULL(tmp, -ENOMEM);
+		CKINT(json_object_array_add(testgroups, tmp));
+	} else {
+		json = *full_json;
+		td = *testdef;
+		testgroups = *testgroup;
+		tmp = *test;
+	}
+
+	v = json_object_new_array();
+	CKNULL(v, -ENOMEM);
+	CKINT(json_object_object_add(tmp, "tests", v));
+
+	if (full_json)
+		*full_json = json;
+	if (testdef)
+		*testdef = td;
+	if (testgroup)
+		*testgroup = testgroups;
+	if (test)
+		*test = tmp;
+	if (vectors)
+		*vectors = v;
+
+	return 0;
+
+out:
+	if (!*testgroup)
+		json_object_put(json);
+	return ret;
+}
+

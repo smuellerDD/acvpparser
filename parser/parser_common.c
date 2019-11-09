@@ -215,7 +215,7 @@ int write_one_entry(const struct json_entry *entry,
 		logger(LOGGER_DEBUG, "Add integer to test result %u\n",
 		       data->data.integer);
 		json_object_object_add(testresult, entry->name,
-				json_object_new_int(*data->data.integer));
+				json_object_new_int((int32_t)(*data->data.integer)));
 		break;
 
 	default:
@@ -234,12 +234,12 @@ out:
  *
  * @param writedef Write definition of parser specification
  * @param testvector Input JSON data to process
- * @param testsresults Output JSON data to fill with the unparsing.
+ * @param testresults Output JSON data to fill with the unparsing.
  * @param parsed_flags All previously parsed flags
  *
  * @return 0 on success, < 0 on error
  */
-static int write_all_results(const struct json_testresult *writeddef,
+static int write_all_results(const struct json_testresult *writedef,
 			     struct json_object *testvector,
 			     struct json_object *testresults,
 			     flags_t parsed_flags)
@@ -250,7 +250,7 @@ static int write_all_results(const struct json_testresult *writeddef,
 	int ret = 0;
 
 	/* If no test results are defined to be written, skip processing. */
-	if (!writeddef->count)
+	if (!writedef->count)
 		return 0;
 
 	/* Create output stream. */
@@ -259,7 +259,7 @@ static int write_all_results(const struct json_testresult *writeddef,
 	CKINT(json_add_test_data(testvector, testresult));
 
 	/* Iterate over each write definition and invoke it. */
-	for_each_testresult(writeddef, entry, i)
+	for_each_testresult(writedef, entry, i)
 		CKINT(write_one_entry(entry, testresult, parsed_flags));
 
 	CKINT(json_object_array_add(testresults, testresult));
@@ -329,6 +329,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(rsa_keygen)
 			CB_HANDLER(rsa_siggen)
 			CB_HANDLER(rsa_sigver)
+			CB_HANDLER(rsa_signature_primitive)
+			CB_HANDLER(rsa_decryption_primitive)
 			CB_HANDLER(dh_ss)
 			CB_HANDLER(dh_ss_ver)
 			CB_HANDLER(drbg)
@@ -338,6 +340,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(dsa_sigver)
 			CB_HANDLER(ecdh_ss)
 			CB_HANDLER(ecdh_ss_ver)
+			CB_HANDLER(ecdh_ed_ss)
+			CB_HANDLER(ecdh_ed_ss_ver)
 			CB_HANDLER(ecdsa_keygen)
 			CB_HANDLER(ecdsa_keygen_extra)
 			CB_HANDLER(ecdsa_pkvver)
@@ -354,6 +358,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kdf_ikev2)
 			CB_HANDLER(kdf_108)
 			CB_HANDLER(pbkdf)
+			CB_HANDLER(hkdf)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -395,12 +400,12 @@ struct parser_flagsconv {
  * Iterate over the flags definition of a given block and detect which flag
  * is set in the test case entry.
  *
- * @param obj: test case entry
- * @param parsed_flags: flags field that should contain the C flags
- * @param jsonkey: JSON key of the test vector holding the flag to be converted.
- * @param flagsconv: block of flags conversion definition to be applied. Only
- *		     one flag out of the flags definition array is allowed at
- *		     any given time.
+ * @param obj test case entry
+ * @param parsed_flags flags field that should contain the C flags
+ * @param jsonkey JSON key of the test vector holding the flag to be converted.
+ * @param flagsconv block of flags conversion definition to be applied. Only
+ *		    one flag out of the flags definition array is allowed at
+ *		    any given time.
  */
 static void parse_flagblock(const struct json_object *obj,
 			    flags_t *parsed_flags,
@@ -503,9 +508,9 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_ASYM_TYPE_KEYVER, {.string = "keyVer"}, "Asymmetric key verification"},
 	{FLAG_OP_RSA_TYPE_LEGACY_SIGVER, {.string = "legacySigVer"},
 					"RSA legacy signature verification"},
-	{FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE, {.string = "componentSigPrimitive"},
+	{FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE, {.string = "signaturePrimitive"},
 					"RSA signature component primitive"},
-	{FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE, {.string = "componentDecPrimitive"},
+	{FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE, {.string = "decryptionPrimitive"},
 					"RSA decryption component primitive"},
 	{FLAG_OP_DSA_TYPE_PQGGEN, {.string = "pqgGen"}, "DSA PQG generation"},
 	{FLAG_OP_DSA_TYPE_PQGVER, {.string = "pqgVer"}, "DSA PQG verification"},
@@ -812,7 +817,7 @@ static int parse_one_entry(const struct json_entry *entry,
 			   struct json_object *testresults)
 {
 	const struct json_data *data = &entry->data;
-	struct buffer_array *array;
+	struct buffer_array *barray;
 	int ret = 0;
 
 	CKNULL_LOG(entry, -EINVAL,
@@ -828,8 +833,8 @@ static int parse_one_entry(const struct json_entry *entry,
 		ret = json_get_bin(readdata, entry->name, data->data.buf);
 		break;
 	case PARSER_BIN_BUFFERARRAY:
-		array = data->data.buffer_array;
-		if (array->arraysize >= MAX_BUFFER_ARRAY) {
+		barray = data->data.buffer_array;
+		if (barray->arraysize >= MAX_BUFFER_ARRAY) {
 			logger(LOGGER_ERR,
 			       "Array size %u reached, diregarding entry\n",
 			       MAX_BUFFER_ARRAY);
@@ -838,10 +843,10 @@ static int parse_one_entry(const struct json_entry *entry,
 		}
 
 		ret = json_get_bin(readdata, entry->name,
-				   &array->buffers[array->arraysize]);
+				   &barray->buffers[barray->arraysize]);
 		logger(LOGGER_DEBUG, "Parsing buffer array entry %u\n",
-		       array->arraysize);
-		array->arraysize++;
+		       barray->arraysize);
+		barray->arraysize++;
 		break;
 	case PARSER_UINT:
 		ret = json_get_uint(readdata, entry->name,
@@ -876,11 +881,11 @@ static int parse_one_entry(const struct json_entry *entry,
 			for (i = 0;
 			     i < (uint32_t)json_object_array_length(readdata);
 			     i++) {
-				struct cipher_array *array =
+				struct cipher_array *carray =
 							data->data.cipher_array;
 				const char *cipher;
 
-				if (array->arraysize >= MAX_BUFFER_ARRAY) {
+				if (carray->arraysize >= MAX_BUFFER_ARRAY) {
 					logger(LOGGER_ERR,
 					"Array size %u reached, diregarding entry\n",
 					       MAX_CIPHER_ARRAY);
@@ -890,17 +895,17 @@ static int parse_one_entry(const struct json_entry *entry,
 
 				CKINT(json_get_string(readdata, entry->name,
 						      &cipher));
-				array->cipher[array->arraysize] =
+				carray->cipher[carray->arraysize] =
 					convert_algo_cipher(cipher,
-						array->cipher[array->arraysize]);
-				if (array->cipher[array->arraysize] ==
+						carray->cipher[carray->arraysize]);
+				if (carray->cipher[carray->arraysize] ==
 				    ACVP_UNKNOWN) {
 					logger(LOGGER_WARN,
 					       "Unknown cipher algorithm %s\n", cipher);
 					ret = -EINVAL;
 					goto out;
 				}
-				array->arraysize++;
+				carray->arraysize++;
 			}
 			break;
 		}
@@ -999,8 +1004,6 @@ static int parse_all_processdata(const struct json_array *processdata,
 
 	/* Iterate over each write definition and invoke it. */
 	if (tgid_entry && processdata->testresult) {
-		const struct json_entry *entry;
-
 		for_each_testresult(processdata->testresult, entry, i)
 			CKINT(write_one_entry(entry, tgid_entry, parsed_flags));
 
@@ -1009,33 +1012,6 @@ static int parse_all_processdata(const struct json_array *processdata,
 
 out:
 	return ret ? ret : processed;
-}
-
-static int check_acvversion(struct json_object *in, const char *exp_version,
-			    struct json_object *out)
-{
-	struct json_object *o = NULL;
-	const char *ver;
-	int ret = json_find_key(in, "acvVersion", &o, json_type_string);
-
-	if (ret) {
-		json_logger(LOGGER_DEBUG, in, "Used JSON object");
-		return ret;
-	}
-
-	ver = json_object_to_json_string(o);
-	if (strstr(ver, exp_version)) {
-		logger(LOGGER_DEBUG, "Expected JSON file version %s found\n",
-		       ver);
-		json_object_object_add(out, "acvVersion",
-				       json_object_new_string(exp_version));
-		return 0;
-	} else {
-		logger(LOGGER_ERR,
-		       "Unexpected JSON file version %s (expected %s)\n",
-		       ver, exp_version);
-		return -EOPNOTSUPP;
-	}
 }
 
 int process_json(const struct json_array *processdata, const char *exp_version,
@@ -1057,7 +1033,7 @@ int process_json(const struct json_array *processdata, const char *exp_version,
 	/* Check the version of the JSON input with the expected version. */
 	outversion = json_object_new_object();
 	CKNULL(outversion, -ENOMEM);
-	CKINT(check_acvversion(versiondata, exp_version, outversion));
+	CKINT(json_check_acvversion(versiondata, exp_version, outversion));
 
 	/* Add version information to final output array. */
 	CKINT(json_object_array_add(out, outversion));

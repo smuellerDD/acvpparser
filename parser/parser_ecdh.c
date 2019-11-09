@@ -26,7 +26,7 @@
 
 #define ECDH_DEF_CALLBACK(name, flags)	DEF_CALLBACK(ecdh, name, flags)
 
-struct ecdh_backend *ecdh_backend = NULL;
+static struct ecdh_backend *ecdh_backend = NULL;
 
 static int ecdh_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)

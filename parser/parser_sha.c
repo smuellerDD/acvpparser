@@ -28,7 +28,7 @@
 #include "parser_common.h"
 #include "parser_sha.h"
 
-struct sha_backend *sha_backend = NULL;
+static struct sha_backend *sha_backend = NULL;
 
 #define min(x, y)	(((size_t)x < (size_t)y) ? x : y)
 

@@ -32,6 +32,7 @@
 #include "parser_drbg.h"
 #include "parser_dsa.h"
 #include "parser_ecdh.h"
+#include "parser_ecdh_ed.h"
 #include "parser_ecdsa.h"
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
@@ -41,10 +42,9 @@
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
 #include "parser_pbkdf.h"
+#include "parser_hkdf.h"
 #include "parser_rsa.h"
 #include "parser_sha.h"
 #include "parser_sym.h"
-
-
 
 #endif /* _BACKEND_COMMON_H */

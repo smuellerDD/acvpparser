@@ -26,7 +26,7 @@
 
 #define DH_DEF_CALLBACK(name, flags)	DEF_CALLBACK(dh, name, flags)
 
-struct dh_backend *dh_backend = NULL;
+static struct dh_backend *dh_backend = NULL;
 
 static int dh_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)

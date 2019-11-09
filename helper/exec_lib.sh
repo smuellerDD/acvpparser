@@ -14,11 +14,23 @@ fi
 _LIB_IUT="testvectors"
 _LIB_REQ="testvector-request.json"
 _LIB_RESP="testvector-response.json"
+_LIB_EXPECTED="testvector-expected.json"
 #_LIB_OE="operational_environment.json"
 _LIB_REGRESSION="${_LIB_RESP}.regression.$$"
 
 failures=0
 local_failures=0
+
+EBITS=${EBITS:-"64 32"}
+ABITS=()
+for B in ${EBITS}; do
+    ABITS+=("_${B}_bit___ ")
+done
+EXEC_TYPES=${ABITS[@]}
+
+EXEC_TYPES__64_bit___=""
+EXEC_TYPES__32_bit___="CFLAGS=-m32 LDFLAGS=-m32"
+
 
 color()
 {
@@ -47,7 +59,7 @@ color()
 
 echo_pass()
 {
-	echo $(color "green")[PASSED]$(color off) $@
+	echo $(color "green")[GENERATED]$(color off) $@
 }
 
 echo_fail()
@@ -193,6 +205,7 @@ exec_module()
 			local vsid_dir=$(basename $dir)
 			local testid_dir=$(dirname $dir)
 			local found=0
+			local respfile=$_LIB_RESP
 
 			for j in $vsid
 			do
@@ -241,8 +254,13 @@ exec_module()
 
 			if [ ! -f $dir/$_LIB_RESP -a -n "$regression" -a x"$regression" != x"X" ]
 			then
-				echo_deact "Response file missing but regression testing requested - skipping $dir"
-				continue
+				if [ -f $dir/$_LIB_EXPECTED ]
+				then
+					respfile=$_LIB_EXPECTED
+				else
+					echo_deact "Response file missing but regression testing requested - skipping $dir"
+					continue
+				fi
 			fi
 
 			if [ ! -f $dir/$_LIB_REQ ]
@@ -261,7 +279,7 @@ exec_module()
 			then
 				# Do real testing
 
-				$_LIB_EXEC $module $dir/$_LIB_REQ $dir/$_LIB_RESP
+				$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_RESP
 				local ret=$?
 				if [ $ret -eq 95 ]	#EOPNOTSUPP
 				then
@@ -303,7 +321,7 @@ exec_module()
 					continue
 				fi
 
-				$_LIB_EXEC $module $dir/$_LIB_REQ $dir/$_LIB_REGRESSION
+				$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_REGRESSION
 				local ret=$?
 				if [ $ret -eq 95 ]	#EOPNOTSUPP
 				then
@@ -312,7 +330,7 @@ exec_module()
 				then
 					echo_fail "Execution for $dir failed (error code $ret) - executed command:"
 					echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_REGRESSION"
-				elif ! $($_LIB_EXEC -e $dir/$_LIB_REGRESSION $dir/$_LIB_RESP > /dev/null); then
+				elif ! $($_LIB_EXEC -e $dir/$_LIB_REGRESSION $dir/$respfile > /dev/null); then
 					echo_fail "Regression testing for $dir"
 				else
 					echo_pass "Regression testing for $dir"

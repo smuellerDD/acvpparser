@@ -13,6 +13,7 @@
 #undef realloc
 
 #include "strerror_override.h"
+#include "json_object_private.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -92,7 +93,7 @@ struct json_object* json_object_from_fd(int fd)
     _json_c_set_last_err("json_object_from_file: printbuf_new failed\n");
     return NULL;
   }
-  while((ret = read(fd, buf, JSON_FILE_BUF_SIZE)) > 0) {
+  while((ret = (int)read(fd, buf, JSON_FILE_BUF_SIZE)) > 0) {
     printbuf_memappend(pb, buf, ret);
   }
   if(ret < 0) {
@@ -168,7 +169,7 @@ static int _json_object_to_fd(int fd, struct json_object *obj, int flags, const 
 	wsize = (unsigned int)(strlen(json_str) & UINT_MAX); /* CAW: probably unnecessary, but the most 64bit safe */
 	wpos = 0;
 	while(wpos < wsize) {
-		if((ret = write(fd, json_str + wpos, wsize-wpos)) < 0) {
+		if((ret = (int)write(fd, json_str + wpos, wsize-wpos)) < 0) {
 		  _json_c_set_last_err("json_object_to_file: error writing file %s: %s\n",
 			 filename, strerror(errno));
 		  return -1;

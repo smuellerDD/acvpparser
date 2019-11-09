@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2019, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2019, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -17,29 +17,23 @@
  * DAMAGE.
  */
 
-#ifndef CONSTRUCTOR_H
-#define CONSTRUCTOR_H
+#ifndef ALGORITHMS_H
+#define ALGORITHMS_H
+
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#if  __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
-#define ACVP_DEFINE_CONSTRUCTOR(_func)	\
-	static void __attribute__((constructor)) _func (void);
-#define ACVP_DEFINE_DESTRUCTOR(_func)	\
-	static void __attribute__((destructor)) _func (void);
-
-#else
-
-#error "Constructor / destructor not defined for compiler"
-
-#endif
+uint64_t convert_algo_cipher(const char *algo, uint64_t cipher);
+int convert_cipher_algo(uint64_t cipher, const char **algo);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CONSTRUCTOR_H */
+#endif /* ALGORITHMS_H */

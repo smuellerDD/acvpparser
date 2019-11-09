@@ -71,63 +71,63 @@
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @param L [in] L size in bits
- * @param N [in] N size in bits
- * @param cipher [in] Hash type to use for PQG operation
- * @param P [out: PQ generation, in: G generation, in: PQG verification] domain
+ * @var L [in] L size in bits
+ * @var N [in] N size in bits
+ * @var cipher [in] Hash type to use for PQG operation
+ * @var P [out: PQ generation, in: G generation, in: PQG verification] domain
  *	    parameter P
- * @param Q [out: PQ generation, in: G generation, in: PQG verification] domain
+ * @var Q [out: PQ generation, in: G generation, in: PQG verification] domain
  *	    parameter Q
- * @param G [out: G generation, in: PQG verification] domain parameter G
+ * @var G [out: G generation, in: PQG verification] domain parameter G
  *
- * @param g_canon_index [out: G generation, in: G verification] The index
+ * @var g_canon_index [out: G generation, in: G verification] The index
  *			value provided to the generator in canonical method.
  *			Only to be used for canonical G generation /
  *			verification.
- * @param g_canon_domain_param_seed [out: G generation, in: G verification] The
+ * @var g_canon_domain_param_seed [out: G generation, in: G verification] The
  *				    seed used for the P and Q generation in
  *				    the probable method. Only to be used for
  *				    unverifiable G generation / verification.
  *
- * @param g_unver_domain_param_seed [out: G generation, in: G verification] The
+ * @var g_unver_domain_param_seed [out: G generation, in: G verification] The
  *				    seed used for the P and Q generation in
  *				    the probable method. Only to be used for
  *				    unverifiable G generation / verification.
- * @param g_unver_h [out: G generation, in: G verification] The index
+ * @var g_unver_h [out: G generation, in: G verification] The index
  *		    value provided to the generator in unverifiable method.
  *		    Only to be used for unverifiable G generation /
  *		    verification.
  *
- * @param pg_prob_counter [out: PQ generation, in: PQ verification] The counter
+ * @var pg_prob_counter [out: PQ generation, in: PQ verification] The counter
  *			  to be used for the probable P and Q generation. Only
  *			  to be used for PQ generation / verification with
  *			  probable primes.
- * @param pq_prob_domain_param_seed [out: PQ generation, in: PQ verification]
+ * @var pq_prob_domain_param_seed [out: PQ generation, in: PQ verification]
  *				    The seed used for the P and Q generation in
  *				    the probable method. Only to be used for
  *				    probable P/Q generation / verification.
  *
- * @param pq_prov_firstseed [out: PQ generation, in: PQ: verification]
+ * @var pq_prov_firstseed [out: PQ generation, in: PQ: verification]
  *			    Firstseed for PQ generation. Only to be used for PQ
  *			    generation / verification with provable primes.
- * @param pq_prov_pcounter [out: PQ generation, in: PQ verification] The counter
+ * @var pq_prov_pcounter [out: PQ generation, in: PQ verification] The counter
  *			   to be used for the provable P generation. Only to be
  *			   used for PQ generation / verification with provable
  *			   primes.
- * @param pq_prov_qcounter [out: PQ generation, in: PQ verification] The counter
+ * @var pq_prov_qcounter [out: PQ generation, in: PQ verification] The counter
  *			   to be used for the provable Q generation. Only to be
  *			   used for PQ generation / verification with provable
  *			   primes.
- * @param pq_prov_pseed [out] PQ generation, in: PQ verification] The seed
+ * @var pq_prov_pseed [out] PQ generation, in: PQ verification] The seed
  *			to be used for the provable P generation. Only to be
  *			used for PQ generation / verification with provable
  *			primes.
- * @param pq_prov_qseed [out] PQ generation, in: PQ verification] The seed
+ * @var pq_prov_qseed [out] PQ generation, in: PQ verification] The seed
  *			to be used for the provable Q generation. Only to be
  *			used for PQ generation / verification with provable
  *			primes.
  *
- * @param pqgver_success [out] for PQG verification only] Is PQ or G
+ * @var pqgver_success [out] for PQG verification only] Is PQ or G
  *			 verification with given parameters successful (1) or
  *			 whether it failed (0).
  */
@@ -165,12 +165,12 @@ struct dsa_pqg_data {
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @param cipher [in] Hash type to use for signature operation
- * @param L [in] L size in bits
- * @param N [in] N size in bits
- * @param P [out] domain parameter P
- * @param Q [out] domain parameter Q
- * @param G [out] domain parameter G
+ * @var cipher [in] Hash type to use for signature operation
+ * @var L [in] L size in bits
+ * @var N [in] N size in bits
+ * @var P [out] domain parameter P
+ * @var Q [out] domain parameter Q
+ * @var G [out] domain parameter G
  */
 struct dsa_pqggen_data {
 	uint64_t cipher;
@@ -188,13 +188,13 @@ struct dsa_pqggen_data {
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @param pqg.L [in] L size in bits
- * @param pqg.N [in] N size in bits
- * @param pqg.P [in] domain parameter P
- * @param pqg.Q [in] domain parameter Q
- * @param pqg.G [in] domain parameter G
- * @param X [out] private DSA key parameter X
- * @param Y [out] public DSA key parameter Y
+ * @var pqg.L [in] L size in bits
+ * @var pqg.N [in] N size in bits
+ * @var pqg.P [in] domain parameter P
+ * @var pqg.Q [in] domain parameter Q
+ * @var pqg.G [in] domain parameter G
+ * @var X [out] private DSA key parameter X
+ * @var Y [out] public DSA key parameter Y
  */
 struct dsa_keygen_data {
 	struct dsa_pqggen_data pqg;
@@ -207,11 +207,11 @@ struct dsa_keygen_data {
  *	  cipher operations specified with dsa_siggen.
  *
  * NOTE: You MUST use the very same private key for the same modulo. That means
- *	 you generate a new DSA key when a new @param pqg value set is provided.
+ *	 you generate a new DSA key when a new @var pqg value set is provided.
  *	 If the Y value of the data structure below is not filled,
  *	 you must copy the DSA.Y from your used key. To simplify the
  *	 entire key handling, you may implement the helper functions
- *	 registered with @param dsa_keygen_en and @param dsa_free_key below.
+ *	 registered with @var dsa_keygen_en and @var dsa_free_key below.
  *	 When using these functions, you must ensure that the DSA signature
  *	 generation is invoked single-threaded because the generated
  *	 DSA key and the Y parameter is stored in a global variable.
@@ -219,17 +219,17 @@ struct dsa_keygen_data {
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @param cipher [in] Hash type to use for signature operation
- * @param msg [in] Message that shall be signed
- * @param pqg.L [in] L size in bits
- * @param pqg.N [in] N size in bits
- * @param pqg.P [out] domain parameter P
- * @param pqg.Q [out] domain parameter Q
- * @param pqg.G [out] domain parameter G
- * @param Y [out] public DSA key parameter Y
- * @param R [out] DSA signature parameter R
- * @param S [out] DSA signature parameter S
- * @param privkey [in] DSA private key to be used for signature generation.
+ * @var cipher [in] Hash type to use for signature operation
+ * @var msg [in] Message that shall be signed
+ * @var pqg.L [in] L size in bits
+ * @var pqg.N [in] N size in bits
+ * @var pqg.P [out] domain parameter P
+ * @var pqg.Q [out] domain parameter Q
+ * @var pqg.G [out] domain parameter G
+ * @var Y [out] public DSA key parameter Y
+ * @var R [out] DSA signature parameter R
+ * @var S [out] DSA signature parameter S
+ * @var privkey [in] DSA private key to be used for signature generation.
  *		  This variable is only set if dsa_keygen_en callback provided.
  */
 struct dsa_siggen_data {
@@ -249,17 +249,17 @@ struct dsa_siggen_data {
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @param pqg.L [in] L size in bits
- * @param pqg.N [in] N size in bits
- * @param cipher [in] Hash type to use for signature operation
- * @param msg [in] Message whose signature shall be verified
- * @param pqg.P [in] domain parameter P
- * @param pqg.Q [in] domain parameter Q
- * @param pqg.G [in] domain parameter G
- * @param Y [in] public DSA key parameter Y
- * @param R [in] DSA signature parameter R
- * @param S [in] DSA signature parameter S
- * @param sigver_success [out] Is DSA signature successfully verified (1) or
+ * @var pqg.L [in] L size in bits
+ * @var pqg.N [in] N size in bits
+ * @var cipher [in] Hash type to use for signature operation
+ * @var msg [in] Message whose signature shall be verified
+ * @var pqg.P [in] domain parameter P
+ * @var pqg.Q [in] domain parameter Q
+ * @var pqg.G [in] domain parameter G
+ * @var Y [in] public DSA key parameter Y
+ * @var R [in] DSA signature parameter R
+ * @var S [in] DSA signature parameter S
+ * @var sigver_success [out] Is DSA signature successfully verified (1) or
  *			 whether the verification failed (0).
  */
 struct dsa_sigver_data {
@@ -278,23 +278,23 @@ struct dsa_sigver_data {
  *	  shall be tested.
  *
  * All functions return 0 on success or != 0 on error. Note, a failure in the
- * DSA PQG verification @param dsa_pqg due to problematic input parameters is
+ * DSA PQG verification @var dsa_pqg due to problematic input parameters is
  * expected. In such cases, a DSA PQG verification error is still considered to
  * be a successful operation and the return code should be 0. Similarly, the
- * signature verification callback @param dsa_sigver shall return 0 if the
+ * signature verification callback @var dsa_sigver shall return 0 if the
  * signature verification fails. Only if some general error is detected a
  * return code != must be returned.
  *
- * @param dsa_keygen DSA key generation
- * @param dsa_siggen DSA signature generation
- * @param dsa_sigver DSA signature verification
- * @param dsa_pqg PQG generation and verification callback handler -- see
+ * @var dsa_keygen DSA key generation
+ * @var dsa_siggen DSA signature generation
+ * @var dsa_sigver DSA signature verification
+ * @var dsa_pqg PQG generation and verification callback handler -- see
  *		  the documentation for dsa_pqg_data how the backend can
  *		  identify the PQG operation type.
- * @param dsa_pqggen Generic PQG generation functionality without specific
+ * @var dsa_pqggen Generic PQG generation functionality without specific
  *		     limitations or requirements.
  *
- * @param dsa_keygen_en This is an optional helper call to reduce the amount
+ * @var dsa_keygen_en This is an optional helper call to reduce the amount
  *			of code in the backend for signature generation. The
  *			ACVP protocol requires that the same DSA key is used
  *			for multiple signature generation operation. Yet,
@@ -302,12 +302,12 @@ struct dsa_sigver_data {
  *			ACVP Parser to manage the DSA key and invoke the
  *			DSA key generation, you may provide this function with
  *			the following parameters:
- *			@param pqg [in] Buffer holding the PQG information to
+ *			@var pqg [in] Buffer holding the PQG information to
  *					generate the DSA key.
- *			@param Y [out] Buffer with the DSA public key.
- *			@param privkey [out] Provide the pointer to the RSA
+ *			@var Y [out] Buffer with the DSA public key.
+ *			@var privkey [out] Provide the pointer to the RSA
  *				        private key.
- * @param dsa_free_key This function is required if dsa_keygen_en is registered.
+ * @var dsa_free_key This function is required if dsa_keygen_en is registered.
  *		       This function is intended to free the private DSA key
  *		       handle created with dsa_keygen_en.
  */

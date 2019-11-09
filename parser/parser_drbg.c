@@ -25,7 +25,7 @@
 #include "parser_common.h"
 #include "parser_drbg.h"
 
-struct drbg_backend *drbg_backend = NULL;
+static struct drbg_backend *drbg_backend = NULL;
 
 static int drbg_tester(struct json_object *in, struct json_object *out,
 		       uint64_t cipher)

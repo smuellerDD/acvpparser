@@ -26,15 +26,15 @@
 /**
  * @brief ECC CDH primitive and hashed Shared Secret generation
  *
- * @param cipher [in] ECC curve containing an OR of: one curve out of
+ * @var cipher [in] ECC curve containing an OR of: one curve out of
  * 		      CURVEMASK, one hash out of HASHMASK, one MAC out
  * 		      of HMACMASK when using KDF
- * @param Qxrem [in] affine X coordinate of remote pubkey
- * @param Qyrem [in] affine Y coordinate of remote pubkey
- * @param privloc [disregard]
- * @param Qxloc [out] affine X coordinate of local pubkey
- * @param Qyloc [out] affine Y coordinate of local pubkey
- * @param hashzz [out] hashed shared secret / raw shared secret for ECC CDH
+ * @var Qxrem [in] affine X coordinate of remote pubkey
+ * @var Qyrem [in] affine Y coordinate of remote pubkey
+ * @var privloc [disregard]
+ * @var Qxloc [out] affine X coordinate of local pubkey
+ * @var Qyloc [out] affine Y coordinate of local pubkey
+ * @var hashzz [out] hashed shared secret / raw shared secret for ECC CDH
  */
 struct ecdh_ss_data {
 	uint64_t cipher;
@@ -49,17 +49,17 @@ struct ecdh_ss_data {
 /**
  * @brief ECC hashed Shared Secret verification
  *
- * @param cipher [in] ECC curve containing an OR of: one curve out of
+ * @var cipher [in] ECC curve containing an OR of: one curve out of
  * 		      CURVEMASK, one hash out of HASHMASK, one MAC out
  * 		      of HMACMASK
- * @param Qxrem [in] affine X coordinate of remote pubkey
- * @param Qzrem [in] affine Y coordinate of remote pubkey
- * @param privloc [in] private local key
- * @param Qxloc [in] affine X coordinate of local pubkey
- * @param Qyloc [in] affine Y coordinate of local pubkey
- * @param hashzz [in] hashed shared secret / raw shared secret for ECC CDH
- * @param validity_success [out] Does the generated shared secret match with
- *				 @param hashzz (true - 1) or not (false - 0).
+ * @var Qxrem [in] affine X coordinate of remote pubkey
+ * @var Qzrem [in] affine Y coordinate of remote pubkey
+ * @var privloc [in] private local key
+ * @var Qxloc [in] affine X coordinate of local pubkey
+ * @var Qyloc [in] affine Y coordinate of local pubkey
+ * @var hashzz [in] hashed shared secret / raw shared secret for ECC CDH
+ * @var validity_success [out] Does the generated shared secret match with
+ *				 @var hashzz (true - 1) or not (false - 0).
  */
 struct ecdh_ss_ver_data {
 	uint64_t cipher;
@@ -78,14 +78,14 @@ struct ecdh_ss_ver_data {
  *	  shall be tested.
  *
  * All functions return 0 on success or != 0 on error. Note, a failure in the
- * validity check @param ecdh_ss_ver due to a mismatch between the expected
+ * validity check @var ecdh_ss_ver due to a mismatch between the expected
  * and the actual shared secret is expected. In such cases, the validity test
  * error is still considered to be a successful operation and the return code
  * should be 0. Only if some general error is
  * detected a return code != must be returned.
  *
- * @param ecdh_ss ECC shared secret generation
- * @param ecdh_ss_ver ECC shared secret verification
+ * @var ecdh_ss ECC shared secret generation
+ * @var ecdh_ss_ver ECC shared secret verification
  */
 struct ecdh_backend {
 	int (*ecdh_ss)(struct ecdh_ss_data *data, flags_t parsed_flags);

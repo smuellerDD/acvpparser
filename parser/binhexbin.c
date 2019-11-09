@@ -25,14 +25,14 @@
 
 #include "binhexbin.h"
 
-static int bin_char(char hex)
+static uint8_t bin_char(char hex)
 {
 	if (48 <= hex && 57 >= hex)
-		return (hex - 48);
+		return (uint8_t)(hex - 48);
 	if (65 <= hex && 70 >= hex)
-		return (hex - 55);
+		return (uint8_t)(hex - 55);
 	if (97 <= hex && 102 >= hex)
-		return (hex - 87);
+		return (uint8_t)(hex - 87);
 	return 0;
 }
 
@@ -61,7 +61,7 @@ void hex2bin(const char *hex, size_t hexlen,
 	}
 
 	for (i = 0; i < chars; i++) {
-		bin[i] = bin_char(hex[(i*2)]) << 4;
+		bin[i] = (uint8_t)(bin_char(hex[(i*2)]) << 4);
 		bin[i] |= bin_char(hex[((i*2)+1)]);
 	}
 }

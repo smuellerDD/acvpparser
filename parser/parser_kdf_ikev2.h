@@ -26,19 +26,19 @@
 /**
  * @brief IKEV2 PRF testing context
  *
- * @param hashalg [in] Hash algorithm to be used for PRF.
- * @param dkmlen [in] Length of derived key material to be produced
- * @param n_init [in] Value of initiator nonce
- * @param n_resp [in] Value of responder nonce
- * @param spi_init [in] Security parameter indice of the initiator
- * @param spi_resp [in] Security parameter indice of the responder
- * @param gir [in] Diffie-Hellman shared secret
- * @param gir_new [in] New Diffie-Hellman shared secret
- * @param s_key_seed [out] Results of the extraction step
- * @param s_key_seed_rekey [out] Results of the newly created skeyid
- * @param dkm [out] Derived key material from expansion step
- * @param dkm_child [out] Expansion step results for child SA
- * @param dkm_child_dh [out] Expansion step results for child SA DH
+ * @var hashalg [in] Hash algorithm to be used for PRF.
+ * @var dkmlen [in] Length of derived key material to be produced
+ * @var n_init [in] Value of initiator nonce
+ * @var n_resp [in] Value of responder nonce
+ * @var spi_init [in] Security parameter indice of the initiator
+ * @var spi_resp [in] Security parameter indice of the responder
+ * @var gir [in] Diffie-Hellman shared secret
+ * @var gir_new [in] New Diffie-Hellman shared secret
+ * @var s_key_seed [out] Results of the extraction step
+ * @var s_key_seed_rekey [out] Results of the newly created skeyid
+ * @var dkm [out] Derived key material from expansion step
+ * @var dkm_child [out] Expansion step results for child SA
+ * @var dkm_child_dh [out] Expansion step results for child SA DH
  */
 struct kdf_ikev2_data {
 	uint64_t hashalg;
@@ -61,7 +61,7 @@ struct kdf_ikev2_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param kdf_ikev2 Invoke the IKEV2 PRF testing.
+ * @var kdf_ikev2 Invoke the IKEV2 PRF testing.
  */
 
 struct kdf_ikev2_backend {

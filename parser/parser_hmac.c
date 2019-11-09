@@ -26,7 +26,7 @@
 #include "parser_common.h"
 #include "parser_hmac.h"
 
-struct hmac_backend *hmac_backend = NULL;
+static struct hmac_backend *hmac_backend = NULL;
 
 #undef ACVP_PARSER_CMAC_TDES_3_KEYS
 

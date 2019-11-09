@@ -27,16 +27,16 @@
  * @brief Keyed message digest (HMAC / CMAC) cipher data structure holding
  *	  the data for the cipher operations specified in hmac_backend
  *
- * @param key [in] Symmetric key for cipher operation in binary form.
- * @param key2 [disregard] Parser-internal use.
- * @param key3 [disregard] Parser-internal use.
- * @param msg [in] Data buffer holding the message to be hashed in binary form.
- * @param mac [out] Message digest of the message in binary form.
+ * @var key [in] Symmetric key for cipher operation in binary form.
+ * @var key2 [disregard] Parser-internal use.
+ * @var key3 [disregard] Parser-internal use.
+ * @var msg [in] Data buffer holding the message to be hashed in binary form.
+ * @var mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
- * @param verify_result [disregard] Please disregard this variable, it is used
+ * @var verify_result [disregard] Please disregard this variable, it is used
  *				    by the parser.
- * @param cipher [in] Cipher specification as defined in cipher_definitions.h
+ * @var cipher [in] Cipher specification as defined in cipher_definitions.h
  */
 struct hmac_data {
 	struct buffer key;
@@ -53,7 +53,7 @@ struct hmac_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param hmac_generate Perform a keyed message digest operation with the given
+ * @var hmac_generate Perform a keyed message digest operation with the given
  *			data. Note, despite the name, HMAC and CMAC is covered
  *			by the callback.
  */

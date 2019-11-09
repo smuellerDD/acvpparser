@@ -223,7 +223,7 @@ static int get_time_seed()
 
 /* json_c_get_random_seed */
 
-int json_c_get_random_seed()
+int json_c_get_random_seed(void)
 {
 #if HAVE_RDRAND
     if (has_rdrand()) return get_rdrand_seed();

@@ -27,20 +27,20 @@
 
 static void string_replace_all_occurrences_with_char(char *s, const char *occur, char repl_char)
 {
-	int slen = strlen(s);
-	int skip = strlen(occur) - 1; /* length of the occurence, minus the char we're replacing */
+	size_t slen = strlen(s);
+	size_t skip = strlen(occur) - 1; /* length of the occurence, minus the char we're replacing */
 	char *p = s;
 	while ((p = strstr(p, occur))) {
 		*p = repl_char;
 		p++;
 		slen -= skip;
-		memmove(p, (p + skip), slen - (p - s) + 1); /* includes null char too */
+		memmove(p, (p + skip), slen - (unsigned long)(p - s) + 1); /* includes null char too */
 	}
 }
 
 static int is_valid_index(struct json_object *jo, const char *path, int32_t *idx)
 {
-	int i, len = strlen(path);
+    int i, len = (int)strlen(path);
 	/* this code-path optimizes a bit, for when we reference the 0-9 index range in a JSON array
 	   and because leading zeros not allowed */
 	if (len == 1) {
@@ -64,13 +64,13 @@ static int is_valid_index(struct json_object *jo, const char *path, int32_t *idx
 		}
 	}
 
-	*idx = strtol(path, NULL, 10);
+	*idx = (int32_t)strtol(path, NULL, 10);
 	if (*idx < 0) {
 		errno = EINVAL;
 		return 0;
 	}
 check_oob:
-	len = json_object_array_length(jo);
+	len = (int)json_object_array_length(jo);
 	if (*idx >= len) {
 		errno = ENOENT;
 		return 0;
@@ -85,7 +85,7 @@ static int json_pointer_get_single_path(struct json_object *obj, char *path, str
 		int32_t idx;
 		if (!is_valid_index(obj, path, &idx))
 			return -1;
-		obj = json_object_array_get_idx(obj, idx);
+		obj = json_object_array_get_idx(obj, (size_t)idx);
 		if (obj) {
 			if (value)
 				*value = obj;
@@ -120,7 +120,7 @@ static int json_pointer_set_single_path(
 			return json_object_array_add(parent, value);
 		if (!is_valid_index(parent, path, &idx))
 			return -1;
-		return json_object_array_put_idx(parent, idx, value);
+		return json_object_array_put_idx(parent, (size_t)idx, value);
 	}
 
 	/* path replacements should have been done in json_pointer_get_single_path(),

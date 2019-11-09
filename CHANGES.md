@@ -1,3 +1,13 @@
+v0.6.0
+- remove requirement for mct_get_last_iv
+- PBKDF: data->password.len now truly contains the correct length of the password
+- add RSA signature primitive and decryption primitive support
+- ACVP server sample files can be used in regression testing (-e option)
+- fix: Invoke RSA_generate_key_ex multiple times if one invocation fails
+- add private version of HKDF protocol
+- add private version of ED-ECDH
+- fixes for -Wconversion and -Wdocumentation
+
 v0.5.3
 - reenable OpenSSL FIPS mode
 - add new TLS KDF and SSH KDF implementations to OpenSSL

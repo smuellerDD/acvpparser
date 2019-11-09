@@ -40,7 +40,7 @@ struct printbuf* printbuf_new(void)
   if(!p) return NULL;
   p->size = 32;
   p->bpos = 0;
-  if(!(p->buf = (char*)malloc(p->size))) {
+  if(!(p->buf = (char*)malloc((unsigned long)p->size))) {
     free(p);
     return NULL;
   }
@@ -65,7 +65,7 @@ static int printbuf_extend(struct printbuf *p, int min_size)
 	if (p->size >= min_size)
 		return 0;
 
-	new_size = p->size * 2;
+	new_size = (int)(p->size * 2);
 	if (new_size < min_size + 8)
 		new_size =  min_size + 8;
 #ifdef PRINTBUF_DEBUG
@@ -73,7 +73,7 @@ static int printbuf_extend(struct printbuf *p, int min_size)
 	  "bpos=%d min_size=%d old_size=%d new_size=%d\n",
 	  p->bpos, min_size, p->size, new_size);
 #endif /* PRINTBUF_DEBUG */
-	if(!(t = (char*)realloc(p->buf, new_size)))
+	if(!(t = (char*)realloc(p->buf, (unsigned long)new_size)))
 		return -1;
 	p->size = new_size;
 	p->buf = t;

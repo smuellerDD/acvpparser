@@ -30,20 +30,20 @@
  * All variables and how they are applied with the DRBG implementation are
  * documented in the CAVS specification for the DRBG.
  *
- * @param entropy [in] Buffer holding the entropy string in binary form.
- * @param nonce [in] Buffer holding the nonce string in binary form.
- * @param pers [in] Buffer holding the personalization string in binary form.
- * @param addti_reseed [in]
+ * @var entropy [in] Buffer holding the entropy string in binary form.
+ * @var nonce [in] Buffer holding the nonce string in binary form.
+ * @var pers [in] Buffer holding the personalization string in binary form.
+ * @var addtl_reseed [in]
  * 		Data structure holding the additional input string to be used
  *		for the reseed operation before the random number generation
  *		operation. It is allowed to to contain NULL entries when no
  *		additional data is required.
- * @param entropy_reseed [in]
+ * @var entropy_reseed [in]
  *		Data structure holding the entropy input string to be used for
  *		the reseed operation before the random number generation. It is
  *		allowed to to contain NULL entries when no entropy data is
  *		required.
- * @param addtl_generate [in]
+ * @var addtl_generate [in]
  *			Data structure holding the additional input string in
  *		 	for the prediction resistance operation in binary form.
  *			This data structure holds two buffers for the first and
@@ -51,7 +51,7 @@
  *			with the first reseed and the second buffer corresponds
  *			with the second reseed. It is allowed to to contain NULL
  *			entries when no additional data is required.
- * @param entropy_generate [in]
+ * @var entropy_generate [in]
  *			  Data structure holding the entropy input string in
  *			  for the prediction resistance operation in binary
  *			  form. This data structure holds two buffers for the
@@ -60,10 +60,10 @@
  *			  buffer corresponds with the second reseed. It is
  *			  allowed to to contain NULL entries when no
  *			  entropy data is required.
- * @param random [out] The buffer to hold the generated random number in binary
+ * @var random [out] The buffer to hold the generated random number in binary
  *		       form (buffer must be allocated by the backend, and the
  *		       parser releases the buffer).
- * @param cipher [in] Cipher specification as defined in cipher_definitions.h.
+ * @var cipher [in] Cipher specification as defined in cipher_definitions.h.
  *		       The value is an OR of DRBG type and cipher core):
  *				 * DRBGCTR | AES128
  *				 * DRBGCTR | AES192
@@ -82,9 +82,9 @@
  *				 * DRBGHMAC | SHA512
  *				 * DRBGHMAC | SHA512224
  *				 * DRBGHMAC | SHA512256
- * @param rnd_data_bits_len [in] Length of random data to produce in bits.
- * @param pr [in] Prediction resistance enabled (1 == true, 0 == false)
- * @param df [in] Derivation function requested (1 == true, 0 == false)
+ * @var rnd_data_bits_len [in] Length of random data to produce in bits.
+ * @var pr [in] Prediction resistance enabled (1 == true, 0 == false)
+ * @var df [in] Derivation function requested (1 == true, 0 == false)
  */
 struct drbg_data {
 	struct buffer entropy;
@@ -106,7 +106,7 @@ struct drbg_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param drbg_generate Perform a DRBG random number generation operation with
+ * @var drbg_generate Perform a DRBG random number generation operation with
  *			the given data.
  */
 struct drbg_backend {

@@ -28,8 +28,7 @@
 #define EDDSA_DEF_CALLBACK_HELPER(name, flags, helper)			       \
 				DEF_CALLBACK_HELPER(eddsa, name, flags, helper)
 
-struct eddsa_backend *eddsa_backend = NULL;
-
+static struct eddsa_backend *eddsa_backend = NULL;
 
 struct eddsa_static_key {
 	void *key;
@@ -165,6 +164,8 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry eddsa_keyver_test_entries[] = {
 		{"q",		{.data.buf = &eddsa_keyver_vector.q, PARSER_BIN},
 			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+		{"d",		{.data.buf = &eddsa_keyver_vector.d, PARSER_BIN},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
 	};
 
 	/* search for empty arrays */
@@ -208,7 +209,7 @@ static int eddsa_tester(struct json_object *in, struct json_object *out,
 		{"tests",	{.data.array = &eddsa_siggen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 	};
 	const struct json_array eddsa_siggen_testgroup = SET_ARRAY(eddsa_siggen_testgroup_entries,
-								   &eddsa_siggen_testgroup_result);
+		  &eddsa_siggen_testgroup_result);
 
 	/**********************************************************************
 	 * EDDSA signature verification

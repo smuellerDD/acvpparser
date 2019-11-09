@@ -25,7 +25,7 @@
 #include "read_json.h"
 #include "stringhelper.h"
 
-struct aead_backend *aead_backend = NULL;
+static struct aead_backend *aead_backend = NULL;
 
 static int aead_gcm_helper(const struct json_array *processdata,
 			   flags_t parsed_flags,
@@ -58,9 +58,16 @@ static int aead_gcm_helper(const struct json_array *processdata,
 	for_each_testresult(processdata->testresult, entry, i)
 		CKINT(write_one_entry(entry, testresult, parsed_flags));
 
-	if (!vector->integrity_error && !vector->data.len)
-		CKINT(json_add_bin2hex(testresult, enc ? "ct" : "pt",
-				       &vector->data));
+	if (vector->cipher != ACVP_GMAC) {
+		if (!vector->integrity_error && !vector->data.len)
+			CKINT(json_add_bin2hex(testresult, enc ? "ct" : "pt",
+					       &vector->data));
+	}
+
+	if (vector->cipher == ACVP_GMAC && !enc && !vector->integrity_error) {
+		CKINT(json_object_object_add(testresult, "testPassed",
+					     json_object_new_boolean(true)));
+	}
 
 	ret = FLAG_RES_DATA_WRITTEN;
 
@@ -197,7 +204,7 @@ static int aead_gmac_tester(struct json_object *in, struct json_object *out,
 	const struct json_testresult aead_testresult = SET_ARRAY(aead_testresult_entries, callbacks);
 
 	const struct json_entry aead_test_entries[] = {
-		{"iv",		{.data.buf = &vector->iv, PARSER_BIN},		 FLAG_OP_ENC | FLAG_OP_AFT},
+		{"iv",		{.data.buf = &vector->iv, PARSER_BIN},		 FLAG_OPTIONAL | FLAG_OP_ENC | FLAG_OP_AFT},
 		{"key",		{.data.buf = &vector->key, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_AFT},
 		{"aad",		{.data.buf = &vector->assoc, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_AFT},
 

@@ -22,7 +22,7 @@
 #include "logger.h"
 #include "parser_common.h"
 
-struct kdf_108_backend *kdf_108_backend = NULL;
+static struct kdf_108_backend *kdf_108_backend = NULL;
 
 static int kdf_108_tester(struct json_object *in, struct json_object *out,
 			  uint64_t cipher)

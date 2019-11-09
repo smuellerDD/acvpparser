@@ -18,6 +18,7 @@
  */
 
 #include <string.h>
+#include <sys/types.h>
 
 #include "parser.h"
 #include "stringhelper.h"
@@ -27,7 +28,7 @@
 #include "parser_common.h"
 #include "parser_sym.h"
 
-struct sym_backend *sym_backend = NULL;
+static struct sym_backend *sym_backend = NULL;
 
 static void sym_mct_cfb8_enqueue(struct buffer *dst, uint8_t val)
 {
@@ -53,12 +54,12 @@ static void sym_mct_cfb1_enqueue(struct buffer *dst, uint8_t val)
 	 * bit-memmove by one bit (oldest bit is
 	 * left-most to reuse buffer for key update)
 	 */
-	for (a = dst->len - 1; a >= 0; a--) {
+	for (a = (ssize_t)(dst->len - 1); a >= 0; a--) {
 		/* remember MSB of current byte */
 		uint8_t tmp = dst->buf[a]>>7;
 
 		/* roll byte by one */
-		dst->buf[a] = dst->buf[a]<<1;
+		dst->buf[a] = (unsigned char)(dst->buf[a]<<1);
 		/* add the MSB of previous byte as LSB for this byte */
 		dst->buf[a] |= msb_prev;
 		msb_prev = tmp;
@@ -127,7 +128,7 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 	BUFFER_INIT(cfb_old_calc_data);
 	BUFFER_INIT(inittext);
 	BUFFER_INIT(last_iv);
-	BUFFER_INIT(tmp);
+	BUFFER_INIT(otmp);
 	BUFFER_INIT(tmp2);
 	struct json_object *testresult, *resultsarray;
 
@@ -139,25 +140,17 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 	    !sym_backend->mct_fini)
 		return -EOPNOTSUPP;
 
-	if ((vector->cipher == ACVP_TDESCFB64 ||
-	     vector->cipher == ACVP_TDESCFB8 ||
-	     vector->cipher == ACVP_TDESCFB1 ||
-	     vector->cipher == ACVP_TDESOFB) && !sym_backend->mct_get_last_iv) {
-		logger(LOGGER_WARN, "mct_get_last_iv not implemented\n");
-		return -EOPNOTSUPP;
-	}
-
 	CKINT(alloc_buf(vector->key.len + vector->key2.len + vector->key3.len,
-			&tmp));
-	memcpy(tmp.buf, vector->key.buf, vector->key.len);
-	memcpy(tmp.buf + vector->key.len, vector->key2.buf, vector->key2.len);
-	memcpy(tmp.buf + vector->key.len + vector->key2.len, vector->key3.buf,
+			&otmp));
+	memcpy(otmp.buf, vector->key.buf, vector->key.len);
+	memcpy(otmp.buf + vector->key.len, vector->key2.buf, vector->key2.len);
+	memcpy(otmp.buf + vector->key.len + vector->key2.len, vector->key3.buf,
 	       vector->key3.len);
 
 	/* save original key pointer */
 	copy_ptr_buf(&tmp2, &vector->key);
 	/* move new key pointer into vector->key */
-	copy_ptr_buf(&vector->key, &tmp);
+	copy_ptr_buf(&vector->key, &otmp);
 
 	if (vector->cipher != ACVP_TDESCFB1 &&
 	    vector->cipher != ACVP_TDESCFB8 &&
@@ -232,7 +225,7 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 				        "pt" : "ct", &vector->data));
 
 		for (iloop = 0; iloop < 9999; iloop++) {
-			struct buffer tmp;
+			struct buffer itmp;
 
 			memcpy(old_old_calc_data.buf, old_calc_data.buf,
 			       vector->data.len);
@@ -241,9 +234,9 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 			       vector->data.buf, vector->data.len);
 
 			if (vector->cipher == ACVP_TDESOFB) {
-				CKINT(sym_backend->mct_get_last_iv(vector,
-						&calc_data, parsed_flags));
-			}
+				memcpy(cfb_old_calc_data.buf, vector->data.buf,
+				       vector->data.len);
+ 			}
 
 			CKINT(sym_backend->mct_update(vector, parsed_flags));
 
@@ -255,9 +248,19 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 				       vector->data.len);
 
 				/* Ciphertext is the new plaintext */
-				copy_ptr_buf(&tmp, &vector->data);
+				copy_ptr_buf(&itmp, &vector->data);
 				copy_ptr_buf(&vector->data, &calc_data);
-				copy_ptr_buf(&calc_data, &tmp);
+				copy_ptr_buf(&calc_data, &itmp);
+			}
+
+			/* Next input is the previous IV */
+			if (vector->cipher == ACVP_TDESOFB) {
+				unsigned int idx;
+
+				for (idx = 0; idx < vector->data.len; idx++) {
+					calc_data.buf[idx] ^=
+						cfb_old_calc_data.buf[idx];
+				}
 			}
 
 			if (!(parsed_flags & FLAG_OP_ENC) &&
@@ -286,6 +289,8 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 							vector->data.buf[0]);
 					vector->data.buf[0] ^=
 							old_calc_data.buf[23];
+					sym_mct_cfb8_enqueue(&last_iv,
+							vector->data.buf[0]);
 				}
 			}
 
@@ -301,19 +306,33 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 				} else {
 					sym_mct_cfb1_enqueue(&calc_data,
 							vector->data.buf[0]);
-					vector->data.buf[0] ^= (old_calc_data.buf[23] & (1<<7));
+					vector->data.buf[0] ^=  (old_calc_data.buf[23] & (1<<7));
+					sym_mct_cfb1_enqueue(&last_iv,
+							vector->data.buf[0]);
 				}
 
 			}
 		}
 
+		if (vector->cipher == ACVP_TDESOFB)
+			memcpy(last_iv.buf, calc_data.buf, calc_data.len);
+
 		/* we need that for key calculation */
 		if (vector->cipher != ACVP_TDESCFB1)
 			memcpy(calc_data.buf, vector->data.buf, vector->data.len);
-		if (vector->cipher == ACVP_TDESCFB64 ||
-		    vector->cipher == ACVP_TDESOFB) {
-			CKINT(sym_backend->mct_get_last_iv(vector, &last_iv,
-							   parsed_flags));
+
+		if (vector->cipher == ACVP_TDESCFB64) {
+			struct buffer *i1 = (parsed_flags & FLAG_OP_ENC) ?
+					     &old_old_calc_data :
+					     &cfb_old_calc_data;
+			struct buffer *i2 = (parsed_flags & FLAG_OP_ENC) ?
+					     &old_calc_data :
+					     &cfb_calc_data;
+			unsigned int idx;
+
+			for (idx = 0; idx < vector->iv.len; idx++) {
+				last_iv.buf[idx] = i1->buf[idx] ^ i2->buf[idx];
+ 			}
 		}
 
 		if (vector->cipher == ACVP_TDESCFB1 &&
@@ -330,7 +349,7 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 				cfb_byte_for_next_round =
 					calc_data.buf[calc_data.len - 8];
 				sym_mct_cfb8_enqueue(&calc_data,
-						vector->data.buf[0]);
+						     vector->data.buf[0]);
 			} else {
 				cfb_byte_for_next_round = vector->data.buf[0] ^
 							calc_data.buf[0];
@@ -353,15 +372,32 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 			}
 		}
 
-		if (vector->cipher == ACVP_TDESCFB64 ||
-		    vector->cipher == ACVP_TDESOFB) {
-			CKINT(sym_backend->mct_get_last_iv(vector, &vector->iv,
-							   parsed_flags));
+		if (vector->cipher == ACVP_TDESOFB) {
+			unsigned int idx;
+
+			for (idx = 0; idx < vector->iv.len; idx++) {
+				vector->iv.buf[idx] = vector->data.buf[idx] ^
+						      calc_data.buf[idx];
+			}
 		}
-		if (vector->cipher == ACVP_TDESCFB1 ||
-		    vector->cipher == ACVP_TDESCFB8) {
-			CKINT(sym_backend->mct_get_last_iv(vector, &last_iv,
-							   parsed_flags));
+
+		if (vector->cipher == ACVP_TDESCFB64) {
+			if (parsed_flags & FLAG_OP_ENC)
+				memcpy(vector->iv.buf, vector->data.buf,
+				       vector->iv.len);
+			else
+				memcpy(vector->iv.buf, calc_data.buf,
+				       calc_data.len);
+		}
+
+		if (vector->cipher == ACVP_TDESCFB8 ||
+		    vector->cipher == ACVP_TDESCFB1) {
+			if (parsed_flags & FLAG_OP_ENC)
+				memcpy(last_iv.buf,
+				       calc_data.buf + calc_data.len -
+								last_iv.len,
+				       last_iv.len);
+			/* Decryption last IV is generated in the loop above */
 		}
 
 		CKINT(sym_backend->mct_fini(vector, parsed_flags));
@@ -514,7 +550,7 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 out:
 	/* restore original key pointer */
 	copy_ptr_buf(&vector->key, &tmp2);
-	free_buf(&tmp);
+	free_buf(&otmp);
 
 	free_buf(&calc_data);
 	free_buf(&old_calc_data);
@@ -617,20 +653,20 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 			}
 
 			if (vector->cipher == ACVP_CFB8) {
-				uint8_t tmp = calc_data.buf[calc_data.len - 16];
+				uint8_t ctmp = calc_data.buf[calc_data.len - 16];
 
 				sym_mct_cfb8_enqueue(&calc_data,
 						     vector->data.buf[0]);
 
-				vector->data.buf[0] = tmp;
+				vector->data.buf[0] = ctmp;
 			} else if (vector->cipher == ACVP_CFB1) {
-				uint8_t tmp =
+				uint8_t ctmp =
 					calc_data.buf[calc_data.len - 16] & 1<<7;
 
 				sym_mct_cfb1_enqueue(&calc_data,
 						     vector->data.buf[0]);
 
-				vector->data.buf[0] = tmp;
+				vector->data.buf[0] = ctmp;
 			} else if (vector->cipher != ACVP_ECB) {
 				copy_ptr_buf(&tmp, &vector->data);
 				copy_ptr_buf(&vector->data, &calc_data);

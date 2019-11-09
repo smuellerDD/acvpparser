@@ -967,10 +967,12 @@ JSON_EXPORT int json_object_set_string_len(json_object* obj, const char* new_val
  *
  * @param obj1 the first json_object instance
  * @param obj2 the second json_object instance
+ * @param str_cmp comparison function (e.g. memcmp, strncmp)
  * @returns whether both objects are equal or not
  */
-JSON_EXPORT int json_object_equal(struct json_object *obj1,
-			     struct json_object *obj2);
+JSON_EXPORT int json_object_equal(struct json_object* jso1,
+				  struct json_object* jso2,
+		int (*str_cmp)(const void *s1, const void *s2, size_t len));
 
 /**
  * Perform a shallow copy of src into *dst as part of an overall json_object_deep_copy().

@@ -27,25 +27,25 @@
  * @brief Symmetric cipher data structure holding the data for the cipher
  *	  operations specified in sym_backend
  *
- * @param key [in] Symmetric key for cipher operation in binary form
- * @param key2 [disregard] Please disregard this buffer
- * @param key3 [disregard] Please disregard this buffer
- * @param iv [in] IV for the cipher operation in binary form. It may be empty
+ * @var key [in] Symmetric key for cipher operation in binary form
+ * @var key2 [disregard] Please disregard this buffer
+ * @var key3 [disregard] Please disregard this buffer
+ * @var iv [in] IV for the cipher operation in binary form. It may be empty
  *		  for ciphers that do not support IVs (like AES-ECB or AES-KW).
  *		  Note, for XTS, this buffer contains the tweak value.
- * @param cipher [in] Cipher specification as defined in cipher_definitions.h
- * @param data [in/out] Buffer with input data that is also expected to hold
+ * @var cipher [in] Cipher specification as defined in cipher_definitions.h
+ * @var data [in/out] Buffer with input data that is also expected to hold
  *			the result data. Note, if the buffer size needs to be
  *			different for the output data than for the input
  *			data, the backend must change the buffer as needed.
  *			The buffer is freed by the parser.
- * @param data_len_bits [in] Length of input data in bits. This value is
+ * @var data_len_bits [in] Length of input data in bits. This value is
  *			     used for CFB-1 where only some bits out of a byte
  *			     is relevant for testing.
- * @param xts_sequence_no [in] If XTS sequence number is requested, it is
+ * @var xts_sequence_no [in] If XTS sequence number is requested, it is
  *			       stored in this variable. In this case, the IV
  *			       is NULL.
- * @param priv [storage] This pointer allows the backend to store private data
+ * @var priv [storage] This pointer allows the backend to store private data
  *			 like a pointer to a cipher handle allocated during
  *			 the init call and used during update or fini calls.
  *			 The backend must deallocate the resources during fini
@@ -75,11 +75,11 @@ struct sym_data {
  * the return code MUST be 0 as test vectors deliberately provide data with
  * integrity errors.
  *
- * @param encrypt Callback implementing the encrypt operation using the
- *		  @param data buffer. The @param parsed_flags point to flags
+ * @var encrypt Callback implementing the encrypt operation using the
+ *		  @var data buffer. The @var parsed_flags point to flags
  *		  specified in parser_flags.h.
- * @param decrypt Callback implementing the decrypt operation using the
- *		  @param data buffer. The @param parsed_flags point to flags
+ * @var decrypt Callback implementing the decrypt operation using the
+ *		  @var data buffer. The @var parsed_flags point to flags
  *		  specified in parser_flags.h.
 
  * MCT testing implies that a cipher handle with its state is
@@ -90,14 +90,13 @@ struct sym_data {
  * encryption/decryption operation on the current cipher handle state
  * and return the ciphertext/plaintext.
  *
- * @param mct_init Initialize the cipher handle. The @param parsed_flags contain
+ * @var mct_init Initialize the cipher handle. The @var parsed_flags contain
  *		   either FLAG_OP_ENC or FLAG_OP_DEC for encryption/decryption.
  *		   The allocated cipher handle may be stored in the priv
  *		   pointer.
- * @param mct_update Perform a crypto operation on the cipher handle and
+ * @var mct_update Perform a crypto operation on the cipher handle and
  *		     return the result of the crypto operation.
- * @param mct_fini Free all resources pertaining the cipher operation.
- * @param mct_get_last_iv OFB and CFB specific heroin.
+ * @var mct_fini Free all resources pertaining the cipher operation.
  */
 struct sym_backend {
 	int (*encrypt)(struct sym_data *data, flags_t parsed_flags);
@@ -106,8 +105,6 @@ struct sym_backend {
 	int (*mct_init)(struct sym_data *data, flags_t parsed_flags);
 	int (*mct_update)(struct sym_data *data, flags_t parsed_flags);
 	int (*mct_fini)(struct sym_data *data, flags_t parsed_flags);
-	int (*mct_get_last_iv)(struct sym_data *data, struct buffer *iv,
-			       flags_t parsed_flags);
 };
 
 void register_sym_impl(struct sym_backend *implementation);

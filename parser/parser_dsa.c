@@ -27,7 +27,7 @@
 #define DSA_DEF_CALLBACK_HELPER(name, flags, helper)			       \
 				DEF_CALLBACK_HELPER(dsa, name, flags, helper)
 
-struct dsa_backend *dsa_backend = NULL;
+static struct dsa_backend *dsa_backend = NULL;
 
 static int dsa_pqggen_helper(struct dsa_pqggen_data *pqg, flags_t parsed_flags)
 {
@@ -266,11 +266,13 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 		{"qCounter",	{.data.integer = &dsa_pqg_vector.pq_prov_qcounter, PARSER_UINT},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 
 		/* canonical and unverifiable G verification */
-		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OP_DSA_CANONICAL_G_GEN},
+		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_firstseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"index",	{.data.buf = &dsa_pqg_vector.g_canon_index, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 
 		/* unverifiable G verification */
+		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_unver_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
 		{"h",		{.data.buf = &dsa_pqg_vector.g_unver_h, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
 
 		/* canonical G verification */

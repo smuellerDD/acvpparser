@@ -26,17 +26,17 @@
 /**
  * @brief IKEV1 PRF testing context
  *
- * @param hashalg [in] Hash algorithm to be used for PRF.
- * @param n_init [in] Value of initiator nonce
- * @param n_resp [in] Value of responder nonce
- * @param cookie_init [in] Initiator's cookie
- * @param cookie_resp [in] Responder's cookie
- * @param gxy [in] New Diffie-Hellman shared secret
- * @param pre_shared_key [in] Pre-shared key (only provided for PSK auth)
- * @param s_key_id [out] Results of the extraction step
- * @param s_key_id_d [out] Results of the expansion step
- * @param s_key_id_a [out] Results of the expansion step
- * @param s_key_id_e [out] Results of the expansion step
+ * @var hashalg [in] Hash algorithm to be used for PRF.
+ * @var n_init [in] Value of initiator nonce
+ * @var n_resp [in] Value of responder nonce
+ * @var cookie_init [in] Initiator's cookie
+ * @var cookie_resp [in] Responder's cookie
+ * @var gxy [in] New Diffie-Hellman shared secret
+ * @var pre_shared_key [in] Pre-shared key (only provided for PSK auth)
+ * @var s_key_id [out] Results of the extraction step
+ * @var s_key_id_d [out] Results of the expansion step
+ * @var s_key_id_a [out] Results of the expansion step
+ * @var s_key_id_e [out] Results of the expansion step
  */
 struct kdf_ikev1_data {
 	uint64_t hashalg;
@@ -57,7 +57,7 @@ struct kdf_ikev1_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @param kdf_ikev1 Invoke the IKEV1 PRF testing.
+ * @var kdf_ikev1 Invoke the IKEV1 PRF testing.
  */
 
 struct kdf_ikev1_backend {

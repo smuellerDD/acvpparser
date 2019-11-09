@@ -25,13 +25,14 @@
 
 #include "parser_common.h"
 #include "parser_rsa.h"
+#include "read_json.h"
 #include "stringhelper.h"
 
 #define RSA_DEF_CALLBACK(name, flags)		DEF_CALLBACK(rsa, name, flags)
 #define RSA_DEF_CALLBACK_HELPER(name, flags, helper)			       \
 				DEF_CALLBACK_HELPER(rsa, name, flags, helper)
 
-struct rsa_backend *rsa_backend = NULL;
+static struct rsa_backend *rsa_backend = NULL;
 
 struct rsa_static_key {
 	void *key;
@@ -127,6 +128,121 @@ out:
 	return ret;
 }
 
+static int rsa_decprim_keygen(struct rsa_decryption_primitive_data *data,
+			      void **rsa_privkey)
+{
+	int ret = 0;
+
+#define ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE	2048
+	if (rsa_key.modulus != ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE ||
+	    !rsa_key.key) {
+		rsa_key_free_static();
+		CKINT(rsa_backend->rsa_keygen_en(&data->e,
+			ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE,
+			&rsa_key.key, &data->n));
+
+		logger_binary(LOGGER_DEBUG, data->n.buf, data->n.len,
+			      "RSA generated n");
+		logger_binary(LOGGER_DEBUG, data->e.buf, data->e.len,
+			      "RSA generated d");
+
+		/* Free the global variable at exit */
+		atexit(rsa_key_free_static);
+
+		CKINT(rsa_duplicate_buf(&data->e, &rsa_key.e));
+		CKINT(rsa_duplicate_buf(&data->n, &rsa_key.n));
+		rsa_key.modulus = ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE;
+	}
+
+	if (!data->e.len)
+		CKINT(rsa_duplicate_buf(&rsa_key.e, &data->e));
+	if (!data->n.len)
+		CKINT(rsa_duplicate_buf(&rsa_key.n, &data->n));
+
+	*rsa_privkey = rsa_key.key;
+
+out:
+	return ret;
+}
+
+static int rsa_decprim_helper(const struct json_array *processdata,
+			      flags_t parsed_flags,
+			      struct json_object *testvector,
+			      struct json_object *testresults,
+	int (*callback)(struct rsa_decryption_primitive_data *vector,
+			flags_t parsed_flags),
+			      struct rsa_decryption_primitive_data *vector)
+{
+	int ret;
+	void *rsa_privkey = NULL;
+
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	if (rsa_backend->rsa_keygen_en && rsa_backend->rsa_free_key) {
+		CKINT(rsa_decprim_keygen(vector, &rsa_privkey));
+	}
+
+	vector->privkey = rsa_privkey;
+
+	CKINT(callback(vector, parsed_flags));
+
+out:
+	return ret;
+}
+
+static int rsa_keygen_helper(const struct json_array *processdata,
+			     flags_t parsed_flags,
+			     struct json_object *testvector,
+			     struct json_object *testresults,
+	int (*callback)(struct rsa_keygen_data *vector, flags_t parsed_flags),
+			struct rsa_keygen_data *vector)
+{
+
+	int ret = 0;
+
+	(void)testvector;
+
+	CKINT(callback(vector, parsed_flags));
+
+	if (parsed_flags & FLAG_OP_RSA_PQ_B36_PRIMES) {
+		struct json_object *bitlenarray = NULL;
+		struct json_object *testresult = NULL;
+		const struct json_entry *entry;
+		unsigned int i;
+
+		testresult = json_object_new_object();
+		CKNULL(testresult, -ENOMEM);
+		/* Append the output JSON stream with test results. */
+		json_object_array_add(testresults, testresult);
+
+		CKINT(json_add_test_data(testvector, testresult));
+
+		/* Iterate over each write definition and invoke it. */
+		for_each_testresult(processdata->testresult, entry, i)
+			CKINT(write_one_entry(entry, testresult, parsed_flags));
+
+		bitlenarray = json_object_new_array();
+		CKNULL(bitlenarray, -ENOMEM);
+		/* Append the output JSON stream with test results. */
+		json_object_object_add(testresult, "bitlens", bitlenarray);
+		json_object_array_add(bitlenarray,
+				json_object_new_int((int)vector->bitlen[0]));
+		json_object_array_add(bitlenarray,
+				json_object_new_int((int)vector->bitlen[1]));
+		json_object_array_add(bitlenarray,
+				json_object_new_int((int)vector->bitlen[2]));
+		json_object_array_add(bitlenarray,
+				json_object_new_int((int)vector->bitlen[3]));
+
+		ret = FLAG_RES_DATA_WRITTEN;
+	}
+
+out:
+	return ret;
+}
+
 static int rsa_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)
 {
@@ -140,7 +256,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA B.3.4, B.3.5, B.3.6 KeyGen KAT and KeyGen GDT
 	 **********************************************************************/
-	RSA_DEF_CALLBACK(rsa_keygen, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES);
+	RSA_DEF_CALLBACK_HELPER(rsa_keygen, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES, rsa_keygen_helper);
 
 	const struct json_entry rsa_keygen_testresult_entries[] = {
 		{"e",	{.data.buf = &rsa_keygen_vector.e, WRITER_BIN},
@@ -153,6 +269,20 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
 		{"d",	{.data.buf = &rsa_keygen_vector.d, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+
+		/* B.3.6 specific data */
+		{"xP",	{.data.buf = &rsa_keygen_vector.xp, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+		{"xP1",	{.data.buf = &rsa_keygen_vector.xp1, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+		{"xP2",	{.data.buf = &rsa_keygen_vector.xp2, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+		{"xQ",	{.data.buf = &rsa_keygen_vector.xq, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+		{"xQ1",	{.data.buf = &rsa_keygen_vector.xq1, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+		{"xQ2",	{.data.buf = &rsa_keygen_vector.xq2, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
 	};
 	const struct json_testresult rsa_keygen_testresult = SET_ARRAY(rsa_keygen_testresult_entries, &rsa_keygen_callbacks);
 
@@ -257,6 +387,58 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_array rsa_sigver_test = SET_ARRAY(rsa_sigver_test_entries, &rsa_sigver_testresult);
 
 	/**********************************************************************
+	 * RSA signature primitive
+	 **********************************************************************/
+	RSA_DEF_CALLBACK(rsa_signature_primitive, FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK);
+
+	/*
+	 * Define which test result data should be written to the test result
+	 * JSON file.
+	 */
+	const struct json_entry rsa_signature_primitive_testresult_entries[] = {
+		{"signature",	{.data.buf = &rsa_signature_primitive_vector.signature, WRITER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+	};
+	const struct json_testresult rsa_signature_primitive_testresult = SET_ARRAY(rsa_signature_primitive_testresult_entries, &rsa_signature_primitive_callbacks);
+
+
+	const struct json_entry rsa_signature_primitive_test_entries[] = {
+		{"message",	{.data.buf = &rsa_signature_primitive_vector.msg, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"n",		{.data.buf = &rsa_signature_primitive_vector.n, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"d",		{.data.buf = &rsa_signature_primitive_vector.d, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+	};
+	const struct json_array rsa_signature_primitive_test = SET_ARRAY(rsa_signature_primitive_test_entries, &rsa_signature_primitive_testresult);
+
+	/**********************************************************************
+	 * RSA decryption primitive
+	 **********************************************************************/
+	RSA_DEF_CALLBACK_HELPER(rsa_decryption_primitive, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK, rsa_decprim_helper);
+
+	/*
+	 * Define which test result data should be written to the test result
+	 * JSON file.
+	 */
+	const struct json_entry rsa_decryption_primitive_testresult_entries[] = {
+		{"e",		{.data.buf = &rsa_decryption_primitive_vector.e, WRITER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"n",		{.data.buf = &rsa_decryption_primitive_vector.n, WRITER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"plainText",	{.data.buf = &rsa_decryption_primitive_vector.s, WRITER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+	};
+	const struct json_testresult rsa_decryption_primitive_testresult = SET_ARRAY(rsa_decryption_primitive_testresult_entries, &rsa_decryption_primitive_callbacks);
+
+
+	const struct json_entry rsa_decryption_primitive_test_entries[] = {
+		{"cipherText",	{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+	};
+	const struct json_array rsa_decryption_primitive_test = SET_ARRAY(rsa_decryption_primitive_test_entries, &rsa_decryption_primitive_testresult);
+
+	/**********************************************************************
 	 * RSA common test group
 	 **********************************************************************/
 	const struct json_entry rsa_keygen_testgroup_entries[] = {
@@ -327,10 +509,24 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_array rsa_sigver_testgroup = SET_ARRAY(rsa_sigver_testgroup_entries, NULL);
 
+	const struct json_entry rsa_signature_primitive_testgroup_entries[] = {
+		{"tests",	{.data.array = &rsa_signature_primitive_test, PARSER_ARRAY},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT}
+	};
+	const struct json_array rsa_signature_primitive_testgroup = SET_ARRAY(rsa_signature_primitive_testgroup_entries, NULL);
+
+	const struct json_entry rsa_decryption_primitive_testgroup_entries[] = {
+		{"tests",	{.data.array = &rsa_decryption_primitive_test, PARSER_ARRAY},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
+	};
+	const struct json_array rsa_decryption_primitive_testgroup = SET_ARRAY(rsa_decryption_primitive_testgroup_entries, NULL);
+
 	const struct json_entry rsa_testanchor_entries[] = {
 		{"testGroups",	{.data.array = &rsa_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN},
 		{"testGroups",	{.data.array = &rsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
 		{"testGroups",	{.data.array = &rsa_sigver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGVER},
+		{"testGroups",	{.data.array = &rsa_signature_primitive_testgroup, PARSER_ARRAY},	FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE},
+		{"testGroups",	{.data.array = &rsa_decryption_primitive_testgroup, PARSER_ARRAY},	FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE},
 	};
 	const struct json_array rsa_testanchor = SET_ARRAY(rsa_testanchor_entries, NULL);
 

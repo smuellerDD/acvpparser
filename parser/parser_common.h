@@ -33,6 +33,7 @@
 #include "parser_drbg.h"
 #include "parser_dsa.h"
 #include "parser_ecdh.h"
+#include "parser_ecdh_ed.h"
 #include "parser_ecdsa.h"
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
@@ -42,6 +43,7 @@
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
 #include "parser_pbkdf.h"
+#include "parser_hkdf.h"
 
 struct json_array;
 
@@ -129,9 +131,9 @@ struct json_data {
  * @brief json_entry specifies precisely one JSON element in the JSON tree. Each
  * element is defined with the following information.
  *
- * @param name The name of of the JSON entry
- * @param data The data value of the JSON entry
- * @param flags Flags defined in parser_flags.h.
+ * @var name The name of of the JSON entry
+ * @var data The data value of the JSON entry
+ * @var flags Flags defined in parser_flags.h.
  */
 
 struct json_entry {
@@ -147,17 +149,17 @@ struct json_entry {
 /**
  * @brief The ##name_callback structure references one callback to the backends
  *	  for an the respective cipher operation.
- * @param fn Function pointer from the registered backend to be invoked.
- * @param vector Reference to data structure holding the input data to the
+ * @var fn Function pointer from the registered backend to be invoked.
+ * @var vector Reference to data structure holding the input data to the
  *		 backend.
- * @param helper Specify a helper function that can pre-process data before
+ * @var helper Specify a helper function that can pre-process data before
  *		 invoking the backend. This can be used to implement MCT as part
- *		 of the parser. Note, @param fn always must be set. If
- *		 @param helper is non-NULL, it is invoked instead of @param fn,
- *		 but obtains the reference to @param fn with the idea that the
- *		 helper will invoke @param fn as needed. The parameters
- *		 of @param helper are identical to exec_test() plus the
- *		 @param fn and @param vector information to allow the callback
+ *		 of the parser. Note, @var fn always must be set. If
+ *		 @var helper is non-NULL, it is invoked instead of @var fn,
+ *		 but obtains the reference to @var fn with the idea that the
+ *		 helper will invoke @var fn as needed. The parameters
+ *		 of @var helper are identical to exec_test() plus the
+ *		 @var fn and @var vector information to allow the callback
  *		 to be invoked.
  */
 #define DEF_CALLBACK_TYPE(name)						       \
@@ -181,6 +183,8 @@ DEF_CALLBACK_TYPE(rsa_keygen_prov_prime)
 DEF_CALLBACK_TYPE(rsa_keygen)
 DEF_CALLBACK_TYPE(rsa_siggen)
 DEF_CALLBACK_TYPE(rsa_sigver)
+DEF_CALLBACK_TYPE(rsa_signature_primitive)
+DEF_CALLBACK_TYPE(rsa_decryption_primitive)
 DEF_CALLBACK_TYPE(dh_ss)
 DEF_CALLBACK_TYPE(dh_ss_ver)
 DEF_CALLBACK_TYPE(drbg)
@@ -190,6 +194,8 @@ DEF_CALLBACK_TYPE(dsa_siggen)
 DEF_CALLBACK_TYPE(dsa_sigver)
 DEF_CALLBACK_TYPE(ecdh_ss)
 DEF_CALLBACK_TYPE(ecdh_ss_ver)
+DEF_CALLBACK_TYPE(ecdh_ed_ss)
+DEF_CALLBACK_TYPE(ecdh_ed_ss_ver)
 DEF_CALLBACK_TYPE(ecdsa_keygen)
 DEF_CALLBACK_TYPE(ecdsa_keygen_extra)
 DEF_CALLBACK_TYPE(ecdsa_pkvver)
@@ -206,16 +212,17 @@ DEF_CALLBACK_TYPE(kdf_ikev1)
 DEF_CALLBACK_TYPE(kdf_ikev2)
 DEF_CALLBACK_TYPE(kdf_108)
 DEF_CALLBACK_TYPE(pbkdf)
+DEF_CALLBACK_TYPE(hkdf)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
  * data type of a particular callback.
  *
- * @param callback This union refers to exactly one particular callback.
- * @param cb_type The type field specifies the particular data type of the
+ * @var callback This union refers to exactly one particular callback.
+ * @var cb_type The type field specifies the particular data type of the
  *		  callback.
- * @param flags This field specifies one of the flags documented for
- *		@param json_entry.
+ * @var flags This field specifies one of the flags documented for
+ *		@var json_entry.
  */
 enum {
 	CB_TYPE_aead,
@@ -226,6 +233,8 @@ enum {
 	CB_TYPE_rsa_keygen,
 	CB_TYPE_rsa_siggen,
 	CB_TYPE_rsa_sigver,
+	CB_TYPE_rsa_signature_primitive,
+	CB_TYPE_rsa_decryption_primitive,
 	CB_TYPE_dh_ss,
 	CB_TYPE_dh_ss_ver,
 	CB_TYPE_drbg,
@@ -235,6 +244,8 @@ enum {
 	CB_TYPE_dsa_sigver,
 	CB_TYPE_ecdh_ss,
 	CB_TYPE_ecdh_ss_ver,
+	CB_TYPE_ecdh_ed_ss,
+	CB_TYPE_ecdh_ed_ss_ver,
 	CB_TYPE_ecdsa_keygen,
 	CB_TYPE_ecdsa_keygen_extra,
 	CB_TYPE_ecdsa_pkvver,
@@ -253,6 +264,7 @@ enum {
 	CB_TYPE_kdf_ikev2,
 	CB_TYPE_kdf_108,
 	CB_TYPE_pbkdf,
+	CB_TYPE_hkdf,
 };
 struct json_callback {
 	union {
@@ -264,6 +276,8 @@ struct json_callback {
 		struct rsa_keygen_callback rsa_keygen;
 		struct rsa_siggen_callback rsa_siggen;
 		struct rsa_sigver_callback rsa_sigver;
+		struct rsa_signature_primitive_callback rsa_signature_primitive;
+		struct rsa_decryption_primitive_callback rsa_decryption_primitive;
 		struct dh_ss_callback dh_ss;
 		struct dh_ss_ver_callback dh_ss_ver;
 		struct drbg_callback drbg;
@@ -273,6 +287,8 @@ struct json_callback {
 		struct dsa_sigver_callback dsa_sigver;
 		struct ecdh_ss_callback ecdh_ss;
 		struct ecdh_ss_ver_callback ecdh_ss_ver;
+		struct ecdh_ed_ss_callback ecdh_ed_ss;
+		struct ecdh_ed_ss_ver_callback ecdh_ed_ss_ver;
 		struct ecdsa_keygen_callback ecdsa_keygen;
 		struct ecdsa_keygen_extra_callback ecdsa_keygen_extra;
 		struct ecdsa_pkvver_callback ecdsa_pkvver;
@@ -289,17 +305,18 @@ struct json_callback {
 		struct kdf_ikev2_callback kdf_ikev2;
 		struct kdf_108_callback kdf_108;
 		struct pbkdf_callback pbkdf;
+		struct hkdf_callback hkdf;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;
 };
 
 /**
- * @brief The json_callbacks wraps one or more @param json_callback instances.
+ * @brief The json_callbacks wraps one or more @var json_callback instances.
  *
- * @param callback This variable is the head of an array of @param json_callback
+ * @var callback This variable is the head of an array of @var json_callback
  *		   instances.
- * @param count This variable specifies the number of callbacks.
+ * @var count This variable specifies the number of callbacks.
  */
 struct json_callbacks {
 	const struct json_callback *callback;
@@ -307,20 +324,20 @@ struct json_callbacks {
 };
 
 /**
- * @brief With the @param json_testresult data structure, a set of entries can
+ * @brief With the @var json_testresult data structure, a set of entries can
  * be specified. These entries will point to C variables which should be turned
  * into a JSON structure.
  *
- * @param entry This variable is the head of an array of @json_entry values. All
+ * @var entry This variable is the head of an array of @json_entry values. All
  *		these pointers should ultimately refer to a @json_data value of
  *		type WRITE_*.
- * @param count This variable specifies the number of entries.
- * @param callbacks Before any variable pointed to by one of the @entry values
+ * @var count This variable specifies the number of entries.
+ * @var callbacks Before any variable pointed to by one of the @entry values
  *		    is written to the JSON file, all callbacks are executed.
- *		    The idea is that precisely when a @param json_testresult is
+ *		    The idea is that precisely when a @var json_testresult is
  *		    hit, one test is executed by the backend cipher
  *		    implementation to fill the variables pointed to by
- *		    @param entry before they are written to JSON.
+ *		    @var entry before they are written to JSON.
  */
 struct json_testresult {
 	const struct json_entry *entry;
@@ -329,21 +346,21 @@ struct json_testresult {
 };
 
 /**
- * @brief The @param json_array is considered to hold the basic test definition
- * of one hierarchy level of the JSON input data. If @param testresult is
- * non-NULL, at the end of the parsing of all @param entry members, the logic
- * described for @param testresult is invoked to invoke one test with the given
- * data. If @param testresult is NULL, no test is executed for the respective
+ * @brief The @var json_array is considered to hold the basic test definition
+ * of one hierarchy level of the JSON input data. If @var testresult is
+ * non-NULL, at the end of the parsing of all @var entry members, the logic
+ * described for @var testresult is invoked to invoke one test with the given
+ * data. If @var testresult is NULL, no test is executed for the respective
  * JSON hierarchy level.
  *
- * @param entry This variable is the head of an array of @json_entry values.
+ * @var entry This variable is the head of an array of @json_entry values.
  *		All these pointers should ultimately refer to a @json_data value
  *		of type PARSER_*.
- * @param count This variable specifies the number of entries.
- * @param testresult This is a reference to one @param json_testresult
+ * @var count This variable specifies the number of entries.
+ * @var testresult This is a reference to one @var json_testresult
  *		     definition. It may be NULL which would imply that no
  *		     testing is invoked after parsing all members of
- *		     @param entry.
+ *		     @var entry.
  */
 struct json_array {
 	const struct json_entry *entry;
@@ -355,20 +372,20 @@ struct json_array {
 #define SET_CALLBACKS(entry) { entry, ARRAY_SIZE(entry) }
 #define SET_ARRAY(entry, addtl) { entry, ARRAY_SIZE(entry), addtl }
 
-#define for_each_arraymember(array, entry, __i)				\
-	for (__i = 0, entry = array->entry;				\
-	     __i < array->count;					\
-	     __i++, entry = array->entry + __i )
+#define for_each_arraymember(__array, __entry, __i)			\
+	for (__i = 0, __entry = __array->entry;				\
+	     __i < __array->count;					\
+	     __i++, __entry = __array->entry + __i )
 
-#define for_each_callback(testresult, callback, __i)			\
-	for (__i = 0, callback = testresult->callbacks->callback;	\
-	     __i < testresult->callbacks->count;			\
-	     __i++, callback = testresult->callbacks->callback + __i )
+#define for_each_callback(__testresult, __callback, __i)		\
+	for (__i = 0, __callback = __testresult->callbacks->callback;	\
+	     __i < __testresult->callbacks->count;			\
+	     __i++, __callback = __testresult->callbacks->callback + __i )
 
-#define for_each_testresult(testresult, entry, __i)			\
-	for (__i = 0, entry = testresult->entry;			\
-	     __i < testresult->count;					\
-	     __i++, entry = testresult->entry + __i )
+#define for_each_testresult(__testresult, __entry, __i)			\
+	for (__i = 0, __entry = __testresult->entry;			\
+	     __i < __testresult->count;					\
+	     __i++, __entry = __testresult->entry + __i )
 
 /**
  * @brief Entry function to start evaluating a test definition
@@ -376,11 +393,11 @@ struct json_array {
  * This function is to be invoked by the different test definitions in
  * parser_*.c with the layout definition of the JSON data to be parsed.
  *
- * @param processdata Parser definition to process
- * @param exp_version Version number to search for in the JSON data (if version
+ * @var processdata Parser definition to process
+ * @var exp_version Version number to search for in the JSON data (if version
  *		      does not match, the parser definition is not executed).
- * @param in Input JSON data to analyze.
- * @param out Any data to be generated based on the application of the parser
+ * @var in Input JSON data to analyze.
+ * @var out Any data to be generated based on the application of the parser
  *	      definition is written to this value.
  *
  * @return 0 on success, < 0 on error
@@ -390,11 +407,11 @@ int process_json(const struct json_array *processdata, const char *exp_version,
 
 /**
  * @brief write_one_entry writes the test result data to the testresults
- *	  structure based on the test definition given in @param entry.
+ *	  structure based on the test definition given in @var entry.
  *
- * @param entry Test definition with the C data to be added to testresult
- * @param testresult JSON data that shall receive the data from the C structure
- * @param parsed_flags Flags that have been obtained from the input JSON data.
+ * @var entry Test definition with the C data to be added to testresult
+ * @var testresult JSON data that shall receive the data from the C structure
+ * @var parsed_flags Flags that have been obtained from the input JSON data.
  *
  * @return 0 on success, < 0 on error
  */
