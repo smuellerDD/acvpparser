@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -226,19 +226,28 @@ struct rsa_signature_primitive_data {
  * client is responsible for generating RSA key pairs of modulus 'n',
  * private key 'd', and calculates 's'.
  *
+ * @var modulus [in] RSA modulus in bits
+ * @var num_failures [in] Number of failing RSA keys (used internally by the
+ *			  parser, disregard)
+ * @var tcid [in] (internal usage)
  * @var msg [in] Message (or cipherText) to be decrypted.
  * @var n [out] RSA modulus
  * @var e [out] RSA exponent
  * @var s [out] Result of the decryption operation
+ * @var dec_result [out] Is RSA decryption operation successful (1) or not (0).
  * @var privkey [in] RSA private key to be used for signature generation.
  *	 	     This variable is only set if rsa_keygen_en callback
  *		     provided.
  */
 struct rsa_decryption_primitive_data {
+	uint32_t modulus;
+	uint32_t num_failures;
+	uint32_t tcid;
 	struct buffer msg;
 	struct buffer n;
 	struct buffer e;
 	struct buffer s;
+	uint32_t dec_result;
 	void *privkey;
 };
 

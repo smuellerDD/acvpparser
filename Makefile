@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 
@@ -41,6 +41,7 @@ C_SRCS := $(filter-out $(wildcard backend*.c), $(C_SRCS))
 INCLUDE_DIRS := $(PARSERDIR)
 LIBRARY_DIRS :=
 LIBRARIES :=
+REQUIED_FILES :=
 
 ############### CONFIGURE BACKEND ACVP2CAVS ##################
 
@@ -85,12 +86,15 @@ ifeq (nettle,$(firstword $(MAKECMDGOALS)))
 endif
 
 ################## CONFIGURE BACKEND GNUTLS ################
+GNUTLS_SRCS = gnutls_src
+GNUTLS_NETTLE_SRCS := $(GNUTLS_SRCS)/lib/nettle/int
+GNUTLS_CONFIG_SRCS := $(GNUTLS_SRCS)/config.h
 
 ifeq (gnutls,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_gnutls.c
-	INCLUDE_DIRS += /home/$(shell echo $$USER)/rpmbuild/BUILD/nettle-2.7.1/ \
-			/home/$(shell echo $$USER)/hacking/repos/gnutls/
+	INCLUDE_DIRS += $(GNUTLS_SRCS)
 	LIBRARIES += gnutls hogweed nettle gmp
+	REQUIED_FILES += $(GNUTLS_NETTLE_SRCS) $(GNUTLS_CONFIG_SRCS)
 
 endif
 
@@ -106,6 +110,19 @@ endif
 ifeq (commoncrypto,$(firstword $(MAKECMDGOALS)))
 	INCLUDE_DIRS += backend_interfaces/commoncrypto
 	C_SRCS += backends/backend_commoncrypto.c
+endif
+
+######################################################
+
+## CONFIGURE BACKEND CoreCrypto using the CoreCrypto cavs_dispatch interface ##
+
+ifeq (corecrypto-dispatch,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_corecrypto_dispatch.c
+	CFLAGS += -Wno-gnu-union-cast -Wno-ignored-qualifiers -Wno-pedantic -Wno-strict-aliasing
+	INCLUDE_DIRS += /Users/sm/Desktop/acvp/corecrypto/DerivedData/corecrypto/Build/Products/Debug/usr/local/include \
+			../corecrypto \
+			backend_interfaces/corecrypto \
+			/home/sm/hacking/sources-nosync/apple/corecrypto-ios11
 endif
 
 ######################################################
@@ -235,10 +252,10 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle default
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -250,6 +267,7 @@ gnutls: $(NAME)
 openssl: $(NAME)
 nss: $(NAME)
 commoncrypto: $(NAME)
+corecrypto-dispatch: $(NAME)
 corecrypto: $(NAME)
 openssh: $(NAME)
 strongswan: $(NAME)
@@ -264,6 +282,8 @@ bouncycastle: $(NAME)
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)
+
+$(OBJS): | files
 
 $(analyze_plists): %.plist: %.c
 	@echo "  CCSA  " $@
@@ -290,6 +310,21 @@ clean:
 	@- $(RM) acvpcert9.db acvpkey4.db
 
 distclean: clean
+
+files: $(REQUIED_FILES)
+
+$(GNUTLS_NETTLE_SRCS):
+	@echo "Checked $(GNUTLS_NETTLE_SRCS)"
+	@echo "GnuTLS's Nettle sources not found in gnutls_src directory"
+	@echo "Copy or symlink configured sources in gnutls_src"
+	@echo "Example: ln -s $(HOME)/rpmbuild/BUILD/gnutls-3.6.8 gnutls_src"
+	@false
+
+$(GNUTLS_CONFIG_SRCS):
+	@echo "Checked $(GNUTLS_CONFIG_SRCS)"
+	@echo "GNuTLS's source are not configured"
+	@echo "Please run $(GNUTLS_SRCS)/configure with the appropriate flags"
+	@false
 
 ###############################################################################
 #

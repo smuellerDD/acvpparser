@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2019, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2020, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -81,6 +81,9 @@ struct ecdsa_pkvver_data {
  *	  signature generation operation. This test is specified in the ECDSA
  *	  CAVS specification.
  *
+ * This data structure is also used for the ECDSA signature generation
+ * primitive testing where @var msg is the already hashed message.
+ *
  * NOTE: You MUST use the very same private key for the same curve. That means
  *	 you generate a new ECDSA key when a new curve in @var cipher value is
  *	 provided. If the Qx and Qy values of the data structure below are not
@@ -119,6 +122,9 @@ struct ecdsa_siggen_data {
  *	  signature verification operation. This test is specified in the ECDSA
  *	  CAVS specification.
  *
+ * This data structure is also used for the ECDSA signature verification
+ * primitive testing where @var msg is the already hashed message.
+ *
  * @var msg [in] Plaintext message to be signature verified.
  * @var Qx [in] ECDSA affine x coordinate of public point Q that was used to
  *		  sign the message
@@ -127,7 +133,7 @@ struct ecdsa_siggen_data {
  * @var R [in] R part of the ECDSA signature to be verified
  * @var S [in] S part of the ECDSA signature to be verified
  * @var cipher [in] Curve and hash algorithm to be used for ECDSA signature
- *		      generation.
+ *		    generation.
  * @var sigver_success [out] Is ECDSA signature verification with given
  *			       parameters successful (1) or whether it
  *			       failed (0).
@@ -177,6 +183,9 @@ struct ecdsa_sigver_data {
  * @var ecdsa_free_key This function is required if ecdsa_keygen_en is
  * 			 registered. This function is intended to free the
  *			 private ECDSA key handle created with ecdsa_keygen_en.
+ *
+ * @var ecdsa_siggen_primitive ECDSA signature generation primitive testing
+ * @var ecdsa_siggen_primitive ECDSA signature verification primitive testing
  */
 struct ecdsa_backend {
 	int (*ecdsa_keygen)(struct ecdsa_keygen_data *data,
@@ -193,6 +202,11 @@ struct ecdsa_backend {
 	int (*ecdsa_keygen_en)(uint64_t curve, struct buffer *qx,
 			       struct buffer *qy, void **privkey);
 	void (*ecdsa_free_key)(void *privkey);
+
+	int (*ecdsa_siggen_primitive)(struct ecdsa_siggen_data *data,
+				      flags_t parsed_flags);
+	int (*ecdsa_sigver_primitive)(struct ecdsa_sigver_data *data,
+				      flags_t parsed_flags);
 };
 
 /**

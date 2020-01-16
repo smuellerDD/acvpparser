@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -622,20 +622,20 @@ int json_acvp_generate(struct json_object **full_json,
 			CKNULL(tmp, -ENOMEM);
 			CKINT(json_object_array_add(json, tmp));
 			CKINT(json_object_object_add(tmp, "acvVersion",
-						json_object_new_string(version)));
+					json_object_new_string(version)));
 
 			/* Actual data - first level */
 			td = json_object_new_object();
 			CKNULL(td, -ENOMEM);
 			CKINT(json_object_array_add(json, td));
 			CKINT(json_object_object_add(td, "vsId",
-						json_object_new_int(INT_MAX)));
+					json_object_new_int(INT_MAX)));
 			CKINT(json_object_object_add(td, "algorithm",
-						json_object_new_string(algorithm)));
+					json_object_new_string(algorithm)));
 			CKINT(json_object_object_add(td, "revision",
-						json_object_new_string("1.0")));
+					json_object_new_string("1.0")));
 			CKINT(json_object_object_add(td, "isSample",
-						json_object_new_boolean(issample)));
+					json_object_new_boolean(issample)));
 
 			/* Test groups */
 			testgroups = json_object_new_array();

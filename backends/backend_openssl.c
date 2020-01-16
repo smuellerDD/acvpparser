@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2019, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2020, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -90,6 +90,13 @@ static void openssl_backend_init(void)
  */
 #ifndef OPENSSL_10X_RHEL
 # undef OPENSSL_10X_RHEL
+#endif
+
+/*
+ * Enable SHA3 support
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+# define OPENSSL_SSH_SHA3
 #endif
 
 /*
@@ -363,7 +370,7 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 		l_type = EVP_sha512();
 		break;
 
-#ifndef OPENSSL_10X_RHEL
+#ifdef OPENSSL_SSH_SHA3
 	case ACVP_HMACSHA3_224:
 	case ACVP_SHA3_224:
 		l_type = EVP_sha3_224();
@@ -496,14 +503,6 @@ static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
 #endif
 
 #ifdef OPENSSL_10X_RHEL
-static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
-{
-	(void)ctx;
-	(void)md;
-	(void)size;
-	return -EOPNOTSUPP;
-}
-
 int
 private_tls1_PRF(long digest_mask,
 		 const void *seed1, int seed1_len,
@@ -814,7 +813,7 @@ out:
 	return ret;
 }
 
-#if OPENSSL_VERSION_NUMBER >= 0x100020
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
 int dsa_paramgen_check_g(DSA *dsa);
 #else
 /* Not changing the indentation because directly copied from OpenSSL */
@@ -925,11 +924,6 @@ static int openssl_dh_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key)
 }
 
 #else
-
-static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
-{
-	return EVP_DigestFinalXOF(ctx, md, size);
-}
 
 /* Copy from ssl/t1_enc.c */
 #ifndef OPENSSL_SSH_KDF
@@ -1285,6 +1279,22 @@ static int openssl_dh_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key)
 	return DH_set0_key(dh, pub_key, priv_key);
 }
 #endif
+
+#ifdef OPENSSL_SSH_SHA3
+static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
+{
+	return EVP_DigestFinalXOF(ctx, md, size);
+}
+#else
+static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
+{
+	(void)ctx;
+	(void)md;
+	(void)size;
+	return -EOPNOTSUPP;
+}
+#endif
+
 
 /************************************************
  * Symmetric cipher interface functions
@@ -2250,9 +2260,11 @@ static int openssl_kdf_tls_op(struct kdf_tls_data *data, flags_t parsed_flags)
 
 	CKINT(openssl_md_convert(data->hashalg, &md));
 
-	/* Special casse */
+	/* Special case */
 	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1)
 		md = EVP_get_digestbynid(NID_md5_sha1);
+
+	CKNULL_LOG(md, -EFAULT, "Cipher implementation not found\n");
 
 	CKINT(alloc_buf(data->pre_master_secret.len, &data->master_secret));
 
@@ -2841,6 +2853,62 @@ out:
 	return ret;
 }
 
+static int
+openssl_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data,
+				 flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	size_t outlen;
+	EVP_PKEY *key = NULL;
+	RSA *rsa = NULL;
+	int ret;
+
+	(void)parsed_flags;
+
+	rsa = data->privkey;
+	CKNULL_LOG(rsa, -EFAULT, "RSA key missing\n");
+
+	key = EVP_PKEY_new();
+	CKNULL(key, -ENOMEM);
+	EVP_PKEY_set1_RSA(key, rsa);
+
+	ctx = EVP_PKEY_CTX_new(key, NULL);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+
+	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx), "PKEY decrypt init failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
+		    "Disabling padding failed\n")
+
+	/* Determine buffer length */
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, data->msg.buf,
+				     data->msg.len),
+		    "Getting plaintext length failed\n");
+
+	CKINT(alloc_buf(outlen, &data->s));
+
+	ret = EVP_PKEY_decrypt(ctx, data->s.buf, &outlen, data->msg.buf,
+			       data->msg.len);
+	if (ret == 1) {
+		logger(LOGGER_DEBUG, "Decryption successful\n");
+		data->dec_result = 1;
+	} else {
+		logger(LOGGER_DEBUG, "Decryption failed %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
+		data->dec_result = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
 static struct rsa_backend openssl_rsa =
 {
 	openssl_rsa_keygen,     /* rsa_keygen */
@@ -2851,7 +2919,7 @@ static struct rsa_backend openssl_rsa =
 	openssl_rsa_keygen_en,
 	openssl_rsa_free_key,
 	NULL,
-	NULL,
+	openssl_rsa_decryption_primitive,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_rsa_backend)
@@ -3680,21 +3748,13 @@ out:
 	return ret;
 }
 
-static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
-				flags_t parsed_flags)
+static int openssl_ecdsa_convert(struct ecdsa_sigver_data *data,
+				 ECDSA_SIG **sig_out, EC_KEY **key_out)
 {
-	EVP_MD_CTX *ctx = NULL;
-	const EVP_MD *md = NULL;
-	EVP_PKEY *pk = NULL;
 	ECDSA_SIG *sig = NULL;
-	BIGNUM *Qx = NULL, *Qy = NULL, *R = NULL, *S = NULL;
-	int nid = NID_undef, ret = 0;
 	EC_KEY *key = NULL;
-	unsigned int sig_len;
-	unsigned char sig_buf[1024];
-	unsigned char *sig_buf_p = sig_buf;
-
-	(void)parsed_flags;
+	BIGNUM *Qx = NULL, *Qy = NULL, *R = NULL, *S = NULL;
+	int ret, nid = NID_undef;
 
 	logger_binary(LOGGER_DEBUG, data->R.buf, data->R.len, "R");
 	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
@@ -3710,10 +3770,7 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 		      NULL);
 	CKNULL(S, -EFAULT);
 
-	if (1 != openssl_ecdsa_SIG_set0(sig, R, S)) {
-		ret = -EFAULT;
-		goto out;
-	}
+	CKINT_O(openssl_ecdsa_SIG_set0(sig, R, S));
 
 	CKINT(_openssl_ecdsa_curves(data->cipher, &nid));
 
@@ -3731,10 +3788,44 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 		       NULL);
 	CKNULL(Qy, -EFAULT);
 
-	if (1 != EC_KEY_set_public_key_affine_coordinates(key, Qx, Qy)) {
-		ret = -EFAULT;
-		goto out;
+	CKINT_O(EC_KEY_set_public_key_affine_coordinates(key, Qx, Qy));
+
+	*key_out = key;
+	*sig_out = sig;
+
+	ret = 0;
+
+out:
+	if (ret) {
+		if (sig)
+			ECDSA_SIG_free(sig);
+		if (key)
+			EC_KEY_free(key);
 	}
+
+	if (Qx)
+		BN_free(Qx);
+	if (Qy)
+		BN_free(Qy);
+	return ret;
+}
+
+static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_MD_CTX *ctx = NULL;
+	const EVP_MD *md = NULL;
+	EVP_PKEY *pk = NULL;
+	ECDSA_SIG *sig = NULL;
+	EC_KEY *key = NULL;
+	unsigned int sig_len;
+	unsigned char sig_buf[1024];
+	unsigned char *sig_buf_p = sig_buf;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_ecdsa_convert(data, &sig, &key));
 
 	pk = EVP_PKEY_new();
 	CKNULL(pk, -ENOMEM);
@@ -3782,11 +3873,67 @@ out:
 		EC_KEY_free(key);
 	if (pk)
 		EVP_PKEY_free(pk);
-	if (Qx)
-		BN_free(Qx);
-	if (Qy)
-		BN_free(Qy);
 
+	return ret;
+}
+
+static int
+openssl_ecdsa_sigver_primitive(struct ecdsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	EC_KEY *ec_key = NULL;
+	ECDSA_SIG *sig = NULL;
+	unsigned char *der_sig = NULL;
+	size_t der_sig_len;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_ecdsa_convert(data, &sig, &ec_key));
+
+	der_sig_len = (size_t)i2d_ECDSA_SIG(sig, &der_sig);
+
+	if (!der_sig_len) {
+		logger(LOGGER_ERR, "Failure to convert signature into DER\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	key = EVP_PKEY_new();
+	CKNULL(key, -ENOMEM);
+	EVP_PKEY_set1_EC_KEY(key, ec_key);
+
+	ctx = EVP_PKEY_CTX_new(key, NULL);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+	CKINT_O_LOG(EVP_PKEY_verify_init(ctx), "PKEY verify init failed\n");
+
+	ret = EVP_PKEY_verify(ctx, der_sig, der_sig_len, data->msg.buf,
+			      data->msg.len);
+	if (ret == 1) {
+		logger(LOGGER_DEBUG, "Signature verification successful\n");
+		data->sigver_success = 1;
+	} else {
+		logger(LOGGER_DEBUG, "Signature verification failed %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (der_sig)
+		free(der_sig);
+	if (sig)
+		ECDSA_SIG_free(sig);
+	if (ec_key)
+		EC_KEY_free(ec_key);
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
 	return ret;
 }
 
@@ -3798,8 +3945,9 @@ static struct ecdsa_backend openssl_ecdsa =
 	openssl_ecdsa_siggen,   /* ecdsa_siggen */
 	openssl_ecdsa_sigver,   /* ecdsa_sigver */
 	openssl_ecdsa_keygen_en,
-	openssl_ecdsa_free_key
-
+	openssl_ecdsa_free_key,
+	NULL,
+	openssl_ecdsa_sigver_primitive
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_ecdsa_backend)
@@ -4105,7 +4253,8 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 			CKINT(alloc_buf(ybufferlen, Qyloc));
 
 		CKINT_O_LOG(EC_KEY_generate_key(local_key),
-			    "Cannot generate local key\n");
+			    "Cannot generate local key %s\n",
+			    ERR_error_string(ERR_get_error(), NULL));
 
 		localQx = BN_new();
 		CKNULL(localQx, -ENOMEM);

@@ -12,6 +12,7 @@ else
 	_LIB_EXEC="./acvp-parser"
 fi
 _LIB_IUT="testvectors"
+_LIB_IUT_PROD="testvectors-production"
 _LIB_REQ="testvector-request.json"
 _LIB_RESP="testvector-response.json"
 _LIB_EXPECTED="testvector-expected.json"
@@ -164,6 +165,7 @@ exec_module()
 	local vendordir
 	local i
 	local j
+	local lib_iut_dir=${_LIB_IUT}
 
 	# If the script name contains "_regression" we switch into regression
 	# mode transparently
@@ -180,11 +182,16 @@ exec_module()
 
 	if [ ! -d "${_LIB_IUT}" ]
 	then
-		echo "Test vector base directory ${_LUB_IUT} not found"
-		return
+		if [ d "${_LIB_IUT_PROD}" ]
+		then
+			lib_iut_dir=${_LIB_IUT_PROD}
+		else
+			echo "Test vector base directory ${_LUB_IUT} / ${_LIB_IUT_PROD} not found"
+			return
+		fi
 	fi
 
-	for vendordir in ${_LIB_IUT}/*
+	for vendordir in ${lib_iut_dir}/*
 	do
 		if [ ! -d "$vendordir" ]
 		then
@@ -371,6 +378,7 @@ regression_test()
 cleanup()
 {
 	find $_LIB_IUT -name "$_LIB_REGRESSION" | xargs rm -f
+	find ${_LIB_IUT_PROD} -name "$_LIB_REGRESSION" | xargs rm -f
 	clean_tool
 }
 

@@ -1,3 +1,8 @@
+v0.6.1
+- addition of RSADP for OpenSSL
+- add first bits of ECDSA primitive testing
+- add HKDF and Curve25519 internal testing
+
 v0.6.0
 - remove requirement for mct_get_last_iv
 - PBKDF: data->password.len now truly contains the correct length of the password

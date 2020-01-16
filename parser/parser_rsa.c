@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2019, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -133,31 +133,20 @@ static int rsa_decprim_keygen(struct rsa_decryption_primitive_data *data,
 {
 	int ret = 0;
 
-#define ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE	2048
-	if (rsa_key.modulus != ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE ||
-	    !rsa_key.key) {
-		rsa_key_free_static();
-		CKINT(rsa_backend->rsa_keygen_en(&data->e,
-			ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE,
-			&rsa_key.key, &data->n));
+	free_buf(&data->e);
+	free_buf(&data->n);
+	CKINT(rsa_backend->rsa_keygen_en(&data->e, data->modulus,
+					 &rsa_key.key, &data->n));
 
-		logger_binary(LOGGER_DEBUG, data->n.buf, data->n.len,
-			      "RSA generated n");
-		logger_binary(LOGGER_DEBUG, data->e.buf, data->e.len,
-			      "RSA generated d");
+	logger_binary(LOGGER_DEBUG, data->n.buf, data->n.len,
+		      "RSA generated n");
+	logger_binary(LOGGER_DEBUG, data->e.buf, data->e.len,
+		      "RSA generated e");
 
-		/* Free the global variable at exit */
-		atexit(rsa_key_free_static);
+	/* Free the global variable at exit */
+	atexit(rsa_key_free_static);
 
-		CKINT(rsa_duplicate_buf(&data->e, &rsa_key.e));
-		CKINT(rsa_duplicate_buf(&data->n, &rsa_key.n));
-		rsa_key.modulus = ACVP_DECRYPTION_PRIMITIVE_MODULUS_SIZE;
-	}
-
-	if (!data->e.len)
-		CKINT(rsa_duplicate_buf(&rsa_key.e, &data->e));
-	if (!data->n.len)
-		CKINT(rsa_duplicate_buf(&rsa_key.n, &data->n));
+	rsa_key.modulus = data->modulus;
 
 	*rsa_privkey = rsa_key.key;
 
@@ -173,6 +162,10 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 			flags_t parsed_flags),
 			      struct rsa_decryption_primitive_data *vector)
 {
+	struct json_object *testresult = NULL, *resultsarray = NULL,
+			   *resultsobject = NULL;
+	const struct json_entry *entry;
+	unsigned int i;//, max;
 	int ret;
 	void *rsa_privkey = NULL;
 
@@ -180,13 +173,83 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	(void)testvector;
 	(void)testresults;
 
-	if (rsa_backend->rsa_keygen_en && rsa_backend->rsa_free_key) {
-		CKINT(rsa_decprim_keygen(vector, &rsa_privkey));
+	/* We try at most 10 times */
+//	for (max = 0; max < 5; max++) {
+		if (rsa_backend->rsa_keygen_en && rsa_backend->rsa_free_key) {
+			CKINT(rsa_decprim_keygen(vector, &rsa_privkey));
+		}
+
+		vector->privkey = rsa_privkey;
+
+		CKINT(callback(vector, parsed_flags));
+
+// 		if (vector->num_failures) {
+// 			if (vector->dec_result) {
+// 				free_buf(&vector->s);
+// 				continue;
+// 			}
+// 			vector->num_failures--;
+// 		} else {
+// 			if (!vector->dec_result) {
+// 				free_buf(&vector->s);
+// 				continue;
+// 			}
+// 		}
+// 		break;
+// 	}
+
+	/*
+	 * Create object with following structure:
+	 *
+	 * {
+		"vsId": 0,
+		"algorithm": "RSA",
+		"mode": "decryptionPrimitive",
+		"revision": "1.0",
+		"testGroups": [
+		{
+			"tgId": 1,
+			"tests": [
+			{
+				"tcId": 1,
+				"resultsArray": [
+				{
+					"e": "60BDBEF656869D",
+					"n": "8FA73CF9CAD37456B64B3B3DF75C3D3BF254A62C82F445682D0BC34FC998F893039C964E3F3B2F0BD70AA39FB693AD5E1C29398BCE7D43A6F57C34FADF4C6159EBF2D1A4BB5A652BDF74A9C69A3AE46105A29B2AF2E385D54152A8A4660F8081D03DDA9AF5B301B8542B6E535285F89D219A095FCD3296C58DC758BC12B9564EC8FC4B92D805FC0F01695D89A9129C9A0EBB5EBC5D487D1CD0B3A0F2C30321B1B41766EF1F0659805667A84B4F66792DB91BBF346B0A652FEB6B9932855377AAB4ACF0224056B6CEF0CAC7C378698869E526453AADD65EA43AA746D5D5494A1E2A20B4D7D05F53FF566C0BC9AFA0D731416E7BD071A2CA6984C08294560D3BFB",
+					"testPassed": false
+				},
+	 */
+	testresult = json_object_new_object();
+	CKNULL(testresult, -ENOMEM);
+	/* Append the output JSON stream with test results. */
+	json_object_array_add(testresults, testresult);
+
+	CKINT(json_add_test_data(testvector, testresult));
+
+	/* Results-array */
+	resultsarray = json_object_new_array();
+	CKNULL(resultsarray, -ENOMEM);
+	json_object_object_add(testresult, "resultsArray", resultsarray);
+
+	/* One object holding the test results */
+	resultsobject = json_object_new_object();
+	CKNULL(resultsobject, -ENOMEM);
+	json_object_array_add(resultsarray, resultsobject);
+
+	/* Iterate over each write definition and invoke it. */
+	for_each_testresult(processdata->testresult, entry, i)
+		CKINT(write_one_entry(entry, resultsobject, parsed_flags));
+
+	if (vector->dec_result) {
+		CKINT(json_add_bin2hex(resultsobject, "plainText",
+				       &vector->s));
+	} else {
+		CKINT(json_object_object_add(resultsobject, "testPassed",
+					     json_object_new_boolean(false)));
 	}
+	free_buf(&vector->s);
 
-	vector->privkey = rsa_privkey;
-
-	CKINT(callback(vector, parsed_flags));
+	ret = FLAG_RES_DATA_WRITTEN;
 
 out:
 	return ret;
@@ -415,7 +478,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA decryption primitive
 	 **********************************************************************/
-	RSA_DEF_CALLBACK_HELPER(rsa_decryption_primitive, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK, rsa_decprim_helper);
+	RSA_DEF_CALLBACK_HELPER(rsa_decryption_primitive, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT, rsa_decprim_helper);
 
 	/*
 	 * Define which test result data should be written to the test result
@@ -423,20 +486,28 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry rsa_decryption_primitive_testresult_entries[] = {
 		{"e",		{.data.buf = &rsa_decryption_primitive_vector.e, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 		{"n",		{.data.buf = &rsa_decryption_primitive_vector.n, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
-		{"plainText",	{.data.buf = &rsa_decryption_primitive_vector.s, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"tcId",	{.data.integer = &rsa_decryption_primitive_vector.tcid, WRITER_UINT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 	};
 	const struct json_testresult rsa_decryption_primitive_testresult = SET_ARRAY(rsa_decryption_primitive_testresult_entries, &rsa_decryption_primitive_callbacks);
 
 
 	const struct json_entry rsa_decryption_primitive_test_entries[] = {
 		{"cipherText",	{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 	};
 	const struct json_array rsa_decryption_primitive_test = SET_ARRAY(rsa_decryption_primitive_test_entries, &rsa_decryption_primitive_testresult);
+
+	const struct json_entry rsa_decryption_primitive_testresults_entries[] = {
+		{"tcId",	{.data.integer = &rsa_decryption_primitive_vector.tcid, PARSER_UINT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"resultsArray",	{.data.array = &rsa_decryption_primitive_test, PARSER_ARRAY},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
+	};
+	const struct json_array rsa_decryption_primitive_testresults = SET_ARRAY(rsa_decryption_primitive_testresults_entries, NULL);
 
 	/**********************************************************************
 	 * RSA common test group
@@ -516,7 +587,9 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_array rsa_signature_primitive_testgroup = SET_ARRAY(rsa_signature_primitive_testgroup_entries, NULL);
 
 	const struct json_entry rsa_decryption_primitive_testgroup_entries[] = {
-		{"tests",	{.data.array = &rsa_decryption_primitive_test, PARSER_ARRAY},
+		{"modulo",	{.data.integer = &rsa_decryption_primitive_vector.modulus, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"totalFailingCases",	{.data.integer = &rsa_decryption_primitive_vector.num_failures, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"tests",	{.data.array = &rsa_decryption_primitive_testresults, PARSER_ARRAY},
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
 	};
 	const struct json_array rsa_decryption_primitive_testgroup = SET_ARRAY(rsa_decryption_primitive_testgroup_entries, NULL);
