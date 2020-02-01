@@ -310,6 +310,7 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ecdsa_sigver_testgroup_entries[] = {
 		{"curve",	{.data.largeint = &ecdsa_sigver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER },
 		{"hashAlg",	{.data.largeint = &ecdsa_sigver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER },
+		{"component",	{.data.integer = &ecdsa_sigver_vector.component, PARSER_BOOL},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER | FLAG_OPTIONAL},
 		{"tests",	{.data.array = &ecdsa_sigver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER },
 	};
 	const struct json_array ecdsa_sigver_testgroup = SET_ARRAY(ecdsa_sigver_testgroup_entries, NULL);

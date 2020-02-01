@@ -768,7 +768,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 					   data->pq_prob_domain_param_seed.len,
 					   &counter2,
 					   h2, NULL),
-		    "FIPS_dsa_builtin_paramgen() failed");
+		    "FIPS_dsa_builtin_paramgen() failed\n");
 
 	data->pqgver_success = 1;
 	if (BN_cmp(dsa->p, p)) {
@@ -1033,7 +1033,8 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, L, N, md, NULL, 0,
 					       0, seed, (int *)counter,
 					       &h, NULL),
-		    "FIPS_dsa_builtin_paramgen2() failed\n");
+		    "FIPS_dsa_builtin_paramgen2() failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	openssl_dsa_get0_pqg(dsa, &p, &q, &g);
 	CKINT(openssl_bn2buffer(p, P));
@@ -1103,7 +1104,8 @@ static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
 					       NULL, 0, 0, seed, &counter, &h,
 					       NULL),
-		    "FIPS_dsa_generate_pq() failed\n");
+		    "FIPS_dsa_generate_pq() failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	openssl_dsa_get0_pqg(dsa, NULL, NULL, &g_gen);
 	CKINT(openssl_bn2buffer(g_gen, &data->G));
@@ -1177,7 +1179,8 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 					data->pq_prob_domain_param_seed.len,
 					(int)data->pq_prob_counter,
 					seed, &counter, &h, NULL),
-		    "FIPS_dsa_builtin_paramgen2() failed\n");
+		    "FIPS_dsa_builtin_paramgen2() failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	openssl_dsa_get0_pqg(dsa, &gen_p, &gen_q, &gen_g);
 
@@ -2637,7 +2640,7 @@ static int openssl_rsa_keygen_internal(struct buffer *ebuf, uint32_t modulus,
 	do {
 		ret = RSA_generate_key_ex(rsa, (int)modulus, e, NULL);
 		retry++;
-	} while (ret != 1 && retry < 10);
+	} while (ret != 1 && retry < 100);
 	CKINT_O_LOG(ret, "RSA_generate_key_ex() failed: %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
 
@@ -2702,9 +2705,10 @@ static int openssl_rsa_siggen(struct rsa_siggen_data *data,
 {
 	const EVP_MD *md = NULL;
 	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
 	EVP_PKEY *pk = NULL;
 	RSA *rsa = NULL;
-	unsigned int siglen;
+	size_t siglen;
 	int ret;
 
 	(void)parsed_flags;
@@ -2725,33 +2729,40 @@ static int openssl_rsa_siggen(struct rsa_siggen_data *data,
 
 	EVP_PKEY_set1_RSA(pk, rsa);
 
-	CKINT(alloc_buf((size_t)RSA_size(rsa), &data->sig));
+	CKINT(alloc_buf((size_t)EVP_PKEY_size(pk), &data->sig));
+	siglen = data->sig.len;
 
 	ctx = EVP_MD_CTX_create();
 	CKNULL(ctx, -ENOMEM);
 
-#if 0
-	if (saltlen)
-		EVP_MD_CTX_set_flags(&ctx,
-				EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
+	CKINT_O_LOG(EVP_DigestSignInit(ctx, &pctx, md, NULL, pk),
+		    "EVP_DigestSignInit failed: %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
-		EVP_MD_CTX_set_flags(&ctx, EVP_MD_CTX_FLAG_PAD_X931);
-#endif
-
-	if (!EVP_SignInit_ex(ctx, md, NULL)) {
-		ret = -EFAULT;
-		goto out;
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PSS_PADDING),
+			    "Setting PSS type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx,
+						data->saltlen),
+			    "Setting salt length to %u failed: %s\n",
+			    data->saltlen,
+			    ERR_error_string(ERR_get_error(), NULL));
 	}
 
-	if (!EVP_SignUpdate(ctx, data->msg.buf, data->msg.len)) {
-		ret = -EFAULT;
-		goto out;
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_X931_PADDING),
+			    "Setting X9.31 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
 	}
 
-	if (!EVP_SignFinal(ctx, data->sig.buf, &siglen, pk)) {
-		ret = -EFAULT;
-		goto out;
-	}
+	CKINT_O_LOG(EVP_DigestSignUpdate(ctx, data->msg.buf, data->msg.len),
+		    "EVP_DigestSignUpdate failed: %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
+
+	CKINT_O_LOG(EVP_DigestSignFinal(ctx, data->sig.buf, &siglen),
+		    "EVP_DigestSignFinal failed: %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
 
 	logger_binary(LOGGER_DEBUG, data->sig.buf, data->sig.len, "sig");
 
@@ -2769,6 +2780,7 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 {
 	const EVP_MD *md = NULL;
 	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
 	EVP_PKEY *pk = NULL;
 	RSA *rsa = NULL;
 	BIGNUM *n = NULL, *e = NULL;
@@ -2807,26 +2819,28 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 	ctx = EVP_MD_CTX_create();
 	CKNULL(ctx, -ENOMEM);
 
-#if 0
-	if (saltlen)
-		EVP_MD_CTX_set_flags(&ctx,
-				EVP_MD_CTX_FLAG_PAD_PSS | (Saltlen << 16));
+	CKINT_O(EVP_DigestVerifyInit(ctx, &pctx, md, NULL, pk));
 
-		EVP_MD_CTX_set_flags(&ctx, EVP_MD_CTX_FLAG_PAD_X931);
-#endif
-
-	if (!EVP_VerifyInit_ex(ctx, md, NULL)) {
-		ret = -EFAULT;
-		goto out;
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PSS_PADDING),
+			    "Setting PSS type failed: %s\n",  ERR_error_string(ERR_get_error(), NULL));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx,
+						data->saltlen),
+			    "Setting salt length to %u failed: %s\n",
+			    data->saltlen,
+			    ERR_error_string(ERR_get_error(), NULL));
 	}
 
-        if (!EVP_VerifyUpdate(ctx, data->msg.buf, data->msg.len)) {
-		ret = -EFAULT;
-		goto out;
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_X931_PADDING),
+			    "Setting X9.31 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
 	}
 
-	ret = EVP_VerifyFinal(ctx, data->sig.buf, (unsigned int)data->sig.len,
-			      pk);
+        CKINT_O(EVP_DigestVerifyUpdate(ctx, data->msg.buf, data->msg.len));
+
+	ret = EVP_DigestVerifyFinal(ctx, data->sig.buf, data->sig.len);
 	if (!ret) {
 		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
 		data->sig_result = 0;
@@ -3671,6 +3685,8 @@ static void openssl_ecdsa_free_key(void *privkey)
 		EC_KEY_free(ecdsa);
 }
 
+// TODO add ECDSA siggen primitive
+
 static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
 				flags_t parsed_flags)
 {
@@ -3810,73 +3826,6 @@ out:
 	return ret;
 }
 
-static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
-				flags_t parsed_flags)
-{
-	EVP_MD_CTX *ctx = NULL;
-	const EVP_MD *md = NULL;
-	EVP_PKEY *pk = NULL;
-	ECDSA_SIG *sig = NULL;
-	EC_KEY *key = NULL;
-	unsigned int sig_len;
-	unsigned char sig_buf[1024];
-	unsigned char *sig_buf_p = sig_buf;
-	int ret = 0;
-
-	(void)parsed_flags;
-
-	CKINT(openssl_ecdsa_convert(data, &sig, &key));
-
-	pk = EVP_PKEY_new();
-	CKNULL(pk, -ENOMEM);
-
-	EVP_PKEY_set1_EC_KEY(pk, key);
-
-	sig_len = (unsigned int)i2d_ECDSA_SIG(sig, &sig_buf_p);
-
-	ctx = EVP_MD_CTX_create();
-	CKNULL(ctx, -ENOMEM);
-
-	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
-
-	if (!EVP_VerifyInit_ex(ctx, md, NULL)) {
-		ret = -EFAULT;
-		goto out;
-	}
-
-	if (!EVP_VerifyUpdate(ctx, data->msg.buf, data->msg.len)) {
-		ret = -EFAULT;
-		goto out;
-	}
-
-	ret = EVP_VerifyFinal(ctx, sig_buf, sig_len, pk);
-	if (!ret) {
-		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
-		data->sigver_success = 0;
-	} else if (ret == 1) {
-		logger(LOGGER_DEBUG,
-		       "Signature verification: signature good\n");
-		data->sigver_success = 1;
-		ret = 0;
-	} else {
-		logger(LOGGER_WARN,
-		       "Signature verification: general error\n");
-		ret = -EFAULT;
-	}
-
-out:
-	if (ctx)
-		EVP_MD_CTX_destroy(ctx);
-	if (sig)
-		ECDSA_SIG_free(sig);
-	if (key)
-		EC_KEY_free(key);
-	if (pk)
-		EVP_PKEY_free(pk);
-
-	return ret;
-}
-
 static int
 openssl_ecdsa_sigver_primitive(struct ecdsa_sigver_data *data,
 			       flags_t parsed_flags)
@@ -3937,6 +3886,74 @@ out:
 	return ret;
 }
 
+static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_MD_CTX *ctx = NULL;
+	const EVP_MD *md = NULL;
+	EVP_PKEY *pk = NULL;
+	ECDSA_SIG *sig = NULL;
+	EC_KEY *key = NULL;
+	unsigned int sig_len;
+	unsigned char sig_buf[1024];
+	unsigned char *sig_buf_p = sig_buf;
+	int ret = 0;
+
+	if (data->component)
+		return openssl_ecdsa_sigver_primitive(data, parsed_flags);
+
+	CKINT(openssl_ecdsa_convert(data, &sig, &key));
+
+	pk = EVP_PKEY_new();
+	CKNULL(pk, -ENOMEM);
+
+	EVP_PKEY_set1_EC_KEY(pk, key);
+
+	sig_len = (unsigned int)i2d_ECDSA_SIG(sig, &sig_buf_p);
+
+	ctx = EVP_MD_CTX_create();
+	CKNULL(ctx, -ENOMEM);
+
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	if (!EVP_VerifyInit_ex(ctx, md, NULL)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (!EVP_VerifyUpdate(ctx, data->msg.buf, data->msg.len)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ret = EVP_VerifyFinal(ctx, sig_buf, sig_len, pk);
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN,
+		       "Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (ctx)
+		EVP_MD_CTX_destroy(ctx);
+	if (sig)
+		ECDSA_SIG_free(sig);
+	if (key)
+		EC_KEY_free(key);
+	if (pk)
+		EVP_PKEY_free(pk);
+
+	return ret;
+}
+
 static struct ecdsa_backend openssl_ecdsa =
 {
 	openssl_ecdsa_keygen,   /* ecdsa_keygen_testing */
@@ -3946,8 +3963,6 @@ static struct ecdsa_backend openssl_ecdsa =
 	openssl_ecdsa_sigver,   /* ecdsa_sigver */
 	openssl_ecdsa_keygen_en,
 	openssl_ecdsa_free_key,
-	NULL,
-	openssl_ecdsa_sigver_primitive
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_ecdsa_backend)
@@ -4094,7 +4109,8 @@ static int openssl_dh_ss_common(uint64_t cipher,
 
 	/* Compute the shared secret */
 	if (0 > DH_compute_key_padded(ss.buf, bn_Yrem, dh)) {
-		logger(LOGGER_DEBUG, "Cannot generate shared secret\n");
+		logger(LOGGER_DEBUG, "Cannot generate shared secret %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
 
 		/*
 		 * This error may be possible if the key does not match PQG.
@@ -4316,7 +4332,8 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 	if (0 == ECDH_compute_key(ss.buf, ss.len, remote_pubkey,
 				  local_key, NULL)) {
-		logger(LOGGER_DEBUG, "Cannot generate shared secret\n");
+		logger(LOGGER_DEBUG, "Cannot generate shared secret %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
 
 		/*
 		 * This error may be possible if the point is not on the curve.

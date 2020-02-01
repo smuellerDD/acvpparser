@@ -1,3 +1,9 @@
+v0.6.2
+- fix exec_lib.sh
+- OpenSSL: increase number of RSA keygen retries
+- addition of ECDSA sigver component for OpenSSL
+- addition of RSA PSS / X9.31 for OpenSSL
+
 v0.6.1
 - addition of RSADP for OpenSSL
 - add first bits of ECDSA primitive testing

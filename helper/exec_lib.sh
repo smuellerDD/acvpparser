@@ -75,32 +75,6 @@ echo_deact()
 	echo $(color "yellow")[DEACTIVATED]$(color off) $@
 }
 
-build_tool()
-{
-	local target=$1
-
-	if [ -z "$target" ]
-	then
-		echo "No module name provided, skipping"
-		return
-	fi
-
-	if [ x"$CURDIR" = x"tests" ]
-	then
-		make -C ../ clean
-		make -C ../ -s $target
-	else
-		make clean
-		make -s $target
-	fi
-	ret=$?
-	if [ $ret -ne 0 ]
-	then
-		echo "Build failed"
-		exit $ret
-	fi
-}
-
 clean_tool()
 {
 	if [ x"$CURDIR" = x"tests" ]
@@ -113,6 +87,32 @@ clean_tool()
 	if [ $ret -ne 0 ]
 	then
 		echo "Cleaning failed"
+		exit $ret
+	fi
+}
+
+build_tool()
+{
+	local target=$1
+
+	if [ -z "$target" ]
+	then
+		echo "No module name provided, skipping"
+		return
+	fi
+
+	clean_tool
+
+	if [ x"$CURDIR" = x"tests" ]
+	then
+		make -C ../ -s $target
+	else
+		make -s $target
+	fi
+	ret=$?
+	if [ $ret -ne 0 ]
+	then
+		echo "Build failed"
 		exit $ret
 	fi
 }
@@ -182,7 +182,7 @@ exec_module()
 
 	if [ ! -d "${_LIB_IUT}" ]
 	then
-		if [ d "${_LIB_IUT_PROD}" ]
+		if [ -d "${_LIB_IUT_PROD}" ]
 		then
 			lib_iut_dir=${_LIB_IUT_PROD}
 		else
@@ -377,9 +377,18 @@ regression_test()
 
 cleanup()
 {
-	find $_LIB_IUT -name "$_LIB_REGRESSION" | xargs rm -f
-	find ${_LIB_IUT_PROD} -name "$_LIB_REGRESSION" | xargs rm -f
-	clean_tool
+	if [ -d $_LIB_IUT ]
+        then
+		find $_LIB_IUT -name "$_LIB_REGRESSION" | xargs rm -f
+	fi
+
+	if [ -d ${_LIB_IUT_PROD} ]
+        then
+		find ${_LIB_IUT_PROD} -name "$_LIB_REGRESSION" | xargs rm -f
+	fi
+
+	# Do not call make clean here
+#	clean_tool
 }
 
 trap "cleanup; exit $failures" 0 1 2 3 15

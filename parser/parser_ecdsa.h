@@ -132,11 +132,13 @@ struct ecdsa_siggen_data {
  *		  sign the message
  * @var R [in] R part of the ECDSA signature to be verified
  * @var S [in] S part of the ECDSA signature to be verified
+ * @var component [in] Is vector an ECDSA component testing (1) or a full
+ *		       ECDSA signature testing (0)
  * @var cipher [in] Curve and hash algorithm to be used for ECDSA signature
  *		    generation.
  * @var sigver_success [out] Is ECDSA signature verification with given
- *			       parameters successful (1) or whether it
- *			       failed (0).
+ *			     parameters successful (1) or whether it
+ *			     failed (0).
  */
 struct ecdsa_sigver_data {
 	struct buffer msg;
@@ -144,6 +146,7 @@ struct ecdsa_sigver_data {
 	struct buffer Qy;
 	struct buffer R;
 	struct buffer S;
+	uint32_t component;
 	uint64_t cipher;
 	uint32_t sigver_success;
 };
@@ -202,11 +205,6 @@ struct ecdsa_backend {
 	int (*ecdsa_keygen_en)(uint64_t curve, struct buffer *qx,
 			       struct buffer *qy, void **privkey);
 	void (*ecdsa_free_key)(void *privkey);
-
-	int (*ecdsa_siggen_primitive)(struct ecdsa_siggen_data *data,
-				      flags_t parsed_flags);
-	int (*ecdsa_sigver_primitive)(struct ecdsa_sigver_data *data,
-				      flags_t parsed_flags);
 };
 
 /**
