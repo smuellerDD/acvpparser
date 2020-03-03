@@ -101,6 +101,8 @@ struct ecdsa_pkvver_data {
  *		      to sign the message
  * @var R [out] R part of the generated ECDSA signature
  * @var S [out] S part of the generated ECDSA signature
+ * @var component [in] Is vector an ECDSA component testing (1) or a full
+ *		       ECDSA signature testing (0)
  * @var cipher [in] Curve and hash algorithm to be used for ECDSA signature
  *		      generation.
  * @var privkey [in] ECDSA private key to be used for signature generation.
@@ -113,6 +115,7 @@ struct ecdsa_siggen_data {
 	struct buffer Qy;
 	struct buffer R;
 	struct buffer S;
+	uint32_t component;
 	uint64_t cipher;
 	void *privkey;
 };

@@ -1,3 +1,8 @@
+v0.6.3
+- OpenSSL: support for invcation of P224 and P192 (P192 is deactivated in OpenSSL though)
+- AES: updated key shuffle for MCT to follow specification precisely
+- add ARM64 support for OpenSSL
+
 v0.6.2
 - fix exec_lib.sh
 - OpenSSL: increase number of RSA keygen retries

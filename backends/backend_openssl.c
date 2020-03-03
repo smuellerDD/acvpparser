@@ -3466,6 +3466,12 @@ static int _openssl_ecdsa_curves(uint64_t curve, int *out_nid)
 	logger(LOGGER_DEBUG, "curve : %u\n", curve);
 
 	switch(curve & ACVP_CURVEMASK) {
+	case ACVP_NISTP192:
+		nid = NID_secp192k1;
+		break;
+	case ACVP_NISTP224:
+		nid = NID_secp224r1;
+		break;
 	case ACVP_NISTP256:
 		nid = NID_X9_62_prime256v1;
 		break;
@@ -4030,7 +4036,7 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		ss->len = 0;
 
 		logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-				      "Shared secret");
+			      "Shared secret");
 	}
 
 out:

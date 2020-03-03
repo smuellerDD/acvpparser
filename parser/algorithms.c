@@ -26,6 +26,9 @@
 
 static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ACVP-AES-ECB", ACVP_ECB},
+	{"ACVP-AES-CBC-CS1", ACVP_CBC_CS1 },
+	{"ACVP-AES-CBC-CS2", ACVP_CBC_CS2 },
+	{"ACVP-AES-CBC-CS3", ACVP_CBC_CS3 },
 	{"ACVP-AES-CBC", ACVP_CBC},
 	{"ACVP-AES-OFB", ACVP_OFB},
 	{"ACVP-AES-CFB8", ACVP_CFB8},
@@ -106,6 +109,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"middle fixed data", ACVP_KDF_108_MIDDLE_FIXED},
 	{"before iterator", ACVP_KDF_108_BEFORE_ITERATOR},
 
+	{"P-192", ACVP_NISTP192},
 	{"P-224", ACVP_NISTP224},
 	{"P-256", ACVP_NISTP256},
 	{"P-384", ACVP_NISTP384},

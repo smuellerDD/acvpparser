@@ -238,6 +238,16 @@ ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
 	LIBRARIES += jvm
 endif
 
+################## CONFIGURE BACKEND libica ########
+
+ifeq (libica,$(firstword $(MAKECMDGOALS)))
+	CFLAGS += -Wno-strict-aliasing
+	C_SRCS += backends/backend_libica.c
+	C_SRCS += backend_interfaces/libica/sha_common.c
+	INCLUDE_DIRS += backend_interfaces/libica/
+	LIBRARIES += ica crypto
+endif
+
 ######################################################
 
 C_OBJS := ${C_SRCS:.c=.o}
@@ -252,10 +262,10 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle default files
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -277,6 +287,7 @@ libsodium: $(NAME)
 libnacl: $(NAME)
 boringssl: $(NAME)
 botan: $(NAME)
+libica: $(NAME)
 bouncycastle: $(NAME)
 	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 

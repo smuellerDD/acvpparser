@@ -231,8 +231,10 @@ struct rsa_signature_primitive_data {
  *			  parser, disregard)
  * @var tcid [in] (internal usage)
  * @var msg [in] Message (or cipherText) to be decrypted.
- * @var n [out] RSA modulus
- * @var e [out] RSA exponent
+ * @var n [out] RSA modulus - if rsa_keygen_en is set, buffer is filled with
+ *			      the output of that call
+ * @var e [out] RSA exponent - if rsa_keygen_en is set, buffer is filled with
+ *			       the output of that call
  * @var s [out] Result of the decryption operation
  * @var dec_result [out] Is RSA decryption operation successful (1) or not (0).
  * @var privkey [in] RSA private key to be used for signature generation.

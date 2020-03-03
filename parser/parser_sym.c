@@ -605,11 +605,7 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 		const struct json_entry *entry;
 		uint8_t cfb_byte_for_next_round = 0;
 
-		if (vector->cipher == ACVP_CBC_CS1 ||
-		    vector->cipher == ACVP_CBC_CS2 ||
-		    vector->cipher == ACVP_CBC_CS3) {
-			memcpy(calc_data.buf, vector->iv.buf, vector->iv.len);
-		} else if (vector->cipher != ACVP_ECB) {
+		if (vector->cipher != ACVP_ECB) {
 			/* Only for CFB1/8 the calc_data is longer than IV */
  			memcpy(calc_data.buf + calc_data.len - vector->iv.len,
  			       vector->iv.buf, vector->iv.len);
@@ -641,11 +637,13 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 			logger_binary(LOGGER_DEBUG, vector->data.buf,
 				      vector->data.len, "MCT calculated data");
 
-			/* Append MSB(CT) for PT[j+1] */
+			/* IV[i] || MSB(CT) for PT[j+1] */
 			if (vector->cipher == ACVP_CBC_CS1 ||
 			    vector->cipher == ACVP_CBC_CS2 ||
 			    vector->cipher == ACVP_CBC_CS3) {
 				if (iloop == 0) {
+					memcpy(calc_data.buf, vector->iv.buf,
+					       vector->iv.len);
 					memcpy(calc_data.buf + vector->iv.len,
 					       vector->data.buf,
 					       calc_data.len - vector->iv.len);
@@ -721,16 +719,35 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 
 			vector->data.buf[0] = cfb_byte_for_next_round;
 		} else {
-			for (k = vector->key.len, i = vector->data.len;
-			     i > 0 && k > 0;
-			     k--, i--)
-				vector->key.buf[k - 1] ^=
-							vector->data.buf[i - 1];
-			/* Use MSB */
-			for (i = vector->data.len;
-			     i > 0 && k > 0;
-			     k--, i--)
-				vector->key.buf[k - 1] ^= calc_data.buf[i - 1];
+			/*
+			 * AES MCT Key Shuffle - why does it need to be so
+			 * inconsistent?
+			 */
+			if (vector->key.len == 16) {
+				/* Take the 16 MSB from CT[j] */
+				for (i = 0; i < 16; i++)
+					vector->key.buf[i] ^=
+						vector->data.buf[i];
+			} else if (vector->key.len == 24) {
+				/* Take the 8 LSB from CT[j-1] */
+				for (i = 0; i < 8; i++)
+					vector->key.buf[i] ^=
+						calc_data.buf[calc_data.len - 8 + i];
+
+				/* Take the 16 MSB from CT[j] */
+				for (i = 0; i < 16; i++)
+					vector->key.buf[i + 8] ^=
+						vector->data.buf[i];
+			} else if (vector->key.len == 32) {
+				/* Take the 16 MSB from CT[j - 1] */
+				for (i = 0; i < 16; i++)
+					vector->key.buf[i] ^=
+						calc_data.buf[i];
+				/* Take the 16 MSB from CT[j] */
+				for (i = 0; i < 16; i++)
+					vector->key.buf[i + 16] ^=
+						vector->data.buf[i];
+			}
 		}
 
 		if (vector->cipher != ACVP_ECB &&
@@ -739,8 +756,6 @@ static int sym_mct_aes_helper(const struct json_array *processdata,
 			memcpy(vector->iv.buf, vector->data.buf, vector->iv.len);
 			memcpy(vector->data.buf, calc_data.buf, vector->data.len);
 		}
-
-
 	}
 
 	json_object_object_add(testresult, "resultsArray", resultsarray);
