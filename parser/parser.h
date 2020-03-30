@@ -42,11 +42,11 @@ extern "C"
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 6   /* API compatible, ABI may change,
+#define MINVERSION 7   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
-#define PATCHLEVEL 3   /* API / ABI compatible, no functional
+#define PATCHLEVEL 0   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
 

@@ -1,3 +1,11 @@
+v0.7.0
+- OpenSSL: fix memory corruption in ECDH component testing
+- add P-192 support
+- OpenSSL: add DH_generate_key testing
+- DSA keygen: fix padding of PQG values leading to spurious DSA keygen errors
+- fix SHA-512/224 and SHA-512/256 parsing
+- fix DRBG definition: add data->type to hold the DRBG type
+
 v0.6.3
 - OpenSSL: support for invcation of P224 and P192 (P192 is deactivated in OpenSSL though)
 - AES: updated key shuffle for MCT to follow specification precisely

@@ -99,6 +99,7 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_RSA_PRIME_TEST_C2			(0x0000000020000000ULL)
 /* RSA prime test: Miller Rabin (Table C.3) */
 #define FLAG_OP_RSA_PRIME_TEST_C3			(0x0000000040000000ULL)
+#define FLAG_OP_RSA_CRT					(0x0000000080000000ULL)
 #define FLAG_OP_MASK_RSA				(0x00000000fffff000ULL)
 
 /* SHA: Bitwise or Bytewise representation */

@@ -63,25 +63,25 @@
  * @var random [out] The buffer to hold the generated random number in binary
  *		       form (buffer must be allocated by the backend, and the
  *		       parser releases the buffer).
+ * @var type [in] DRBG type - DRBGCTR or DRBGHASH or DRBGHMAC
  * @var cipher [in] Cipher specification as defined in cipher_definitions.h.
- *		       The value is an OR of DRBG type and cipher core):
- *				 * DRBGCTR | AES128
- *				 * DRBGCTR | AES192
- *				 * DRBGCTR | AES256
- *				 * DRBGHASH | SHA1
- *				 * DRBGHASH | SHA224
- *				 * DRBGHASH | SHA256
- *				 * DRBGHASH | SHA384
- *				 * DRBGHASH | SHA512
- *				 * DRBGHASH | SHA512224
- *				 * DRBGHASH | SHA512256
- *				 * DRBGHMAC | SHA1
- *				 * DRBGHMAC | SHA224
- *				 * DRBGHMAC | SHA256
- *				 * DRBGHMAC | SHA384
- *				 * DRBGHMAC | SHA512
- *				 * DRBGHMAC | SHA512224
- *				 * DRBGHMAC | SHA512256
+ *				 * AES128
+ *				 * AES192
+ *				 * AES256
+ *				 * SHA1
+ *				 * SHA224
+ *				 * SHA256
+ *				 * SHA384
+ *				 * SHA512
+ *				 * SHA512224
+ *				 * SHA512256
+ *				 * SHA1
+ *				 * SHA224
+ *				 * SHA256
+ *				 * SHA384
+ *				 * SHA512
+ *				 * SHA512224
+ *				 * SHA512256
  * @var rnd_data_bits_len [in] Length of random data to produce in bits.
  * @var pr [in] Prediction resistance enabled (1 == true, 0 == false)
  * @var df [in] Derivation function requested (1 == true, 0 == false)
@@ -95,6 +95,7 @@ struct drbg_data {
 	struct buffer_array addtl_generate;
 	struct buffer_array entropy_generate;
 	struct buffer random;
+	uint64_t type;
 	uint64_t cipher;
 	uint32_t rnd_data_bits_len;
 	uint32_t pr;

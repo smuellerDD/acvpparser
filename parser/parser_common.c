@@ -102,10 +102,14 @@ static void vector_free_entry(const struct json_entry *entry)
 	case PARSER_BOOL:
 	case WRITER_BOOL:
 	case WRITER_BOOL_TRUE_TO_FALSE:
-	case PARSER_CIPHER:
 		logger(LOGGER_DEBUG, "Freeing entry %s with data type %d\n",
 		       entry->name, data->datatype);
 		*data->data.integer = 0;
+		break;
+	case PARSER_CIPHER:
+		logger(LOGGER_DEBUG, "Freeing entry %s with data type %d\n",
+		       entry->name, data->datatype);
+		*data->data.largeint = 0;
 		break;
 	case PARSER_CIPHER_ARRAY:
 		cipher_array = data->data.cipher_array;
@@ -538,6 +542,12 @@ static const struct parser_flagsconv flagsconv_rsarandpq[] = {
 	{0, {NULL}, NULL}
 };
 
+/* Flags conversion for RSA keyType */
+static const struct parser_flagsconv flagsconv_rsakeytype[] = {
+	{FLAG_OP_RSA_CRT, {.string = "crt"}, "RSA CRT key type"},
+	{0, {NULL}, NULL}
+};
+
 /* Flags conversion for RSA signature type */
 static const struct parser_flagsconv flagsconv_rsasigtype[] = {
 	{FLAG_OP_RSA_SIG_PKCS15, {.string = "pkcs1v1.5"}, "RSA signature PKCS15"},
@@ -652,6 +662,8 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 			flagsconv_rsarandpq);
 	parse_flagblock(obj, parsed_flags, "sigType", json_type_string,
 			flagsconv_rsasigtype);
+	parse_flagblock(obj, parsed_flags, "keyType", json_type_string,
+			flagsconv_rsakeytype);
 #if 0
 	parse_flagblock(obj, parsed_flags, "primeTest", flagsconv_rsaprimetest);
 #endif

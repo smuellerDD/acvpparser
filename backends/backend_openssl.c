@@ -20,6 +20,7 @@
  * Fedora 29.
  */
 
+#define _GNU_SOURCE
 #include <errno.h>
 #include <openssl/aes.h>
 #include <openssl/cmac.h>
@@ -238,6 +239,7 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		}
 		break;
 
+	case ACVP_GMAC:
 	case ACVP_GCM:
 		switch (keylen) {
 		case 16:
@@ -1406,7 +1408,7 @@ static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
 	 * Round up to the nearest AES block boundary as input data for KWP
 	 * is not block-aligned.
 	 */
-	buflen = ((data->data.len + 15) / 16) * 16;
+	buflen = ((data->data.len + 7) / 8) * 8;
 	buflen += SEMIBSIZE;
 
 	CKINT(alloc_buf(buflen, &ct));
@@ -1649,6 +1651,7 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 {
 	EVP_MD_CTX *ctx = NULL;
 	const EVP_MD *md = NULL;
+	unsigned int maclen = 0;
 	int mdlen;
 	int ret;
 
@@ -1665,7 +1668,7 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 		  "SHA buffer cannot be allocated\n");
 
 	ctx = EVP_MD_CTX_create();
-	CKNULL(ctx, -ENOMEM);
+	CKNULL_LOG(ctx, -ENOMEM, "MD context not created\n");
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
 	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed %s\n",
@@ -1680,8 +1683,9 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 			    "EVP_DigestFinalXOF() failed\n");
 	} else {
 		CKINT_O_LOG(EVP_DigestFinal(ctx, data->mac.buf,
-					    (unsigned int *) &data->mac.len),
+					    &maclen),
 			    "EVP_DigestFinal() failed\n");
+		data->mac.len = (size_t)maclen;
 	}
 
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "hash");
@@ -1805,8 +1809,9 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		/* 96 bit IV */
 		CKINT(alloc_buf(ivlen, &data->iv));
 
-		CKINT_O(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, 4,
-					    data->iv.buf));
+		CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, 4,
+						data->iv.buf),
+			    "EVP_CTRL_GCM_SET_IV_FIXED setting fixed value failed\n");
 		CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_IV_GEN,
 						0, data->iv.buf),
 			    "EVP_CIPHER_CTX_ctrl() failed to generate IV %d\n",
@@ -1831,6 +1836,8 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		      "ciphertext");
 
 	if (EVP_Cipher(ctx, NULL, NULL, 0) < 0) {
+		logger(LOGGER_ERR, "EVP_Cipher failed %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
 		ret = -EFAULT;
 		goto out;
 	}
@@ -2118,19 +2125,19 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	logger(LOGGER_DEBUG, "cipher: %lu\n", data->cipher);
 
 	if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA1) {
-		nid = ((data->cipher & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				NID_hmacWithSHA1 : NID_sha1;
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA224) {
-		nid = ((data->cipher & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				NID_hmacWithSHA224 : NID_sha224;
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA256) {
-		nid = ((data->cipher & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				NID_hmacWithSHA256 : NID_sha256;
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA384) {
-		nid = ((data->cipher & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				NID_hmacWithSHA384 : NID_sha384;
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512) {
-		nid = ((data->cipher & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				NID_hmacWithSHA512 : NID_sha512;
 	} else if ((data->cipher & ACVP_AESMASK) == ACVP_AES128) {
 		nid = NID_aes_128_ctr;
@@ -3147,16 +3154,77 @@ out:
 	return ret;
 }
 
+static int _openssl_dh_keygen(struct buffer *P /* [in] */,
+			      struct buffer *Q /* [in] */,
+			      struct buffer *G /* [in] */,
+			      struct buffer *X /* [out] */,
+			      struct buffer *Y /* [out] */)
+{
+	DH *dh = NULL;
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	const BIGNUM *x, *y;
+	int ret = 0, pqg_consumed = 0;
+
+	dh = DH_new();
+	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
+
+	p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
+	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+	q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
+	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+	g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
+	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+
+	CKINT_O_LOG(openssl_dh_set0_pqg(dh, p, q, g),
+		    "DSA_set0_pqg failed\n");
+	pqg_consumed = 1;
+
+	CKINT_O_LOG(DH_generate_key(dh), "DSA_generate_key() failed\n");
+
+	openssl_dh_get0_key(dh, &y, &x);
+
+	CKINT(openssl_bn2buffer(x, X));
+	CKINT(openssl_bn2buffer(y, Y));
+
+	//logger_binary(LOGGER_DEBUG, X->buf, X->len, "X");
+	//logger_binary(LOGGER_DEBUG, Y->buf, Y->len, "Y");
+
+	ret = 0;
+
+out:
+	if (!pqg_consumed && p)
+		BN_free(p);
+	if (!pqg_consumed && q)
+		BN_free(q);
+	if (!pqg_consumed && g)
+		BN_free(g);
+	if (dh)
+		DH_free(dh);
+
+	return ret;
+}
+
 static int openssl_dsa_keygen(struct dsa_keygen_data *data,
 			      flags_t parsed_flags)
 {
 	struct dsa_pqggen_data *pqg = &data->pqg;
 	DSA *dsa = NULL;
 	int ret;
+	char *envstr = NULL;
 
 	(void)parsed_flags;
-	CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G,
-				  &data->X, &data->Y, &dsa));
+
+	envstr = secure_getenv("OPENSSL_ACVP_DH_KEYGEN");
+
+	if (envstr) {
+		CKINT(_openssl_dh_keygen(&pqg->P, &pqg->Q, &pqg->G,
+					 &data->X, &data->Y));
+	} else {
+		CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G,
+					  &data->X, &data->Y, &dsa));
+	}
 
 out:
 	if (dsa)
@@ -4058,6 +4126,7 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	DH *dh = NULL;
 	BIGNUM *p = NULL, *q = NULL, *g = NULL, *bn_Yrem = NULL,
 	       *bn_Xloc = NULL, *bn_Yloc = NULL;
+	const BIGNUM *cbn_Xloc = NULL, *cbn_Yloc = NULL;
 	BUFFER_INIT(ss);
 	unsigned int pqg_consumed = 0, localkey_consumed = 0;
 	int ret = 0;
@@ -4092,12 +4161,11 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	CKNULL_LOG(bn_Yrem, -ENOMEM, "BN_bin2bn() failed\n");
 
 	if (!Xloc->len || !Yloc->len) {
-		const BIGNUM *bn_Yloc, *bn_Xloc;
 		CKINT_O_LOG(DH_generate_key(dh), "DH_generate_key failed\n");
 
-		openssl_dh_get0_key(dh, &bn_Yloc, &bn_Xloc);
+		openssl_dh_get0_key(dh, &cbn_Yloc, &cbn_Xloc);
 
-		CKINT(openssl_bn2buffer(bn_Yloc, Yloc));
+		CKINT(openssl_bn2buffer(cbn_Yloc, Yloc));
 		logger_binary(LOGGER_DEBUG, Yloc->buf, Yloc->len,
 			      "generated Yloc");
 	} else {
@@ -4245,8 +4313,9 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 	if (EC_METHOD_get_field_type(EC_GROUP_method_of(group))
 	    == NID_X9_62_prime_field) {
-		CKINT_O(EC_POINT_set_affine_coordinates_GFp(group, remote_pubkey,
-							  Qx, Qy, c));
+		CKINT_O(EC_POINT_set_affine_coordinates_GFp(group,
+							    remote_pubkey,
+							    Qx, Qy, c));
 	} else {
 #ifdef OPENSSL_NO_EC2M
 		logger(LOGGER_WARN, "GF2m not supported\n");
@@ -4264,9 +4333,8 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 	if (!privloc->len || !Qxloc->len || !Qyloc->len) {
 		/* Create our own local key */
-
-		if (!privloc->len)
-			CKINT(alloc_buf(dbufferlen, privloc));
+		free_buf(privloc);
+		CKINT(alloc_buf(dbufferlen, privloc));
 
 		if (!Qxloc->len)
 			CKINT(alloc_buf(xbufferlen, Qxloc));
@@ -4285,13 +4353,34 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 		CKINT(ec_get_pubkey(local_key, localQx, localQy));
 
+		if (BN_num_bytes(localQx) > (int)Qxloc->len) {
+			logger(LOGGER_ERR,
+			       "BUG: OpenSSL Qx longer (%u) than expected (%zu)\n",
+			       BN_num_bytes(localQx), Qxloc->len);
+			ret = -EFAULT;
+			goto out;
+		}
 		BN_bn2bin(localQx,
 			  Qxloc->buf - BN_num_bytes(localQx) + Qxloc->len);
+		if (BN_num_bytes(localQy) > (int)Qyloc->len) {
+			logger(LOGGER_ERR,
+			       "BUG: OpenSSL Qx longer (%u) than expected (%zu)\n",
+			       BN_num_bytes(localQy), Qyloc->len);
+			ret = -EFAULT;
+			goto out;
+		}
 		BN_bn2bin(localQy,
 			  Qyloc->buf - BN_num_bytes(localQy) + Qyloc->len);
 
 		d = EC_KEY_get0_private_key(local_key);
 
+		if (BN_num_bytes(d) > (int)privloc->len) {
+			logger(LOGGER_ERR,
+			       "BUG: OpenSSL privkey longer (%u) than expected (%zu)\n",
+			       BN_num_bytes(d), privloc->len);
+			ret = -EFAULT;
+			goto out;
+		}
 		BN_bn2bin(d, privloc->buf - BN_num_bytes(d) + privloc->len);
 
 		logger_binary(LOGGER_DEBUG, Qxloc->buf, Qxloc->len,

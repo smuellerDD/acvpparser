@@ -37,7 +37,10 @@ MODULE_POSTFIX="_"
 EXEC_TYPES_DRBG10X__64_bit___="CFLAGS=-DOPENSSL_DRBG_10X"
 EXEC_TYPES_DRBG10X__32_bit___="CFLAGS=\"-m32 -DOPENSSL_DRBG_10X\" LDFLAGS=-m32"
 
-EXEC="TDES_C"
+EXEC="TDES_C FFC_DH"
+
+# Environment variable evaluated by ACVP Parser
+OPENSSL_REMOVE_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
 if [ $(uname -m) = "s390x" ]; then
 	EXEC="$EXED
@@ -46,7 +49,7 @@ if [ $(uname -m) = "s390x" ]; then
 elif [ $(uname -m) = "aarch64" ]; then
 	EXEC="$EXEC
 	      SHA_ASM SHA3_ASM
-	      VPAES CE"
+	      VPAES CE CE_GCM"
 	EXEC_DRBG10X="SHA_ASM"
 
 	# Unlike for x86, OPENSSL_armcap_P is taken at face value
@@ -64,6 +67,7 @@ elif [ $(uname -m) = "aarch64" ]; then
 
 	# Set the CE bits
 	OPENSSL_REMOVE_CE="OPENSSL_armcap_P=78"
+	OPENSSL_REMOVE_CE_GCM="OPENSSL_armcap_P=78"
 	OPENSSL_REMOVE_SHA_ASM="OPENSSL_armcap_P=78"
 	OPENSSL_REMOVE_SHA3_ASM="OPENSSL_armcap_P=78"
 else

@@ -39,8 +39,9 @@ static int dsa_pqggen_helper(struct dsa_pqggen_data *pqg, flags_t parsed_flags)
 	if (pqg->P.len != pqg->L / 8 ||
 	    pqg->Q.len != pqg->N / 8 ||
 	    pqg->G.len != pqg->L / 8) {
+		int ret;
 
-		switch(pqg->N) {
+		switch (pqg->N) {
 		case 160:
 			pqg->cipher = ACVP_SHA1;
 			break;
@@ -59,7 +60,13 @@ static int dsa_pqggen_helper(struct dsa_pqggen_data *pqg, flags_t parsed_flags)
 		free_buf(&pqg->Q);
 		free_buf(&pqg->G);
 
-		return dsa_backend->dsa_pqggen(pqg, parsed_flags);
+		ret = dsa_backend->dsa_pqggen(pqg, parsed_flags);
+
+		left_pad_buf(&pqg->P, pqg->L / 8);
+		left_pad_buf(&pqg->Q, pqg->N / 8);
+		left_pad_buf(&pqg->G, pqg->L / 8);
+
+		return ret;
 	}
 
 	return 0;

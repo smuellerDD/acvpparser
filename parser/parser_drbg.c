@@ -99,7 +99,7 @@ static int drbg_tester(struct json_object *in, struct json_object *out,
 	const struct json_array drbg_testanchor = SET_ARRAY(drbg_testanchor_entries, NULL);
 
 	/* Set the DRBG type */
-	drbg_vector.cipher = cipher;
+	drbg_vector.type = cipher;
 
 	/* Process all. */
 	return process_json(&drbg_testanchor, "1.0", in, out);

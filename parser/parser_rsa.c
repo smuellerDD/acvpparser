@@ -165,7 +165,7 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	struct json_object *testresult = NULL, *resultsarray = NULL,
 			   *resultsobject = NULL;
 	const struct json_entry *entry;
-	unsigned int i;//, max;
+	//unsigned int i;//, max;
 	int ret;
 	void *rsa_privkey = NULL;
 
@@ -237,8 +237,11 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	json_object_array_add(resultsarray, resultsobject);
 
 	/* Iterate over each write definition and invoke it. */
-	for_each_testresult(processdata->testresult, entry, i)
-		CKINT(write_one_entry(entry, resultsobject, parsed_flags));
+	//for_each_testresult(processdata->testresult, entry, i)
+	//	CKINT(write_one_entry(entry, resultsobject, parsed_flags));
+	(void)entry;
+	CKINT(json_add_bin2hex(resultsobject, "e", &vector->e));
+	CKINT(json_add_bin2hex(resultsobject, "n", &vector->n));
 
 	if (vector->dec_result) {
 		CKINT(json_add_bin2hex(resultsobject, "plainText",
@@ -450,7 +453,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_array rsa_sigver_test = SET_ARRAY(rsa_sigver_test_entries, &rsa_sigver_testresult);
 
 	/**********************************************************************
-	 * RSA signature primitive
+	 * RSA signature primitive regular key type
 	 **********************************************************************/
 	RSA_DEF_CALLBACK(rsa_signature_primitive, FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK);
 
@@ -472,6 +475,17 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"d",		{.data.buf = &rsa_signature_primitive_vector.d, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+#if 0
+		/* d is marked optional in case of CRT */
+		{"d",		{.data.buf = &rsa_signature_primitive_vector.u.rsa_regular.d, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OPTIONAL},
+		{"dmp1",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.dmp1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		{"dmq1",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.dmq1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		{"iqmp",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.iqmp, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+#endif
 	};
 	const struct json_array rsa_signature_primitive_test = SET_ARRAY(rsa_signature_primitive_test_entries, &rsa_signature_primitive_testresult);
 

@@ -189,9 +189,6 @@ struct ecdsa_sigver_data {
  * @var ecdsa_free_key This function is required if ecdsa_keygen_en is
  * 			 registered. This function is intended to free the
  *			 private ECDSA key handle created with ecdsa_keygen_en.
- *
- * @var ecdsa_siggen_primitive ECDSA signature generation primitive testing
- * @var ecdsa_siggen_primitive ECDSA signature verification primitive testing
  */
 struct ecdsa_backend {
 	int (*ecdsa_keygen)(struct ecdsa_keygen_data *data,
