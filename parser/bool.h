@@ -25,11 +25,13 @@ extern "C"
 {
 #endif
 
+#ifndef __cplusplus
 # ifndef bool
 /* Boolean variable */
 enum { false, true };
 typedef _Bool bool;
 # endif
+#endif
 
 #ifdef __cplusplus
 }
