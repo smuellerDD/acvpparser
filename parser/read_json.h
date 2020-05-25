@@ -186,6 +186,13 @@ enum json_validate_res json_validate_result(const char *actualfile,
 					    const char *expectedfile);
 
 /**
+ * Validate the actual test result provided with @param actual with an
+ * expected result found in @param expected .
+ */
+enum json_validate_res json_validate_result_json(struct json_object *actual,
+						 struct json_object *expected);
+
+/**
  * Generate a JSON structure compliant to the ACVP request test vectors. This
  * function can be invoked multiple times:
  * (1) It will always generate the vector structure.

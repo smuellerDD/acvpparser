@@ -107,6 +107,7 @@ static int drbg_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester drbg =
 {
+	0,
 	ACVP_DRBGMASK,
 	drbg_tester,	/* process_req */
 	NULL

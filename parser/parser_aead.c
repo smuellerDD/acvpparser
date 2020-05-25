@@ -476,7 +476,24 @@ static int ccm_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester gcm =
 {
-	ACVP_GCM | ACVP_GCMSIV | ACVP_GMAC,
+	ACVP_GCM,
+	0,
+	gcm_tester,	/* process_req */
+	NULL
+};
+
+static struct cavs_tester gcm_siv =
+{
+	ACVP_GCMSIV,
+	0,
+	gcm_tester,	/* process_req */
+	NULL
+};
+
+static struct cavs_tester gcm_gmac =
+{
+	ACVP_GMAC,
+	0,
 	gcm_tester,	/* process_req */
 	NULL
 };
@@ -484,6 +501,7 @@ static struct cavs_tester gcm =
 static struct cavs_tester ccm =
 {
 	ACVP_CCM,
+	0,
 	ccm_tester,	/* process_req */
 	NULL
 };
@@ -492,6 +510,8 @@ ACVP_DEFINE_CONSTRUCTOR(register_aead)
 static void register_aead(void)
 {
 	register_tester(&gcm, "GCM");
+	register_tester(&gcm_siv, "GCM-SIV");
+	register_tester(&gcm_gmac, "GCM-GMAC");
 	register_tester(&ccm, "CCM");
 }
 

@@ -1081,6 +1081,7 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester sym_aes =
 {
+	0,
 	ACVP_AESMASK,
 	sym_aes_tester,	/* process_req */
 	NULL
@@ -1088,6 +1089,7 @@ static struct cavs_tester sym_aes =
 
 static struct cavs_tester sym_tdes =
 {
+	0,
 	ACVP_TDESMASK,
 	sym_tdes_tester,	/* process_req */
 	NULL

@@ -17,7 +17,6 @@ _LIB_REQ="testvector-request.json"
 _LIB_RESP="testvector-response.json"
 _LIB_EXPECTED="testvector-expected.json"
 #_LIB_OE="operational_environment.json"
-_LIB_REGRESSION="${_LIB_RESP}.regression.$$"
 
 failures=0
 local_failures=0
@@ -328,21 +327,17 @@ exec_module()
 					continue
 				fi
 
-				$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_REGRESSION
+				$_LIB_EXEC -r $dir/$_LIB_REQ $dir/$_LIB_RESP
 				local ret=$?
 				if [ $ret -eq 95 ]	#EOPNOTSUPP
 				then
 					echo_deact "Operation not supported for $dir"
 				elif [ $ret -ne 0 ]
 				then
-					echo_fail "Execution for $dir failed (error code $ret) - executed command:"
-					echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_REGRESSION"
-				elif ! $($_LIB_EXEC -e $dir/$_LIB_REGRESSION $dir/$respfile > /dev/null); then
 					echo_fail "Regression testing for $dir"
 				else
 					echo_pass "Regression testing for $dir"
 				fi
-				rm -f $dir/$_LIB_REGRESSION
 			fi
 		done
 	done
@@ -377,16 +372,7 @@ regression_test()
 
 cleanup()
 {
-	if [ -d $_LIB_IUT ]
-        then
-		find $_LIB_IUT -name "$_LIB_REGRESSION" | xargs rm -f
-	fi
-
-	if [ -d ${_LIB_IUT_PROD} ]
-        then
-		find ${_LIB_IUT_PROD} -name "$_LIB_REGRESSION" | xargs rm -f
-	fi
-
+	echo > /dev/null
 	# Do not call make clean here
 #	clean_tool
 }

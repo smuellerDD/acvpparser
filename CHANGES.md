@@ -1,3 +1,10 @@
+v0.8.0
+- add DH safeprime keygen test support
+- API change, enhancement: add DH safeprime keyver test support - struct dsa_backend now contains a dsa_keyver entry that must be filled in
+- OpenSSL: add DH safeprime keygen implementation
+- OpenSSL: add DH safeprime keyver implementation
+- OpenSSL: fix DSA PQG verification invocation
+
 v0.7.0
 - OpenSSL: fix memory corruption in ECDH component testing
 - add P-192 support

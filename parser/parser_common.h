@@ -190,6 +190,7 @@ DEF_CALLBACK_TYPE(dh_ss_ver)
 DEF_CALLBACK_TYPE(drbg)
 DEF_CALLBACK_TYPE(dsa_pqg)
 DEF_CALLBACK_TYPE(dsa_keygen)
+DEF_CALLBACK_TYPE(dsa_keyver)
 DEF_CALLBACK_TYPE(dsa_siggen)
 DEF_CALLBACK_TYPE(dsa_sigver)
 DEF_CALLBACK_TYPE(ecdh_ss)
@@ -240,6 +241,7 @@ enum {
 	CB_TYPE_drbg,
 	CB_TYPE_dsa_pqg,
 	CB_TYPE_dsa_keygen,
+	CB_TYPE_dsa_keyver,
 	CB_TYPE_dsa_siggen,
 	CB_TYPE_dsa_sigver,
 	CB_TYPE_ecdh_ss,
@@ -283,6 +285,7 @@ struct json_callback {
 		struct drbg_callback drbg;
 		struct dsa_pqg_callback dsa_pqg;
 		struct dsa_keygen_callback dsa_keygen;
+		struct dsa_keyver_callback dsa_keyver;
 		struct dsa_siggen_callback dsa_siggen;
 		struct dsa_sigver_callback dsa_sigver;
 		struct ecdh_ss_callback ecdh_ss;

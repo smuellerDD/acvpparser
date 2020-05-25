@@ -89,6 +89,7 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester hkdf =
 {
 	ACVP_HKDF,
+	0,
 	hkdf_tester,	/* process_req */
 	NULL
 };

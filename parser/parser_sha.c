@@ -510,6 +510,7 @@ static int shake_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester shake =
 {
+	0,
 	ACVP_SHAKEMASK,
 	shake_tester,	/* process_req */
 	NULL
@@ -517,6 +518,7 @@ static struct cavs_tester shake =
 
 static struct cavs_tester sha =
 {
+	0,
 	ACVP_HASHMASK,
 	sha_tester,	/* process_req */
 	NULL

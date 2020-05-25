@@ -43,13 +43,13 @@ EXEC="TDES_C FFC_DH"
 OPENSSL_REMOVE_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
 if [ $(uname -m) = "s390x" ]; then
-	EXEC="$EXED
-	      SHA_ASM SHA3_ASM"
+	EXEC="$EXEC
+	      SHA_ASM SHA3_ASM AESASM AESASM_ASM"
 	EXEC_DRBG10X="SHA_ASM"
 elif [ $(uname -m) = "aarch64" ]; then
 	EXEC="$EXEC
 	      SHA_ASM SHA3_ASM
-	      VPAES CE CE_GCM"
+	      VPAES VPAES_GCM CE CE_GCM"
 	EXEC_DRBG10X="SHA_ASM"
 
 	# Unlike for x86, OPENSSL_armcap_P is taken at face value

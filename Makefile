@@ -11,7 +11,18 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -std=gnu99 -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -Wno-gnu-zero-variadic-macro-arguments -g
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -std=gnu99 -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g
+
+ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
+OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)
+endif
+
+ifeq ($(OS),Ubuntu)
+CFLAGS +=-DUBUNTU
+else
+CFLAGS +=-Wno-gnu-zero-variadic-macro-arguments
+endif
+
 #Hardening
 CFLAGS +=-D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer-size=4
 # Set all symbols to hidden -- increases load time performance, forces
@@ -243,9 +254,18 @@ endif
 ifeq (libica,$(firstword $(MAKECMDGOALS)))
 	CFLAGS += -Wno-strict-aliasing
 	C_SRCS += backends/backend_libica.c
-	C_SRCS += backend_interfaces/libica/sha_common.c
-	INCLUDE_DIRS += backend_interfaces/libica/
 	LIBRARIES += ica crypto
+	INCLUDE_DIRS += backend_interfaces/libica/
+	INCLUDE_DIRS += backend_interfaces/cpacf/
+endif
+
+################## CONFIGURE BACKEND CPACF ########
+
+ifeq (cpacf,$(firstword $(MAKECMDGOALS)))
+	CFLAGS += -Wno-strict-aliasing
+	C_SRCS += backends/backend_cpacf.c
+	C_SRCS += backend_interfaces/cpacf/sha_common.c
+	INCLUDE_DIRS += backend_interfaces/cpacf/
 endif
 
 ######################################################
@@ -265,7 +285,7 @@ analyze_plists = $(analyze_srcs:%.c=%.plist)
 .PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -288,6 +308,7 @@ libnacl: $(NAME)
 boringssl: $(NAME)
 botan: $(NAME)
 libica: $(NAME)
+cpacf: $(NAME)
 bouncycastle: $(NAME)
 	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 

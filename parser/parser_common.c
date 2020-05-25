@@ -340,6 +340,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(drbg)
 			CB_HANDLER(dsa_pqg)
 			CB_HANDLER(dsa_keygen)
+			CB_HANDLER(dsa_keyver)
 			CB_HANDLER(dsa_siggen)
 			CB_HANDLER(dsa_sigver)
 			CB_HANDLER(ecdh_ss)

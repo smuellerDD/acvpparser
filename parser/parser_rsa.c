@@ -624,6 +624,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester rsa =
 {
 	ACVP_RSA,
+	0,
 	rsa_tester,
 	NULL
 };

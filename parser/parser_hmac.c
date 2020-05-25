@@ -291,6 +291,7 @@ static int cmac_tester(struct json_object *in, struct json_object *out,
 
 static struct cavs_tester hmac =
 {
+	0,
 	ACVP_HMACMASK,
 	hmac_tester,	/* process_req */
 	NULL
@@ -298,6 +299,7 @@ static struct cavs_tester hmac =
 
 static struct cavs_tester cmac =
 {
+	0,
 	ACVP_CMACMASK,
 	cmac_tester,	/* process_req */
 	NULL

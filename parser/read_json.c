@@ -524,15 +524,40 @@ static int json_strncasecmp(const void *s1, const void *s2, size_t n)
 	return strncasecmp(s1, s2, n);
 }
 
+enum json_validate_res json_validate_result_json(struct json_object *actual,
+						 struct json_object *expected)
+{
+	struct json_object *expecteddata, *expectedversion,
+			   *actualdata, *actualversion;
+	enum json_validate_res rc = JSON_VAL_RES_FAIL_EXPECTED;
+	int ret;
+
+	/* Open and parse expected test result */
+	CKINT(json_split_version(expected, &expecteddata, &expectedversion));
+	json_prune_data(expecteddata);
+
+	/* Open and parse actual test result */
+	CKINT(json_split_version(actual, &actualdata, &actualversion));
+	json_prune_data(actualdata);
+
+	ret = json_object_equal(expecteddata, actualdata, &json_strncasecmp);
+	if (ret)
+		rc = JSON_VAL_RES_PASS_EXPECTED;
+	else
+		rc = JSON_VAL_RES_FAIL_EXPECTED;
+
+out:
+	return (ret < 0) ? JSON_VAL_RES_FAIL_EXPECTED : rc;
+}
+
 enum json_validate_res json_validate_result(const char *actualfile,
 					    const char *expectedfile)
 {
-	struct json_object *expected = NULL, *actual = NULL,
-			   *expecteddata, *expectedversion,
-			   *actualdata, *actualversion;
+	struct json_object *expected = NULL, *actual = NULL;
 	struct stat statbuf;
 	enum json_validate_res rc = JSON_VAL_RES_FAIL_EXPECTED;
 	int ret;
+
     
 	/*
 	 * If file not found, do not return an error, user does not
@@ -550,19 +575,11 @@ enum json_validate_res json_validate_result(const char *actualfile,
 
 	/* Open and parse expected test result */
 	CKINT(json_read_data(expectedfile, &expected));
-	CKINT(json_split_version(expected, &expecteddata, &expectedversion));
-	json_prune_data(expecteddata);
 
 	/* Open and parse actual test result */
 	CKINT(json_read_data(actualfile, &actual));
-	CKINT(json_split_version(actual, &actualdata, &actualversion));
-	json_prune_data(actualdata);
 
-	ret = json_object_equal(expecteddata, actualdata, &json_strncasecmp);
-	if (ret)
-		rc = JSON_VAL_RES_PASS_EXPECTED;
-	else
-		rc = JSON_VAL_RES_FAIL_EXPECTED;
+	rc = json_validate_result_json(actual, expected);
 
 out:
 	if (expected)

@@ -339,6 +339,7 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester ecdsa =
 {
 	ACVP_ECDSA,
+	0,
 	ecdsa_tester,	/* process_req */
 	NULL
 };

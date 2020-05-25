@@ -115,6 +115,7 @@ static int ecdh_ed_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester ecdh_ed =
 {
 	ACVP_ECDH_ED,
+	0,
 	ecdh_ed_tester,	/* process_req */
 	NULL
 };

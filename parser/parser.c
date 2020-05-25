@@ -79,7 +79,8 @@ static int test_algo(struct json_object *in, struct json_object *out,
 	for (curr_tester = tester;
 		curr_tester != NULL;
 		curr_tester = curr_tester->next) {
-		if (cipher & curr_tester->mask) {
+		if ((curr_tester->testid && (cipher == curr_tester->testid)) ||
+		    (curr_tester->mask && (cipher & curr_tester->mask))) {
 			logger(LOGGER_DEBUG, "Found test executor for %s\n",
 			       algo);
 			return curr_tester->process_req(in, out, cipher);
@@ -175,6 +176,64 @@ out:
 	return ret;
 }
 
+static int perform_testing_regression(const char *infile,
+				      const char *expectedfile)
+{
+	struct json_object *inobj = NULL, *outobj = NULL, *expected = NULL;
+	int ret;
+	const char *algo;
+
+	CKINT(json_read_data(infile, &inobj));
+	logger(LOGGER_DEBUG, "Request file %s read successfully\n", infile);
+
+	CKINT(json_read_data(expectedfile, &expected));
+	logger(LOGGER_DEBUG, "Expected data file %s read successfully\n",
+	       expectedfile);
+
+	CKINT(get_algorithm(inobj, &algo))
+	logger(LOGGER_DEBUG, "Algorithm %s found in request file %s\n",
+	       algo, infile);
+
+	outobj = json_object_new_array();
+	CKNULL_LOG(outobj, -ENOMEM,
+		   "Cannot create toplevel output JSON object\n");
+
+	ret = test_algo(inobj, outobj, algo);
+	if (ret) {
+		if (logger_get_verbosity() >= LOGGER_WARN) {
+			fprintf_red(stdout, "[FAILED] ");
+			fprintf(stdout, "Generation of test results failed\n");
+		}
+		ret = -EIO;
+		goto out;
+	}
+
+	if (json_validate_result_json(outobj, expected) ==
+	    JSON_VAL_RES_PASS_EXPECTED) {
+		if (logger_get_verbosity() >= LOGGER_WARN) {
+			fprintf_green(stdout, "[PASSED] ");
+			fprintf(stdout, "regression test match\n");
+		}
+		ret = 0;
+	} else {
+		if (logger_get_verbosity() >= LOGGER_WARN) {
+			fprintf_red(stdout, "[FAILED] ");
+			fprintf(stdout, "regression test failure\n");
+		}
+		ret = -EIO;
+	}
+
+out:
+	if (outobj)
+		json_object_put(outobj);
+	if (inobj)
+		json_object_put(inobj);
+	if (expected)
+		json_object_put(expected);
+
+	return ret;
+}
+
 #ifdef ACVP_PARSER_IUT
 #define _ACVP_PARSER_IUT ACVP_PARSER_IUT
 #else
@@ -193,11 +252,13 @@ static void usage(void)
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, " acvp-parser [OPTIONS] <testvector-request.json> <testvector-response.json>\n");
 	fprintf(stderr, " acvp-parser [OPTIONS] -e <expected-response.json> <testvector-response.json>\n\n");
+	fprintf(stderr, " acvp-parser [OPTIONS] -r <testvector-request.json> <testvector-response.json>\n\n");
 
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "\t-e --expected\tPerform a JSON matching between the two files\n");
 	fprintf(stderr, "\t\t\t\t(return code 0 - both files match)\n");
 	fprintf(stderr, "\t\t\t\t(return code 1 - both files mismatch)\n");
+	fprintf(stderr, "\t-r --regression\tPerform a JSON regression testing\n");
 
 	fprintf(stderr, "\n\t-v --verbose\tVerbose logging, multiple options increase verbosity\n");
 	fprintf(stderr, "\t-h --help\tPrint this help information\n");
@@ -211,7 +272,7 @@ static void usage(void)
 int main(int argc, char *argv[])
 {
 	const char *infile, *outfile = NULL;
-	int ret, expected = 0, c = 0;
+	int ret, expected = 0, regression = 0, c = 0;
 
 	opterr = 0;
 
@@ -222,11 +283,12 @@ int main(int argc, char *argv[])
 		static struct option options[] = {
 			{"verbose",		no_argument,		0, 'v'},
 			{"expected",		no_argument,		0, 'e'},
+			{"regression",		no_argument,		0, 'r'},
 			{"help",		no_argument,		0, 'h'},
 
 			{0, 0, 0, 0}
 		};
-		c = getopt_long(argc, argv, "veh", options, &opt_index);
+		c = getopt_long(argc, argv, "verh", options, &opt_index);
 		if (-1 == c)
 			break;
 		switch (c) {
@@ -239,6 +301,9 @@ int main(int argc, char *argv[])
 				expected = 1;
 				break;
 			case 2:
+				regression = 1;
+				break;
+			case 3:
 				usage();
 				return 0;
 
@@ -258,6 +323,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'e':
 			expected = 1;
+			break;
+		case 'r':
+			regression = 1;
 			break;
 		case 'h':
 			usage();
@@ -284,6 +352,8 @@ int main(int argc, char *argv[])
 
 	if (expected) {
 		ret = match_expected(infile, outfile);
+	} else if (regression) {
+		ret = perform_testing_regression(infile, outfile);
 	} else {
 		ret = perform_testing(infile, outfile);
 	}

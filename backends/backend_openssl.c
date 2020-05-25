@@ -51,6 +51,14 @@
 	}								\
 }
 
+#define CKINT_O0(x) {							\
+	ret = x;							\
+	if (ret == 0) {							\
+		ret = -EFAULT;						\
+		goto out;						\
+	}								\
+}
+
 #define CKINT_O_LOG(x, ...) {						\
 	ret = x;							\
 	if (ret != 1) {							\
@@ -945,7 +953,7 @@ static int tls1_PRF(uint64_t cipher,
 
 	CKINT(openssl_md_convert(cipher, &md));
 
-	/* Special casse */
+	/* Special case */
 	if ((cipher & ACVP_HASHMASK) == ACVP_SHA1)
 		md = EVP_get_digestbynid(NID_md5_sha1);
 
@@ -1176,22 +1184,31 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 
-	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
-					data->pq_prob_domain_param_seed.buf,
-					data->pq_prob_domain_param_seed.len,
-					(int)data->pq_prob_counter,
-					seed, &counter, &h, NULL),
-		    "FIPS_dsa_builtin_paramgen2() failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
+	ret = FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
+					 data->pq_prob_domain_param_seed.buf,
+					 data->pq_prob_domain_param_seed.len,
+					 (int)data->pq_prob_counter,
+				 	 seed, &counter, &h, NULL);
+	if (ret < 0) {
+		ret = -EFAULT;
+		logger(LOGGER_ERR, "FIPS_dsa_builtin_paramgen2() failed %s\n");
+		goto out;
+	} else if (ret == 0) {
+		ret = 1;
+		data->pqgver_success = 0;
+		goto out;
+	} else {
+		ret = 0;
+		data->pqgver_success = 1;
+	}
 
 	openssl_dsa_get0_pqg(dsa, &gen_p, &gen_q, &gen_g);
 
-	data->pqgver_success = 1;
 	if (BN_cmp(gen_p, p)) {
 		BUFFER_INIT(gen_p_buf);
 
 		CKINT(openssl_bn2buffer(gen_p, &gen_p_buf));
-		logger(LOGGER_DEBUG, "P comparision failed\n");
+		logger(LOGGER_DEBUG, "P comparison failed\n");
 		logger_binary(LOGGER_DEBUG, gen_p_buf.buf, gen_p_buf.len,
 			      "gen P");
 		free_buf(&gen_p_buf);
@@ -1201,7 +1218,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 		BUFFER_INIT(gen_q_buf);
 
 		CKINT(openssl_bn2buffer(gen_q, &gen_q_buf));
-		logger(LOGGER_DEBUG, "Q comparision failed\n");
+		logger(LOGGER_DEBUG, "Q comparison failed\n");
 		logger_binary(LOGGER_DEBUG, gen_q_buf.buf, gen_q_buf.len,
 			      "gen Q");
 		free_buf(&gen_q_buf);
@@ -1209,7 +1226,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	}
 	if (data->G.len) {
 		if (BN_cmp(gen_g, g)) {
-			logger(LOGGER_DEBUG, "G comparision failed\n");
+			logger(LOGGER_DEBUG, "G comparison failed\n");
 			data->pqgver_success = 0;
 		}
 	}
@@ -2354,6 +2371,35 @@ static void openssl_kdf_tls_backend(void)
 /************************************************
  * SSHv2 KDF
  ************************************************/
+#ifdef UBUNTU
+# define	EVP_KDF_CTX		EVP_PKEY_CTX
+# define 	EVP_KDF_CTX_NEW_ID()	EVP_PKEY_CTX_new_id(EVP_PKEY_SSHKDF,NULL)
+# define	EVP_KDF_DERIVE_INIT(a)	EVP_PKEY_derive_init(a)
+# define	EVP_KDF_SET_MD(a,b)	EVP_PKEY_CTX_set_sshkdf_md(a,b)
+# define	EVP_KDF_SET_KEY(a,b,c)	EVP_PKEY_CTX_set1_sshkdf_key(a,b,c)
+# define	EVP_KDF_SET_XCGHASH(a,b,c)				\
+					EVP_PKEY_CTX_set1_sshkdf_xcghash(a,b,c)
+# define	EVP_KDF_SET_SESSIONID(a,b,c)				\
+					EVP_PKEY_CTX_set1_sshkdf_session_id(a,b,c)
+# define	EVP_KDF_SET_SSHKDF_TYPE(a,b)				\
+					EVP_PKEY_CTX_set_sshkdf_type(a,b)
+# define	EVP_KDF_DERIVE(a,b,c)	EVP_PKEY_derive(a,b,&c)
+# define	EVP_KDF_CTX_FREE(a)	EVP_PKEY_CTX_free(a)
+#else
+# define	EVP_KDF_CTX_NEW_ID()	EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF)
+# define	EVP_KDF_DERIVE_INIT(a)	1
+# define	EVP_KDF_SET_MD(a,b)	EVP_KDF_ctrl(a,EVP_KDF_CTRL_SET_MD,b)
+# define	EVP_KDF_SET_KEY(a,b,c)	EVP_KDF_ctrl(a,EVP_KDF_CTRL_SET_KEY,b,c)
+# define	EVP_KDF_SET_XCGHASH(a,b,c)				\
+			EVP_KDF_ctrl(a,EVP_KDF_CTRL_SET_SSHKDF_XCGHASH,b,c)
+# define	EVP_KDF_SET_SESSIONID(a,b,c)				\
+			EVP_KDF_ctrl(a,EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID,b,c)
+# define	EVP_KDF_SET_SSHKDF_TYPE(a,b)				\
+			EVP_KDF_ctrl(a,EVP_KDF_CTRL_SET_SSHKDF_TYPE,b)
+# define	EVP_KDF_DERIVE(a,b,c)	EVP_KDF_derive(a,b,c)
+# define	EVP_KDF_CTX_FREE(a)	EVP_KDF_CTX_free(a)
+#endif
+
 static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
 				    int id, const EVP_MD *md,
 				    struct buffer *out)
@@ -2361,21 +2407,20 @@ static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
 	EVP_KDF_CTX *ctx = NULL;
 	int ret = 0;
 
-	ctx = EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF);
+	ctx = EVP_KDF_CTX_NEW_ID();
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate SSHv2 PRF\n");
 
-	CKINT_O(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_MD, md));
-	CKINT_O(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KEY, data->k.buf,
-			     data->k.len));
-	CKINT_O(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_XCGHASH, data->h.buf,
-			     data->h.len));
-	CKINT_O(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_TYPE, id));
-	CKINT_O(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SSHKDF_SESSION_ID,
-			     data->session_id.buf, data->session_id.len));
-	CKINT_O(EVP_KDF_derive(ctx, out->buf, out->len));
+	CKINT_O(EVP_KDF_DERIVE_INIT(ctx));
+	CKINT_O(EVP_KDF_SET_MD(ctx, md));
+	CKINT_O(EVP_KDF_SET_KEY(ctx, data->k.buf, data->k.len));
+	CKINT_O(EVP_KDF_SET_XCGHASH(ctx, data->h.buf, data->h.len));
+	CKINT_O(EVP_KDF_SET_SSHKDF_TYPE(ctx, id));
+	CKINT_O(EVP_KDF_SET_SESSIONID(ctx, data->session_id.buf,
+				      data->session_id.len));
+	CKINT_O(EVP_KDF_DERIVE(ctx, out->buf, out->len));
 
 out:
-	EVP_KDF_CTX_free(ctx);
+	EVP_KDF_CTX_FREE(ctx);
 	return ret;
 }
 
@@ -2466,7 +2511,7 @@ static void openssl_kdf_ssh_backend(void)
 	register_kdf_ssh_impl(&openssl_kdf);
 }
 
-#else
+#else /* OPENSSL_SSH_KDF */
 
 /************************************************
  * TLS cipher interface functions
@@ -2529,7 +2574,7 @@ static void openssl_kdf_tls_backend(void)
 {
 	register_kdf_tls_impl(&openssl_kdf_tls);
 }
-#endif
+#endif /* OPENSSL_SSH_KDF */
 
 /************************************************
  * RSA interface functions
@@ -2625,9 +2670,6 @@ static int openssl_rsa_keygen_internal(struct buffer *ebuf, uint32_t modulus,
 			ebuf->buf[ebuf->len - 3] |= 1;
 	}
 
-	rsa = RSA_new();
-	CKNULL(rsa, -ENOMEM);
-
 	logger(LOGGER_DEBUG, "modulus: %u\n", modulus);
 	logger_binary(LOGGER_DEBUG, ebuf->buf, ebuf->len, "e");
 
@@ -2645,6 +2687,11 @@ static int openssl_rsa_keygen_internal(struct buffer *ebuf, uint32_t modulus,
 #endif
 
 	do {
+		if (rsa)
+			RSA_free(rsa);
+		rsa = RSA_new();
+		CKNULL(rsa, -ENOMEM);
+
 		ret = RSA_generate_key_ex(rsa, (int)modulus, e, NULL);
 		retry++;
 	} while (ret != 1 && retry < 100);
@@ -3104,9 +3151,348 @@ out:
 }
 #endif
 
+struct safeprimes {
+	char *g;
+	char *q;
+	char *p;
+};
+
+/* q = (p - 1) / 2 */
+static const struct safeprimes safeprimes[] = { {
+	/* rfc3526 group 14 "2048-bit MODP Group" */
+	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
+	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
+	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
+	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
+	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
+	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
+	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
+	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
+	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
+	     "15728E5A" "8AACAA68" "FFFFFFFF" "FFFFFFFF",
+	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
+	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
+	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
+	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
+	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
+	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
+	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
+	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
+	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
+	     "0ab9472d" "45565534" "7fffffff" "ffffffff",
+	.g = "2"
+}, {
+	/* rfc3526 group 15 "3072-bit MODP Group" */
+	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
+	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
+	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
+	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
+	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
+	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
+	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
+	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
+	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
+	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
+	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
+	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
+	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
+	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
+	     "43DB5BFC" "E0FD108E" "4B82D120" "A93AD2CA" "FFFFFFFF" "FFFFFFFF",
+	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
+	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
+	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
+	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
+	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
+	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
+	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
+	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
+	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
+	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
+	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
+	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
+	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
+	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
+	     "a1edadfe" "707e8847" "25c16890" "549d6965" "7fffffff" "ffffffff",
+	.g = "2"
+}, {
+	/* rfc3526 group 16 "4096-bit MODP Group" */
+	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
+	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
+	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
+	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
+	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
+	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
+	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
+	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
+	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
+	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
+	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
+	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
+	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
+	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
+	     "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7"
+	     "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
+	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
+	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
+	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
+	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34063199"
+	     "FFFFFFFF" "FFFFFFFF",
+	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
+	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
+	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
+	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
+	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
+	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
+	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
+	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
+	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
+	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
+	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
+	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
+	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
+	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
+	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
+	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
+	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
+	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
+	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
+	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a0318cc"
+	     "ffffffff" "ffffffff",
+	.g = "2"
+}, {
+	/* rfc3526 group 17 "6144-bit MODP Group" */
+	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
+	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
+	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
+	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
+	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
+	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
+	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
+	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
+	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
+	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
+	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
+	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
+	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
+	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31" "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7" "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
+	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
+	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
+	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
+	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34028492"
+	     "36C3FAB4" "D27C7026" "C1D4DCB2" "602646DE" "C9751E76" "3DBA37BD"
+	     "F8FF9406" "AD9E530E" "E5DB382F" "413001AE" "B06A53ED" "9027D831"
+	     "179727B0" "865A8918" "DA3EDBEB" "CF9B14ED" "44CE6CBA" "CED4BB1B"
+	     "DB7F1447" "E6CC254B" "33205151" "2BD7AF42" "6FB8F401" "378CD2BF"
+	     "5983CA01" "C64B92EC" "F032EA15" "D1721D03" "F482D7CE" "6E74FEF6"
+	     "D55E702F" "46980C82" "B5A84031" "900B1C9E" "59E7C97F" "BEC7E8F3"
+	     "23A97A7E" "36CC88BE" "0F1D45B7" "FF585AC5" "4BD407B2" "2B4154AA"
+	     "CC8F6D7E" "BF48E1D8" "14CC5ED2" "0F8037E0" "A79715EE" "F29BE328"
+	     "06A1D58B" "B7C5DA76" "F550AA3D" "8A1FBFF0" "EB19CCB1" "A313D55C"
+	     "DA56C9EC" "2EF29632" "387FE8D7" "6E3C0468" "043E8F66" "3F4860EE"
+	     "12BF2D5B" "0B7474D6" "E694F91E" "6DCC4024" "FFFFFFFF" "FFFFFFFF",
+	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
+	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
+	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
+	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
+	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
+	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
+	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
+	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
+	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
+	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
+	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
+	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
+	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
+	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
+	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
+	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
+	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
+	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
+	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
+	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a014249"
+	     "1b61fd5a" "693e3813" "60ea6e59" "3013236f" "64ba8f3b" "1edd1bde"
+	     "fc7fca03" "56cf2987" "72ed9c17" "a09800d7" "583529f6" "c813ec18"
+	     "8bcb93d8" "432d448c" "6d1f6df5" "e7cd8a76" "a267365d" "676a5d8d"
+	     "edbf8a23" "f36612a5" "999028a8" "95ebd7a1" "37dc7a00" "9bc6695f"
+	     "acc1e500" "e325c976" "7819750a" "e8b90e81" "fa416be7" "373a7f7b"
+	     "6aaf3817" "a34c0641" "5ad42018" "c8058e4f" "2cf3e4bf" "df63f479"
+	     "91d4bd3f" "1b66445f" "078ea2db" "ffac2d62" "a5ea03d9" "15a0aa55"
+	     "6647b6bf" "5fa470ec" "0a662f69" "07c01bf0" "53cb8af7" "794df194"
+	     "0350eac5" "dbe2ed3b" "7aa8551e" "c50fdff8" "758ce658" "d189eaae"
+	     "6d2b64f6" "17794b19" "1c3ff46b" "b71e0234" "021f47b3" "1fa43077"
+	     "095f96ad" "85ba3a6b" "734a7c8f" "36e62012" "7fffffff" "ffffffff",
+	.g = "2"
+}, {
+	/* rfc3526 group 18 "8192-bit MODP Group" */
+	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
+	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
+	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
+	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
+	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
+	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
+	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
+	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
+	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
+	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
+	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
+	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
+	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
+	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
+	     "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7"
+	     "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
+	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
+	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
+	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
+	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34028492"
+	     "36C3FAB4" "D27C7026" "C1D4DCB2" "602646DE" "C9751E76" "3DBA37BD"
+	     "F8FF9406" "AD9E530E" "E5DB382F" "413001AE" "B06A53ED" "9027D831"
+	     "179727B0" "865A8918" "DA3EDBEB" "CF9B14ED" "44CE6CBA" "CED4BB1B"
+	     "DB7F1447" "E6CC254B" "33205151" "2BD7AF42" "6FB8F401" "378CD2BF"
+	     "5983CA01" "C64B92EC" "F032EA15" "D1721D03" "F482D7CE" "6E74FEF6"
+	     "D55E702F" "46980C82" "B5A84031" "900B1C9E" "59E7C97F" "BEC7E8F3"
+	     "23A97A7E" "36CC88BE" "0F1D45B7" "FF585AC5" "4BD407B2" "2B4154AA"
+	     "CC8F6D7E" "BF48E1D8" "14CC5ED2" "0F8037E0" "A79715EE" "F29BE328"
+	     "06A1D58B" "B7C5DA76" "F550AA3D" "8A1FBFF0" "EB19CCB1" "A313D55C"
+	     "DA56C9EC" "2EF29632" "387FE8D7" "6E3C0468" "043E8F66" "3F4860EE"
+	     "12BF2D5B" "0B7474D6" "E694F91E" "6DBE1159" "74A3926F" "12FEE5E4"
+	     "38777CB6" "A932DF8C" "D8BEC4D0" "73B931BA" "3BC832B6" "8D9DD300"
+	     "741FA7BF" "8AFC47ED" "2576F693" "6BA42466" "3AAB639C" "5AE4F568"
+	     "3423B474" "2BF1C978" "238F16CB" "E39D652D" "E3FDB8BE" "FC848AD9"
+	     "22222E04" "A4037C07" "13EB57A8" "1A23F0C7" "3473FC64" "6CEA306B"
+	     "4BCBC886" "2F8385DD" "FA9D4B7F" "A2C087E8" "79683303" "ED5BDD3A"
+	     "062B3CF5" "B3A278A6" "6D2A13F8" "3F44F82D" "DF310EE0" "74AB6A36"
+	     "4597E899" "A0255DC1" "64F31CC5" "0846851D" "F9AB4819" "5DED7EA1"
+	     "B1D510BD" "7EE74D73" "FAF36BC3" "1ECFA268" "359046F4" "EB879F92"
+	     "4009438B" "481C6CD7" "889A002E" "D5EE382B" "C9190DA6" "FC026E47"
+	     "9558E447" "5677E9AA" "9E3050E2" "765694DF" "C81F56E8" "80B96E71"
+	     "60C980DD" "98EDD3DF" "FFFFFFFF" "FFFFFFFF",
+	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
+	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
+	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
+	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
+	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
+	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
+	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
+	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
+	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
+	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
+	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
+	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
+	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
+	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
+	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
+	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
+	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
+	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
+	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
+	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a014249"
+	     "1b61fd5a" "693e3813" "60ea6e59" "3013236f" "64ba8f3b" "1edd1bde"
+	     "fc7fca03" "56cf2987" "72ed9c17" "a09800d7" "583529f6" "c813ec18"
+	     "8bcb93d8" "432d448c" "6d1f6df5" "e7cd8a76" "a267365d" "676a5d8d"
+	     "edbf8a23" "f36612a5" "999028a8" "95ebd7a1" "37dc7a00" "9bc6695f"
+	     "acc1e500" "e325c976" "7819750a" "e8b90e81" "fa416be7" "373a7f7b"
+	     "6aaf3817" "a34c0641" "5ad42018" "c8058e4f" "2cf3e4bf" "df63f479"
+	     "91d4bd3f" "1b66445f" "078ea2db" "ffac2d62" "a5ea03d9" "15a0aa55"
+	     "6647b6bf" "5fa470ec" "0a662f69" "07c01bf0" "53cb8af7" "794df194"
+	     "0350eac5" "dbe2ed3b" "7aa8551e" "c50fdff8" "758ce658" "d189eaae"
+	     "6d2b64f6" "17794b19" "1c3ff46b" "b71e0234" "021f47b3" "1fa43077"
+	     "095f96ad" "85ba3a6b" "734a7c8f" "36df08ac" "ba51c937" "897f72f2"
+	     "1c3bbe5b" "54996fc6" "6c5f6268" "39dc98dd" "1de4195b" "46cee980"
+	     "3a0fd3df" "c57e23f6" "92bb7b49" "b5d21233" "1d55b1ce" "2d727ab4"
+	     "1a11da3a" "15f8e4bc" "11c78b65" "f1ceb296" "f1fedc5f" "7e42456c"
+	     "91111702" "5201be03" "89f5abd4" "0d11f863" "9a39fe32" "36751835"
+	     "a5e5e443" "17c1c2ee" "fd4ea5bf" "d16043f4" "3cb41981" "f6adee9d"
+	     "03159e7a" "d9d13c53" "369509fc" "1fa27c16" "ef988770" "3a55b51b"
+	     "22cbf44c" "d012aee0" "b2798e62" "8423428e" "fcd5a40c" "aef6bf50"
+	     "d8ea885e" "bf73a6b9" "fd79b5e1" "8f67d134" "1ac8237a" "75c3cfc9"
+	     "2004a1c5" "a40e366b" "c44d0017" "6af71c15" "e48c86d3" "7e013723"
+	     "caac7223" "ab3bf4d5" "4f182871" "3b2b4a6f" "e40fab74" "405cb738"
+	     "b064c06e" "cc76e9ef" "ffffffff" "ffffffff",
+	.g = "2"
+} };
+
+static int openssl_dh_set_param(struct buffer *P /* [in] */,
+			        struct buffer *Q /* [in] */,
+			        struct buffer *G /* [in] */,
+			        uint64_t safeprime /* [in] */,
+				DH *dh /* [out] */)
+{
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	int ret = 0, pqg_consumed = 0;
+
+	switch (safeprime) {
+	case ACVP_DH_MODP_2048:
+		CKINT_O0(BN_hex2bn(&p, safeprimes[0].p));
+		CKINT_O0(BN_hex2bn(&q, safeprimes[0].q));
+		CKINT_O0(BN_hex2bn(&g, safeprimes[0].g));
+		break;
+	case ACVP_DH_MODP_3072:
+		CKINT_O0(BN_hex2bn(&p, safeprimes[1].p));
+		CKINT_O0(BN_hex2bn(&q, safeprimes[1].q));
+		CKINT_O0(BN_hex2bn(&g, safeprimes[1].g));
+		break;
+	case ACVP_DH_MODP_4096:
+		CKINT_O0(BN_hex2bn(&p, safeprimes[2].p));
+		CKINT_O0(BN_hex2bn(&q, safeprimes[2].q));
+		CKINT_O0(BN_hex2bn(&g, safeprimes[2].g));
+		break;
+	case ACVP_DH_MODP_6144:
+		CKINT_O0(BN_hex2bn(&p, safeprimes[3].p));
+		CKINT_O0(BN_hex2bn(&q, safeprimes[3].q));
+		CKINT_O0(BN_hex2bn(&g, safeprimes[3].g));
+		break;
+	case ACVP_DH_MODP_8192:
+		CKINT_O0(BN_hex2bn(&p, safeprimes[4].p));
+		CKINT_O0(BN_hex2bn(&q, safeprimes[4].q));
+		CKINT_O0(BN_hex2bn(&g, safeprimes[4].g));
+		break;
+	default:
+		if (!p || !q || !g) {
+			logger(LOGGER_ERR, "Unknown PQG reference\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
+		CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+		q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
+		CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+		g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
+		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+	}
+
+	CKINT_O_LOG(openssl_dh_set0_pqg(dh, p, q, g),
+		    "DSA_set0_pqg failed\n");
+	pqg_consumed = 1;
+
+	ret = 0;
+
+out:
+	if (!pqg_consumed && p)
+		BN_free(p);
+	if (!pqg_consumed && q)
+		BN_free(q);
+	if (!pqg_consumed && g)
+		BN_free(g);
+
+	return ret;
+}
+
 static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
 			       struct buffer *Q /* [in] */,
 			       struct buffer *G /* [in] */,
+			       uint64_t safeprime /* [in] */,
 			       struct buffer *X /* [out] */,
 			       struct buffer *Y /* [out] */,
 			       DSA **dsa)
@@ -3118,14 +3504,25 @@ static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
 	*dsa = DSA_new();
 	CKNULL_LOG(*dsa, -ENOMEM, "DSA_new() failed\n");
 
-	p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
-	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+	switch (safeprime) {
+	case ACVP_DH_MODP_2048:
+	case ACVP_DH_MODP_3072:
+	case ACVP_DH_MODP_4096:
+	case ACVP_DH_MODP_6144:
+	case ACVP_DH_MODP_8192:
+		logger(LOGGER_ERR, "Safeprime testing with DSA not supported (Q not set)\n");
+		ret = -EFAULT;
+		goto out;
+	default:
+		p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
+		CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
 
-	q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
-	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+		q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
+		CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
 
-	g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
-	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+		g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
+		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+	}
 
 	CKINT_O_LOG(openssl_dsa_set0_pqg(*dsa, p, q, g),
 		    "DSA_set0_pqg failed\n");
@@ -3157,29 +3554,18 @@ out:
 static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 			      struct buffer *Q /* [in] */,
 			      struct buffer *G /* [in] */,
+			      uint64_t safeprime /* [in] */,
 			      struct buffer *X /* [out] */,
 			      struct buffer *Y /* [out] */)
 {
 	DH *dh = NULL;
-	BIGNUM *p = NULL, *q = NULL, *g = NULL;
 	const BIGNUM *x, *y;
-	int ret = 0, pqg_consumed = 0;
+	int ret = 0;
 
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
 
-	p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
-	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
-
-	q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
-	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
-
-	g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
-	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
-
-	CKINT_O_LOG(openssl_dh_set0_pqg(dh, p, q, g),
-		    "DSA_set0_pqg failed\n");
-	pqg_consumed = 1;
+	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh));
 
 	CKINT_O_LOG(DH_generate_key(dh), "DSA_generate_key() failed\n");
 
@@ -3194,12 +3580,6 @@ static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 	ret = 0;
 
 out:
-	if (!pqg_consumed && p)
-		BN_free(p);
-	if (!pqg_consumed && q)
-		BN_free(q);
-	if (!pqg_consumed && g)
-		BN_free(g);
 	if (dh)
 		DH_free(dh);
 
@@ -3220,15 +3600,91 @@ static int openssl_dsa_keygen(struct dsa_keygen_data *data,
 
 	if (envstr) {
 		CKINT(_openssl_dh_keygen(&pqg->P, &pqg->Q, &pqg->G,
+					 pqg->safeprime,
 					 &data->X, &data->Y));
 	} else {
 		CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G,
+					  pqg->safeprime,
 					  &data->X, &data->Y, &dsa));
 	}
 
 out:
 	if (dsa)
 		DSA_free(dsa);
+
+	return ret;
+}
+
+static int openssl_dh_keyver(struct dsa_keyver_data *data,
+			     flags_t parsed_flags)
+{
+	DH *dh = NULL;
+	BIGNUM *y = NULL, *x = NULL;
+	const BIGNUM *nx, *ny;
+	int ret = 0, key_consumed = 0;
+
+	(void)parsed_flags;
+
+	dh = DH_new();
+	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
+
+	CKINT(openssl_dh_set_param(NULL, NULL, NULL, data->pqg.safeprime, dh));
+
+	y = BN_bin2bn((const unsigned char *) data->Y.buf, (int)data->Y.len, y);
+	CKNULL(y, -ENOMEM);
+	x = BN_bin2bn((const unsigned char *) data->X.buf, (int)data->X.len, x);
+	CKNULL(x, -ENOMEM);
+
+	/*
+	 * NOTE: the following tests are expected to be performed:
+	 * Invalid key pair, x must satisfy 0 < x < q
+	 * Invalid key pair, y != g^x mod p
+	 *
+	 * This is NOT implemented in OpenSSL, but can be achieved with the
+	 * following code.
+	 */
+
+	/* Check that the provided public key truly matches the private key */
+	CKINT(openssl_dh_set0_key(dh, NULL, x));
+	key_consumed = 1;
+	CKINT_O_LOG(DH_generate_key(dh), "DH_generate_key failed\n");
+	openssl_dh_get0_key(dh, &ny, &nx);
+
+	if (BN_cmp(ny, y) != 0) {
+		data->keyver_success = 0;
+		logger(LOGGER_DEBUG,
+		       "Key verification failed: provided Y and calculated Y inconsistent\n");
+		ret = 0;
+		goto out;
+	}
+
+#if 0
+	/* Check appropriateness of public key */
+	int check_code = 0;
+	CKINT_O_LOG(DH_check_pub_key(dh, y, &check_code),
+		    "DH_check_pub_key failed\n");
+	if (check_code != 0) {
+		data->keyver_success = 0;
+		logger(LOGGER_DEBUG,
+		       "Key verification failed with error code %d\n",
+		       check_code);
+		ret = 0;
+		goto out;
+	}
+#endif
+
+	data->keyver_success = 1;
+	logger(LOGGER_DEBUG, "Key verification successful\n");
+
+	ret = 0;
+
+out:
+	if (y)
+		BN_free(y);
+	if (!key_consumed && x)
+		BN_free(x);
+	if (dh)
+		DH_free(dh);
 
 	return ret;
 }
@@ -3369,7 +3825,8 @@ static int openssl_dsa_keygen_en(struct dsa_pqggen_data *pqg, struct buffer *Y,
 	//_openssl_dsa_pqg_gen_public_api(&data->P, &data->Q, &data->G,
 	//				      data->L));
 
-	CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G, &X, Y, &dsa));
+	CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G, pqg->safeprime,
+				  &X, Y, &dsa));
 
 	*privkey = dsa;
 
@@ -3508,6 +3965,7 @@ out:
 static struct dsa_backend openssl_dsa =
 {
 	openssl_dsa_keygen,	/* dsa_keygen */
+	openssl_dh_keyver,
 	openssl_dsa_siggen,	/* dsa_siggen */
 	openssl_dsa_sigver,	/* dsa_sigver */
 	openssl_dsa_pqg,	/* dsa_pqg */

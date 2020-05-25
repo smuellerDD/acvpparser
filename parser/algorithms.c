@@ -77,6 +77,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ECDSA", ACVP_ECDSA},
 	{"EDDSA", ACVP_EDDSA},
 	{"DSA", ACVP_DSA},
+	{"safePrimes", ACVP_SAFEPRIMES},
 
 	{"SHA-1", ACVP_SHA1},
 
@@ -129,6 +130,17 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 
 	{"ED-25519", ACVP_ED25519},
 	{"ED-448", ACVP_ED448},
+
+	{"MODP-2048", ACVP_DH_MODP_2048},
+	{"MODP-3072", ACVP_DH_MODP_3072},
+	{"MODP-4096", ACVP_DH_MODP_4096},
+	{"MODP-6144", ACVP_DH_MODP_6144},
+	{"MODP-8192", ACVP_DH_MODP_8192},
+	{"ffdhe-2048", ACVP_DH_FFDHE_2048},
+	{"ffdhe-3072", ACVP_DH_FFDHE_3072},
+	{"ffdhe-4096", ACVP_DH_FFDHE_4096},
+	{"ffdhe-6144", ACVP_DH_FFDHE_6144},
+	{"ffdhe-8192", ACVP_DH_FFDHE_8192},
 
 	/* SSH */
 	{"TDES", ACVP_TDESECB},

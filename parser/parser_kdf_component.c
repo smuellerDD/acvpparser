@@ -345,6 +345,7 @@ out:
 static struct cavs_tester kdf =
 {
 	ACVP_KDF_COMPONENT,
+	0,
 	kdf_tester,
 	NULL
 };

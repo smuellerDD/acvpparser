@@ -92,6 +92,7 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester kdf_108 =
 {
 	ACVP_KDF_800_108,
+	0,
 	kdf_108_tester,	/* process_req */
 	NULL
 };

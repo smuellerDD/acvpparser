@@ -99,7 +99,7 @@ struct dsa_static_key {
 	struct dsa_pqggen_data pqg;
 };
 static struct dsa_static_key dsa_key = { NULL, { NULL, 0 },
-					 { 0, 0, 0, { NULL, 0 }, { NULL, 0 },
+					 { 0, 0, 0, 0, { NULL, 0 }, { NULL, 0 },
 					  { NULL, 0 }} };
 
 static void dsa_key_free(struct dsa_static_key *key)
@@ -316,15 +316,21 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 					{ NULL, 0, &dsa_keygen_testresult};
 
 	const struct json_entry dsa_keygen_testgroup_entries[] = {
-		{"l",	{.data.integer = &dsa_keygen_vector.pqg.L, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN },
-		{"n",	{.data.integer = &dsa_keygen_vector.pqg.N, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN },
+		/* L, N are provided for SP800-56A rev 1 / FIPS 186-4 keygen */
+		{"l",	{.data.integer = &dsa_keygen_vector.pqg.L, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+		{"n",	{.data.integer = &dsa_keygen_vector.pqg.N, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+
+		/* safeprime cipher is provided for SP800-56A rev 3 keygen */
+		{"safePrimeGroup",	{.data.largeint = &dsa_keygen_vector.pqg.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+
 		{"tests",	{.data.array = &dsa_keygen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
 	};
 
 	const struct json_entry dsa_keygen_testgroup_result_entries[] = {
-		{"p",		{.data.buf = &dsa_keygen_vector.pqg.P, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
-		{"q",		{.data.buf = &dsa_keygen_vector.pqg.Q, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
-		{"g",		{.data.buf = &dsa_keygen_vector.pqg.G, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
+		/* P, Q, G are provided for SP800-56A rev 1 / FIPS 186-4 */
+		{"p",		{.data.buf = &dsa_keygen_vector.pqg.P, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+		{"q",		{.data.buf = &dsa_keygen_vector.pqg.Q, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+		{"g",		{.data.buf = &dsa_keygen_vector.pqg.G, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
 	};
 	/*
 	 * The NULL for the function callbacks implies that the n and e
@@ -333,6 +339,35 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_testresult dsa_keygen_testgroup_result = SET_ARRAY(dsa_keygen_testgroup_result_entries, NULL);
 
 	const struct json_array dsa_keygen_testgroup = SET_ARRAY(dsa_keygen_testgroup_entries, &dsa_keygen_testgroup_result);
+
+	/**********************************************************************
+	 * DSA key verification (SP800-56A rev 3 safe primes)
+	 **********************************************************************/
+	DSA_DEF_CALLBACK(dsa_keyver, FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER);
+
+	const struct json_entry dsa_keyver_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &dsa_keyver_vector.keyver_success, WRITER_BOOL},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+	const struct json_testresult dsa_keyver_testresult =
+	SET_ARRAY(dsa_keyver_testresult_entries, &dsa_keyver_callbacks);
+
+	const struct json_entry dsa_keyver_test_entries[] = {
+		{"x",		{.data.buf = &dsa_keyver_vector.X, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+		{"y",		{.data.buf = &dsa_keyver_vector.Y, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+
+	/* search for empty arrays */
+	const struct json_array dsa_keyver_test = SET_ARRAY(dsa_keyver_test_entries, &dsa_keyver_testresult);
+
+	const struct json_entry dsa_keyver_testgroup_entries[] = {
+		/* safeprime cipher is provided for SP800-56A rev 3 keygen */
+		{"safePrimeGroup",	{.data.largeint = &dsa_keyver_vector.pqg.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+
+		{"tests",	{.data.array = &dsa_keyver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+
+	const struct json_array dsa_keyver_testgroup = SET_ARRAY(dsa_keyver_testgroup_entries, NULL);
 
 	/**********************************************************************
 	 * DSA signature generation
@@ -415,6 +450,7 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry dsa_testanchor_entries[] = {
 		{"testGroups",	{.data.array = &dsa_pqg_testgroup, PARSER_ARRAY},	FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_TYPE_PQGVER},
 		{"testGroups",	{.data.array = &dsa_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN},
+		{"testGroups",	{.data.array = &dsa_keyver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYVER},
 		{"testGroups",	{.data.array = &dsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
 		{"testGroups",	{.data.array = &dsa_sigver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGVER},
 	};
@@ -427,6 +463,15 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester dsa =
 {
 	ACVP_DSA,
+	0,
+	dsa_tester,	/* process_req */
+	NULL
+};
+
+static struct cavs_tester safeprimes =
+{
+	ACVP_SAFEPRIMES,
+	0,
 	dsa_tester,	/* process_req */
 	NULL
 };
@@ -435,6 +480,7 @@ ACVP_DEFINE_CONSTRUCTOR(register_dsa)
 static void register_dsa(void)
 {
 	register_tester(&dsa, "DSA");
+	register_tester(&safeprimes, "Safe Primes");
 }
 
 void register_dsa_impl(struct dsa_backend *implementation)

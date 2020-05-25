@@ -42,7 +42,7 @@ extern "C"
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 7   /* API compatible, ABI may change,
+#define MINVERSION 8   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
@@ -78,6 +78,7 @@ struct mpint {
 };
 
 struct cavs_tester {
+	uint64_t testid;
 	uint64_t mask;
 	int (*process_req) (struct json_object *in, struct json_object *out,
 			    uint64_t cipher);

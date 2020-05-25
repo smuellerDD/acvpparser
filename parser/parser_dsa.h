@@ -166,14 +166,16 @@ struct dsa_pqg_data {
  * allocated by the backend. The parser takes care of deallocating them.
  *
  * @var cipher [in] Hash type to use for signature operation
- * @var L [in] L size in bits
- * @var N [in] N size in bits
- * @var P [out] domain parameter P
- * @var Q [out] domain parameter Q
- * @var G [out] domain parameter G
+ * @var pqg.safeprime [in] Safe prime definition (only set for SP800-56A rev 3)
+ * @var L [in] L size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var N [in] N size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var P [out] domain parameter P (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var Q [out] domain parameter Q (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var G [out] domain parameter G (only set for FIPS 186-4 / SP800-56A rev 1)
  */
 struct dsa_pqggen_data {
 	uint64_t cipher;
+	uint64_t safeprime;
 	uint32_t L;
 	uint32_t N;
 	struct buffer P;
@@ -188,11 +190,17 @@ struct dsa_pqggen_data {
  * General note: all data buffers that are returned by the backend must be
  * allocated by the backend. The parser takes care of deallocating them.
  *
- * @var pqg.L [in] L size in bits
- * @var pqg.N [in] N size in bits
- * @var pqg.P [in] domain parameter P
- * @var pqg.Q [in] domain parameter Q
- * @var pqg.G [in] domain parameter G
+ * The key generation covers the following cipher definitions:
+ *	* FIPS 186-4 DSA key generation
+ *	* SP800-56A rev 1 DH key generation
+ *	* SP800-56A rev 3 DH key generation using safe primes
+ *
+ * @var pqg.L [in] L size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var pqg.N [in] N size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var pqg.P [in] domain parameter P (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var pqg.Q [in] domain parameter Q (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var pqg.G [in] domain parameter G (only set for FIPS 186-4 / SP800-56A rev 1)
+ * @var pqg.safeprime [in] Safe prime definition (only set for SP800-56A rev 3)
  * @var X [out] private DSA key parameter X
  * @var Y [out] public DSA key parameter Y
  */
@@ -200,6 +208,26 @@ struct dsa_keygen_data {
 	struct dsa_pqggen_data pqg;
 	struct buffer X;
 	struct buffer Y;
+};
+
+/**
+ * @brief DSA key verification data structure holding the data for the cipher
+ *	  operations specified with dsa_keygen.
+ *
+ * The key verification covers the following cipher definitions:
+ *	* SP800-56A rev 3 DH key generation using safe primes
+ *
+ * @var pqg.safeprime [in] Safe prime definition (only set for SP800-56A rev 3)
+ * @var X [in] private DSA key parameter X
+ * @var Y [in] public DSA key parameter Y
+ * @var keyver_success [out] Is DSA key verification with given parameters
+ *			     successful (1) or whether it failed (0).
+ */
+struct dsa_keyver_data {
+	struct dsa_pqggen_data pqg;
+	struct buffer X;
+	struct buffer Y;
+	uint32_t keyver_success;
 };
 
 /**
@@ -285,7 +313,10 @@ struct dsa_sigver_data {
  * signature verification fails. Only if some general error is detected a
  * return code != must be returned.
  *
- * @var dsa_keygen DSA key generation
+ * @var dsa_keygen DSA key generation (FIPS 184-4 as well as SP800-56A rev 3
+ *		   using safe primes)
+ * @var dsa_keyver DSA key verfication (only for SP800-56A rev 3 using safe
+ *		   primes)
  * @var dsa_siggen DSA signature generation
  * @var dsa_sigver DSA signature verification
  * @var dsa_pqg PQG generation and verification callback handler -- see
@@ -313,6 +344,7 @@ struct dsa_sigver_data {
  */
 struct dsa_backend {
 	int (*dsa_keygen)(struct dsa_keygen_data *data, flags_t parsed_flags);
+	int (*dsa_keyver)(struct dsa_keyver_data *data, flags_t parsed_flags);
 	int (*dsa_siggen)(struct dsa_siggen_data *data, flags_t parsed_flags);
 	int (*dsa_sigver)(struct dsa_sigver_data *data, flags_t parsed_flags);
 	int (*dsa_pqg)(struct dsa_pqg_data *data, flags_t parsed_flags);

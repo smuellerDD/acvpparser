@@ -243,6 +243,7 @@ static int dh_tester(struct json_object *in, struct json_object *out,
 static struct cavs_tester dh =
 {
 	ACVP_DH,
+	0,
 	dh_tester,	/* process_req */
 	NULL
 };
