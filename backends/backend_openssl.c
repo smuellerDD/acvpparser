@@ -118,23 +118,28 @@ static void openssl_backend_init(void)
 # undef OPENSSL_SSH_KDF
 #endif
 
+/*
+ * Enable this option if your OpenSSL code base implements the 
+ * SP800-108 KBKDF.
+ */
+#ifndef OPENSSL_KBKDF
+# define OPENSSL_KBKDF
+#endif
+
 /************************************************
  * General helper functions
  ************************************************/
 static int openssl_cipher(uint64_t cipher, size_t keylen,
 			  const EVP_CIPHER **type)
 {
+	uint64_t mask;
 	int ret = 0;
 	const EVP_CIPHER *l_type = NULL;
 	const char *algo;
 
-	CKINT(convert_cipher_algo(cipher, &algo));
-
-	logger(LOGGER_DEBUG, "Key size = %u\n", keylen);
-	logger(LOGGER_DEBUG, "Cipher = %s\n", algo);
-
 	switch (cipher) {
 	case ACVP_ECB:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_ecb();
@@ -148,9 +153,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CBC:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_cbc();
@@ -164,9 +171,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_OFB:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_ofb();
@@ -180,9 +189,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CFB1:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_cfb1();
@@ -196,9 +207,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CFB8:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_cfb8();
@@ -212,9 +225,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CFB128:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_cfb();
@@ -228,9 +243,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CTR:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_ctr();
@@ -244,11 +261,13 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 
 	case ACVP_GMAC:
 	case ACVP_GCM:
+		mask = ACVP_CIPHERTYPE_AEAD;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_gcm();
@@ -262,9 +281,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_CCM:
+		mask = ACVP_CIPHERTYPE_AEAD;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_ccm();
@@ -278,9 +299,11 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_XTS:
+		mask = ACVP_CIPHERTYPE_AES;
 		switch (keylen) {
 		case 32:
 			l_type = EVP_aes_128_xts();
@@ -291,32 +314,40 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		case 48:
 			logger(LOGGER_WARN, "Key size not supported\n");
 			ret = -EINVAL;
-			break;
+			goto out;
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_TDESECB:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_ecb();
 		break;
 	case ACVP_TDESCBC:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_cbc();
 		break;
 	case ACVP_TDESCFB1:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_cfb1();
 		break;
 	case ACVP_TDESCFB8:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_cfb8();
 		break;
 	case ACVP_TDESCFB64:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_cfb64();
 		break;
 	case ACVP_TDESOFB:
+		mask = ACVP_CIPHERTYPE_TDES;
 		l_type = EVP_des_ede3_ofb();
 		break;
 
 	case ACVP_AESCMAC:
+		mask = ACVP_CIPHERTYPE_CMAC;
 		switch (keylen) {
 		case 16:
 			l_type = EVP_aes_128_cbc();
@@ -330,15 +361,24 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 		default:
 			logger(LOGGER_WARN, "Unknown key size\n");
 			ret = -EINVAL;
+			goto out;
 		}
 		break;
 	case ACVP_TDESCMAC:
+		mask = ACVP_CIPHERTYPE_CMAC;
 		l_type = EVP_des_ede3_cbc();
 		break;
 	default:
 		logger(LOGGER_WARN, "Unknown cipher\n");
 		ret = -EINVAL;
+		goto out;
 	}
+
+	CKINT(convert_cipher_algo(cipher, mask, &algo));
+
+	logger(LOGGER_DEBUG, "Key size = %u\n", keylen);
+	logger(LOGGER_DEBUG, "Cipher = %s\n", algo);
+
 
 	*type = l_type;
 
@@ -354,6 +394,7 @@ static int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 
 	CKINT(convert_cipher_algo(cipher & (ACVP_HASHMASK | ACVP_HMACMASK |
 					    ACVP_SHAKEMASK),
+				  ACVP_CIPHERTYPE_HASH | ACVP_CIPHERTYPE_HMAC | ACVP_CIPHERTYPE_XOF,
 				  &algo));
 
 	logger(LOGGER_DEBUG, "SHA = %s\n", algo);
@@ -1399,6 +1440,69 @@ static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
 	return 0;
 }
 
+/*
+ * Example for AES MCT inner loop handling in backend
+ *
+ * This code is meant to be an example - it is meaningless for OpenSSL (but it
+ * works!), but when having, say, an HSM where ACVP handling code invoking the
+ * HSM crypto code is also found within the HSM, moving this function into that
+ * HSM handling code reduces the round trip between the host executing the ACVP
+ * parser code and the HSM executing the ACVP handling code a 1000-fold.
+ *
+ * The MCT inner loop handling logic must return the final cipher text C[j] and
+ * the last but one cipher text C[j-1].
+ *
+ * This code should be invoked when the mct_update function pointer
+ * is called by the ACVP parser.
+ */
+#if 0
+static int openssl_mct_update_inner_loop(struct sym_data *data,
+					 flags_t parsed_flags)
+{
+	unsigned int i;
+	uint8_t tmp[16];
+	int ret;
+
+	/* This code is only meant for AES */
+	if (data->cipher &~ ACVP_AESMASK)
+		return openssl_mct_update(data, parsed_flags);
+
+	if (data->cipher == ACVP_CFB1 || data->cipher == ACVP_CFB8)
+		return openssl_mct_update(data, parsed_flags);
+
+	if (data->cipher != ACVP_ECB && data->iv.len != sizeof(tmp))
+		return -EINVAL;
+	if (data->data.len != sizeof(tmp))
+		return -EINVAL;
+
+	CKINT(alloc_buf(sizeof(tmp), &data->inner_loop_final_cj1));
+
+	memcpy(data->inner_loop_final_cj1.buf, data->iv.buf, data->iv.len);
+
+	/* 999 rounds where the data shuffling is applied */
+	for (i = 0; i < 999; i++) {
+		CKINT(openssl_mct_update(data, parsed_flags));
+		if (data->cipher != ACVP_ECB) {
+			memcpy(tmp, data->data.buf, data->data.len);
+			memcpy(data->data.buf, data->inner_loop_final_cj1.buf,
+			       data->data.len);
+			memcpy(data->inner_loop_final_cj1.buf, tmp,
+			       data->data.len);
+		}
+	}
+
+	if (data->cipher == ACVP_ECB)
+		memcpy(data->inner_loop_final_cj1.buf, data->data.buf,
+		       data->data.len);
+
+	/* final round of calculation without data shuffle */
+	CKINT(openssl_mct_update(data, parsed_flags));
+
+out:
+	return ret;
+}
+#endif
+
 static int openssl_mct_fini(struct sym_data *data, flags_t parsed_flags)
 {
 	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
@@ -1543,7 +1647,7 @@ static struct sym_backend openssl_sym =
 	openssl_encrypt,
 	openssl_decrypt,
 	openssl_mct_init,
-	openssl_mct_update,
+	openssl_mct_update, /* or openssl_mct_update_inner_loop */
 	openssl_mct_fini,
 };
 
@@ -1747,10 +1851,12 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		return -EINVAL;
 	}
 
+#ifndef UBUNTU
 	if (!data->data.len) {
 		logger(LOGGER_WARN, "Zero length input data not supported\n");
 		return -EINVAL;
 	}
+#endif
 
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
@@ -1842,15 +1948,17 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 			  "EVP_EncryptUpdate() AAD failed\n");
 	}
 
-	if (EVP_Cipher(ctx, data->data.buf, data->data.buf,
-		       (unsigned int)data->data.len) !=
-	    (int)data->data.len) {
-		logger(LOGGER_WARN,"EVP_Cipher() finaliztion failed\n");
-		ret = -EFAULT;
-		goto out;
+	if (data->data.len) {
+		if (EVP_Cipher(ctx, data->data.buf, data->data.buf,
+			       (unsigned int)data->data.len) !=
+		    (int)data->data.len) {
+			logger(LOGGER_WARN,"EVP_Cipher() finaliztion failed\n");
+			ret = -EFAULT;
+			goto out;
+		}
+		logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+			      "ciphertext");
 	}
-	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
-		      "ciphertext");
 
 	if (EVP_Cipher(ctx, NULL, NULL, 0) < 0) {
 		logger(LOGGER_ERR, "EVP_Cipher failed %s\n",
@@ -1890,10 +1998,12 @@ static int openssl_gcm_decrypt(struct aead_data *data, flags_t parsed_flags)
 		return -EINVAL;
 	}
 
+#ifndef UBUNTU
 	if (!data->data.len) {
 		logger(LOGGER_WARN, "Zero length input data not supported\n");
 		return -EINVAL;
 	}
+#endif
 
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
@@ -1929,11 +2039,13 @@ static int openssl_gcm_decrypt(struct aead_data *data, flags_t parsed_flags)
 
 	data->integrity_error = 0;
 
-	if (EVP_Cipher(ctx, data->data.buf, data->data.buf,
-		       (unsigned int)data->data.len) !=
-	    (int)data->data.len) {
-		logger(LOGGER_DEBUG, "EVP_Cipher() finalization failed\n");
-		data->integrity_error = 1;
+	if (data->data.len) {
+		if (EVP_Cipher(ctx, data->data.buf, data->data.buf,
+			       (unsigned int)data->data.len) !=
+		    (int)data->data.len) {
+			logger(LOGGER_DEBUG, "EVP_Cipher() finalization failed\n");
+			data->integrity_error = 1;
+		}
 	}
 
 	if (EVP_Cipher(ctx, NULL, NULL, 0) < 0) {
@@ -2576,6 +2688,161 @@ static void openssl_kdf_tls_backend(void)
 }
 #endif /* OPENSSL_SSH_KDF */
 
+#ifdef OPENSSL_KBKDF
+/************************************************
+ * SP 800-108 KBKDF interface functions
+ ************************************************/
+/* Stolen from crypto/kdf/kbkdf.c */
+static uint32_t be32(uint32_t host)
+{
+	uint32_t big = 0;
+	const union {
+		long one;
+		char little;
+	} is_endian = { 1 };
+
+	if (!is_endian.little)
+		return host;
+
+	big |= (host & 0xff000000) >> 24;
+	big |= (host & 0x00ff0000) >> 8;
+	big |= (host & 0x0000ff00) << 8;
+	big |= (host & 0x000000ff) << 24;
+	return big;
+}
+
+static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
+{
+	EVP_KDF_CTX *ctx = NULL;
+	const EVP_MD *md = NULL;
+	const EVP_CIPHER *type = NULL;
+	uint32_t derived_key_bytes = data->derived_key_length / 8;
+	uint32_t l = be32(data->derived_key_length);
+	BUFFER_INIT(label);
+	BUFFER_INIT(context);
+	int ret = 0;
+	(void)parsed_flags;
+
+	logger(LOGGER_VERBOSE, "data->kdfmode = %lx\n", data->kdfmode);
+	if (!(data->kdfmode & ACVP_CIPHERTYPE_KDF)) {
+		logger(LOGGER_ERR, "The cipher type isn't a KDF");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (data->kdfmode == ACVP_KDF_108_DOUBLE_PIPELINE) {
+		logger(LOGGER_ERR, "Double pipeline mode is not supported");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ctx = EVP_KDF_CTX_new_id(EVP_KDF_KB);
+	CKNULL(ctx, -ENOMEM);
+
+	/* We only check COUNTER or FEEDBACK because DOUBLE PIPELINE is not
+	 * supported and is checked above
+	 */
+	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_MODE,
+				(data->kdfmode == ACVP_KDF_108_COUNTER) ?
+				 EVP_KDF_KB_MODE_COUNTER :
+				 EVP_KDF_KB_MODE_FEEDBACK),
+		    "EVP_KDF_ctrl failed to set KB_MODE");
+
+	logger(LOGGER_VERBOSE, "data->mac = %lx\n", data->mac);
+	if (data->mac & ACVP_CIPHERTYPE_HMAC) {
+		CKINT(openssl_md_convert(data->mac, &md));
+		CKNULL(md, -ENOMEM);
+
+		CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_MD, md),
+			    "EVP_KDF_ctrl failed to set the MD\n");
+		CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_MAC_TYPE,
+					 EVP_KDF_KB_MAC_TYPE_HMAC),
+			    "EVP_KDF_ctrl failed to set the MAC_TYPE\n");
+	} else if (data->mac & ACVP_CIPHERTYPE_CMAC) {
+		CKINT(openssl_cipher(data->mac == ACVP_AESCMAC ? ACVP_AESCMAC :
+				     ACVP_TDESCMAC, data->key.len, &type));
+		CKNULL(type, -ENOMEM);
+
+		CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_CIPHER, type),
+			    "EVP_KDF_ctrl failed to set the CIPHER\n");
+		CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_MAC_TYPE,
+					 EVP_KDF_KB_MAC_TYPE_CMAC),
+                            "EVP_KDF_ctrl failed to set the MAC_TYPE\n");
+	}
+
+	logger_binary(LOGGER_VERBOSE, data->key.buf, data->key.len, "data->key");
+	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KEY,
+				 data->key.buf, data->key.len),
+		    "EVP_KDF_ctrl failed to set the KEY");
+
+	logger(LOGGER_VERBOSE, "L = %u\n", derived_key_bytes);
+	logger_binary(LOGGER_VERBOSE, (unsigned char *)&l, sizeof(l), "[L]_2");
+
+	CKINT(alloc_buf(data->key.len, &label));
+	CKINT(alloc_buf(data->key.len, &context));
+	/* Allocate the fixed_data to hold Label || 0x00 || Context || [L]_2 */
+	CKINT(alloc_buf(label.len + 1 + context.len + sizeof(l),
+			&data->fixed_data));
+
+	/* Randomly choose the label and context */
+	RAND_bytes(label.buf, (int)label.len);
+	RAND_bytes(context.buf, (int)context.len);
+
+	logger_binary(LOGGER_VERBOSE, label.buf, label.len, "label");
+	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SALT, label.buf,
+				 label.len),
+		    "EVP_KDF_ctrl failed to set the SALT (label)");
+
+	logger_binary(LOGGER_VERBOSE, context.buf, context.len, "context");
+	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_INFO, context.buf,
+				 context.len),
+		    "EVP_KDF_ctrl fail to set KB_INFO (context)");
+
+	/* Fixed data = Label || 0x00 || Context || [L]_2
+	 * The counter i is not part of it
+	 */
+	memcpy(data->fixed_data.buf, label.buf, label.len);
+	data->fixed_data.buf[label.len] = 0x00;
+	memcpy(data->fixed_data.buf + label.len + 1, context.buf, context.len);
+	memcpy(data->fixed_data.buf + label.len + 1 + context.len,
+	       (unsigned char *)&l, sizeof(l));
+
+	logger_binary(LOGGER_VERBOSE, data->fixed_data.buf,
+		      data->fixed_data.len, "data->fixed_data");
+
+	if (data->iv.len) {
+		logger_binary(LOGGER_VERBOSE, data->iv.buf, data->iv.len,
+			      "data->iv");
+		CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_SEED,
+					 data->iv.buf, data->iv.len),
+			    "EVP_KDF_ctrl failed to set the KB_SEED (iv)");
+	}
+
+	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
+	CKINT_O_LOG(EVP_KDF_DERIVE(ctx, data->derived_key.buf,
+				   derived_key_bytes),
+		    "EVP_KDF_DERIVE failed\n");
+	logger_binary(LOGGER_VERBOSE, data->derived_key.buf,
+                      derived_key_bytes, "data->derived_key");
+out:
+	EVP_KDF_CTX_free(ctx);
+	free_buf(&label);
+	free_buf(&context);
+	return ret;
+}
+
+static struct kdf_108_backend openssl_kdf108_backend =
+{
+	openssl_kdf108,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_kdf_108_backend)
+static void openssl_kdf_108_backend(void)
+{
+	register_kdf_108_impl(&openssl_kdf108_backend);
+}
+#endif
+
 /************************************************
  * RSA interface functions
  ************************************************/
@@ -2878,7 +3145,8 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
 		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
 						RSA_PKCS1_PSS_PADDING),
-			    "Setting PSS type failed: %s\n",  ERR_error_string(ERR_get_error(), NULL));
+			    "Setting PSS type failed: %s\n",
+			    ERR_error_string(ERR_get_error(), NULL));
 		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx,
 						data->saltlen),
 			    "Setting salt length to %u failed: %s\n",
@@ -2889,7 +3157,8 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
 		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
 						RSA_X931_PADDING),
-			    "Setting X9.31 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+			    "Setting X9.31 type failed: %s\n",
+			    ERR_error_string(ERR_get_error(), NULL));
 	}
 
         CKINT_O(EVP_DigestVerifyUpdate(ctx, data->msg.buf, data->msg.len));
@@ -3151,313 +3420,37 @@ out:
 }
 #endif
 
-struct safeprimes {
-	char *g;
-	char *q;
-	char *p;
-};
-
-/* q = (p - 1) / 2 */
-static const struct safeprimes safeprimes[] = { {
-	/* rfc3526 group 14 "2048-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
-	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
-	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
-	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
-	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
-	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
-	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
-	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
-	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
-	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
-	     "15728E5A" "8AACAA68" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
-	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
-	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
-	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
-	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
-	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
-	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
-	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
-	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
-	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
-	     "0ab9472d" "45565534" "7fffffff" "ffffffff",
-	.g = "2"
-}, {
-	/* rfc3526 group 15 "3072-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
-	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
-	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
-	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
-	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
-	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
-	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
-	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
-	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
-	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
-	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
-	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
-	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
-	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
-	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
-	     "43DB5BFC" "E0FD108E" "4B82D120" "A93AD2CA" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
-	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
-	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
-	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
-	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
-	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
-	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
-	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
-	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
-	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
-	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
-	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
-	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
-	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
-	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
-	     "a1edadfe" "707e8847" "25c16890" "549d6965" "7fffffff" "ffffffff",
-	.g = "2"
-}, {
-	/* rfc3526 group 16 "4096-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
-	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
-	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
-	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
-	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
-	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
-	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
-	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
-	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
-	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
-	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
-	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
-	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
-	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
-	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
-	     "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7"
-	     "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
-	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
-	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
-	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
-	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34063199"
-	     "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
-	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
-	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
-	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
-	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
-	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
-	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
-	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
-	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
-	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
-	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
-	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
-	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
-	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
-	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
-	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
-	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
-	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
-	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
-	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
-	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a0318cc"
-	     "ffffffff" "ffffffff",
-	.g = "2"
-}, {
-	/* rfc3526 group 17 "6144-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
-	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
-	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
-	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
-	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
-	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
-	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
-	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
-	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
-	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
-	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
-	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
-	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
-	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
-	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31" "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7" "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
-	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
-	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
-	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
-	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34028492"
-	     "36C3FAB4" "D27C7026" "C1D4DCB2" "602646DE" "C9751E76" "3DBA37BD"
-	     "F8FF9406" "AD9E530E" "E5DB382F" "413001AE" "B06A53ED" "9027D831"
-	     "179727B0" "865A8918" "DA3EDBEB" "CF9B14ED" "44CE6CBA" "CED4BB1B"
-	     "DB7F1447" "E6CC254B" "33205151" "2BD7AF42" "6FB8F401" "378CD2BF"
-	     "5983CA01" "C64B92EC" "F032EA15" "D1721D03" "F482D7CE" "6E74FEF6"
-	     "D55E702F" "46980C82" "B5A84031" "900B1C9E" "59E7C97F" "BEC7E8F3"
-	     "23A97A7E" "36CC88BE" "0F1D45B7" "FF585AC5" "4BD407B2" "2B4154AA"
-	     "CC8F6D7E" "BF48E1D8" "14CC5ED2" "0F8037E0" "A79715EE" "F29BE328"
-	     "06A1D58B" "B7C5DA76" "F550AA3D" "8A1FBFF0" "EB19CCB1" "A313D55C"
-	     "DA56C9EC" "2EF29632" "387FE8D7" "6E3C0468" "043E8F66" "3F4860EE"
-	     "12BF2D5B" "0B7474D6" "E694F91E" "6DCC4024" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
-	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
-	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
-	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
-	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
-	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
-	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
-	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
-	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
-	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
-	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
-	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
-	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
-	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
-	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
-	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
-	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
-	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
-	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
-	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
-	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a014249"
-	     "1b61fd5a" "693e3813" "60ea6e59" "3013236f" "64ba8f3b" "1edd1bde"
-	     "fc7fca03" "56cf2987" "72ed9c17" "a09800d7" "583529f6" "c813ec18"
-	     "8bcb93d8" "432d448c" "6d1f6df5" "e7cd8a76" "a267365d" "676a5d8d"
-	     "edbf8a23" "f36612a5" "999028a8" "95ebd7a1" "37dc7a00" "9bc6695f"
-	     "acc1e500" "e325c976" "7819750a" "e8b90e81" "fa416be7" "373a7f7b"
-	     "6aaf3817" "a34c0641" "5ad42018" "c8058e4f" "2cf3e4bf" "df63f479"
-	     "91d4bd3f" "1b66445f" "078ea2db" "ffac2d62" "a5ea03d9" "15a0aa55"
-	     "6647b6bf" "5fa470ec" "0a662f69" "07c01bf0" "53cb8af7" "794df194"
-	     "0350eac5" "dbe2ed3b" "7aa8551e" "c50fdff8" "758ce658" "d189eaae"
-	     "6d2b64f6" "17794b19" "1c3ff46b" "b71e0234" "021f47b3" "1fa43077"
-	     "095f96ad" "85ba3a6b" "734a7c8f" "36e62012" "7fffffff" "ffffffff",
-	.g = "2"
-}, {
-	/* rfc3526 group 18 "8192-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
-	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
-	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
-	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
-	     "EE386BFB" "5A899FA5" "AE9F2411" "7C4B1FE6" "49286651" "ECE45B3D"
-	     "C2007CB8" "A163BF05" "98DA4836" "1C55D39A" "69163FA8" "FD24CF5F"
-	     "83655D23" "DCA3AD96" "1C62F356" "208552BB" "9ED52907" "7096966D"
-	     "670C354E" "4ABC9804" "F1746C08" "CA18217C" "32905E46" "2E36CE3B"
-	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
-	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
-	     "15728E5A" "8AAAC42D" "AD33170D" "04507A33" "A85521AB" "DF1CBA64"
-	     "ECFB8504" "58DBEF0A" "8AEA7157" "5D060C7D" "B3970F85" "A6E1E4C7"
-	     "ABF5AE8C" "DB0933D7" "1E8C94E0" "4A25619D" "CEE3D226" "1AD2EE6B"
-	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
-	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
-	     "43DB5BFC" "E0FD108E" "4B82D120" "A9210801" "1A723C12" "A787E6D7"
-	     "88719A10" "BDBA5B26" "99C32718" "6AF4E23C" "1A946834" "B6150BDA"
-	     "2583E9CA" "2AD44CE8" "DBBBC2DB" "04DE8EF9" "2E8EFC14" "1FBECAA6"
-	     "287C5947" "4E6BC05D" "99B2964F" "A090C3A2" "233BA186" "515BE7ED"
-	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
-	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34028492"
-	     "36C3FAB4" "D27C7026" "C1D4DCB2" "602646DE" "C9751E76" "3DBA37BD"
-	     "F8FF9406" "AD9E530E" "E5DB382F" "413001AE" "B06A53ED" "9027D831"
-	     "179727B0" "865A8918" "DA3EDBEB" "CF9B14ED" "44CE6CBA" "CED4BB1B"
-	     "DB7F1447" "E6CC254B" "33205151" "2BD7AF42" "6FB8F401" "378CD2BF"
-	     "5983CA01" "C64B92EC" "F032EA15" "D1721D03" "F482D7CE" "6E74FEF6"
-	     "D55E702F" "46980C82" "B5A84031" "900B1C9E" "59E7C97F" "BEC7E8F3"
-	     "23A97A7E" "36CC88BE" "0F1D45B7" "FF585AC5" "4BD407B2" "2B4154AA"
-	     "CC8F6D7E" "BF48E1D8" "14CC5ED2" "0F8037E0" "A79715EE" "F29BE328"
-	     "06A1D58B" "B7C5DA76" "F550AA3D" "8A1FBFF0" "EB19CCB1" "A313D55C"
-	     "DA56C9EC" "2EF29632" "387FE8D7" "6E3C0468" "043E8F66" "3F4860EE"
-	     "12BF2D5B" "0B7474D6" "E694F91E" "6DBE1159" "74A3926F" "12FEE5E4"
-	     "38777CB6" "A932DF8C" "D8BEC4D0" "73B931BA" "3BC832B6" "8D9DD300"
-	     "741FA7BF" "8AFC47ED" "2576F693" "6BA42466" "3AAB639C" "5AE4F568"
-	     "3423B474" "2BF1C978" "238F16CB" "E39D652D" "E3FDB8BE" "FC848AD9"
-	     "22222E04" "A4037C07" "13EB57A8" "1A23F0C7" "3473FC64" "6CEA306B"
-	     "4BCBC886" "2F8385DD" "FA9D4B7F" "A2C087E8" "79683303" "ED5BDD3A"
-	     "062B3CF5" "B3A278A6" "6D2A13F8" "3F44F82D" "DF310EE0" "74AB6A36"
-	     "4597E899" "A0255DC1" "64F31CC5" "0846851D" "F9AB4819" "5DED7EA1"
-	     "B1D510BD" "7EE74D73" "FAF36BC3" "1ECFA268" "359046F4" "EB879F92"
-	     "4009438B" "481C6CD7" "889A002E" "D5EE382B" "C9190DA6" "FC026E47"
-	     "9558E447" "5677E9AA" "9E3050E2" "765694DF" "C81F56E8" "80B96E71"
-	     "60C980DD" "98EDD3DF" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
-	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
-	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
-	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
-	     "f71c35fd" "ad44cfd2" "d74f9208" "be258ff3" "24943328" "f6722d9e"
-	     "e1003e5c" "50b1df82" "cc6d241b" "0e2ae9cd" "348b1fd4" "7e9267af"
-	     "c1b2ae91" "ee51d6cb" "0e3179ab" "1042a95d" "cf6a9483" "b84b4b36"
-	     "b3861aa7" "255e4c02" "78ba3604" "650c10be" "19482f23" "171b671d"
-	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
-	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
-	     "0ab9472d" "45556216" "d6998b86" "82283d19" "d42a90d5" "ef8e5d32"
-	     "767dc282" "2c6df785" "457538ab" "ae83063e" "d9cb87c2" "d370f263"
-	     "d5fad746" "6d8499eb" "8f464a70" "2512b0ce" "e771e913" "0d697735"
-	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
-	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
-	     "a1edadfe" "707e8847" "25c16890" "54908400" "8d391e09" "53c3f36b"
-	     "c438cd08" "5edd2d93" "4ce1938c" "357a711e" "0d4a341a" "5b0a85ed"
-	     "12c1f4e5" "156a2674" "6ddde16d" "826f477c" "97477e0a" "0fdf6553"
-	     "143e2ca3" "a735e02e" "ccd94b27" "d04861d1" "119dd0c3" "28adf3f6"
-	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
-	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a014249"
-	     "1b61fd5a" "693e3813" "60ea6e59" "3013236f" "64ba8f3b" "1edd1bde"
-	     "fc7fca03" "56cf2987" "72ed9c17" "a09800d7" "583529f6" "c813ec18"
-	     "8bcb93d8" "432d448c" "6d1f6df5" "e7cd8a76" "a267365d" "676a5d8d"
-	     "edbf8a23" "f36612a5" "999028a8" "95ebd7a1" "37dc7a00" "9bc6695f"
-	     "acc1e500" "e325c976" "7819750a" "e8b90e81" "fa416be7" "373a7f7b"
-	     "6aaf3817" "a34c0641" "5ad42018" "c8058e4f" "2cf3e4bf" "df63f479"
-	     "91d4bd3f" "1b66445f" "078ea2db" "ffac2d62" "a5ea03d9" "15a0aa55"
-	     "6647b6bf" "5fa470ec" "0a662f69" "07c01bf0" "53cb8af7" "794df194"
-	     "0350eac5" "dbe2ed3b" "7aa8551e" "c50fdff8" "758ce658" "d189eaae"
-	     "6d2b64f6" "17794b19" "1c3ff46b" "b71e0234" "021f47b3" "1fa43077"
-	     "095f96ad" "85ba3a6b" "734a7c8f" "36df08ac" "ba51c937" "897f72f2"
-	     "1c3bbe5b" "54996fc6" "6c5f6268" "39dc98dd" "1de4195b" "46cee980"
-	     "3a0fd3df" "c57e23f6" "92bb7b49" "b5d21233" "1d55b1ce" "2d727ab4"
-	     "1a11da3a" "15f8e4bc" "11c78b65" "f1ceb296" "f1fedc5f" "7e42456c"
-	     "91111702" "5201be03" "89f5abd4" "0d11f863" "9a39fe32" "36751835"
-	     "a5e5e443" "17c1c2ee" "fd4ea5bf" "d16043f4" "3cb41981" "f6adee9d"
-	     "03159e7a" "d9d13c53" "369509fc" "1fa27c16" "ef988770" "3a55b51b"
-	     "22cbf44c" "d012aee0" "b2798e62" "8423428e" "fcd5a40c" "aef6bf50"
-	     "d8ea885e" "bf73a6b9" "fd79b5e1" "8f67d134" "1ac8237a" "75c3cfc9"
-	     "2004a1c5" "a40e366b" "c44d0017" "6af71c15" "e48c86d3" "7e013723"
-	     "caac7223" "ab3bf4d5" "4f182871" "3b2b4a6f" "e40fab74" "405cb738"
-	     "b064c06e" "cc76e9ef" "ffffffff" "ffffffff",
-	.g = "2"
-} };
-
 static int openssl_dh_set_param(struct buffer *P /* [in] */,
 			        struct buffer *Q /* [in] */,
 			        struct buffer *G /* [in] */,
 			        uint64_t safeprime /* [in] */,
-				DH *dh /* [out] */)
+				DH *dh /* [out] */,
+				size_t *keylen /* [out] */)
 {
 	BIGNUM *p = NULL, *q = NULL, *g = NULL;
 	int ret = 0, pqg_consumed = 0;
 
-	switch (safeprime) {
-	case ACVP_DH_MODP_2048:
-		CKINT_O0(BN_hex2bn(&p, safeprimes[0].p));
-		CKINT_O0(BN_hex2bn(&q, safeprimes[0].q));
-		CKINT_O0(BN_hex2bn(&g, safeprimes[0].g));
-		break;
-	case ACVP_DH_MODP_3072:
-		CKINT_O0(BN_hex2bn(&p, safeprimes[1].p));
-		CKINT_O0(BN_hex2bn(&q, safeprimes[1].q));
-		CKINT_O0(BN_hex2bn(&g, safeprimes[1].g));
-		break;
-	case ACVP_DH_MODP_4096:
-		CKINT_O0(BN_hex2bn(&p, safeprimes[2].p));
-		CKINT_O0(BN_hex2bn(&q, safeprimes[2].q));
-		CKINT_O0(BN_hex2bn(&g, safeprimes[2].g));
-		break;
-	case ACVP_DH_MODP_6144:
-		CKINT_O0(BN_hex2bn(&p, safeprimes[3].p));
-		CKINT_O0(BN_hex2bn(&q, safeprimes[3].q));
-		CKINT_O0(BN_hex2bn(&g, safeprimes[3].g));
-		break;
-	case ACVP_DH_MODP_8192:
-		CKINT_O0(BN_hex2bn(&p, safeprimes[4].p));
-		CKINT_O0(BN_hex2bn(&q, safeprimes[4].q));
-		CKINT_O0(BN_hex2bn(&g, safeprimes[4].g));
-		break;
-	default:
-		if (!p || !q || !g) {
+	/*
+	 * TODO change to
+	 * BIGNUM *BN_get_rfc3526_prime_2048(BIGNUM *bn);
+	 * BIGNUM *BN_get_rfc3526_prime_3072(BIGNUM *bn);
+	 * BIGNUM *BN_get_rfc3526_prime_4096(BIGNUM *bn);
+	 * BIGNUM *BN_get_rfc3526_prime_6144(BIGNUM *bn);
+	 * BIGNUM *BN_get_rfc3526_prime_8192(BIGNUM *bn);
+	 */
+	if (safeprime) {
+		struct safeprimes *p_safeprime;
+
+		CKINT(acvp_safeprime_get(safeprime, &p_safeprime));
+
+		CKINT_O0(BN_hex2bn(&p, p_safeprime->p));
+		CKINT_O0(BN_hex2bn(&q, p_safeprime->q));
+		CKINT_O0(BN_hex2bn(&g, p_safeprime->g));
+
+		if (keylen)
+			*keylen = p_safeprime->p_b.len;
+	} else {
+		if (!P || !Q || !G) {
 			logger(LOGGER_ERR, "Unknown PQG reference\n");
 			ret = -EINVAL;
 			goto out;
@@ -3470,6 +3463,8 @@ static int openssl_dh_set_param(struct buffer *P /* [in] */,
 
 		g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
 		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+		if (keylen)
+			*keylen = P->len;
 	}
 
 	CKINT_O_LOG(openssl_dh_set0_pqg(dh, p, q, g),
@@ -3565,7 +3560,7 @@ static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
 
-	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh));
+	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh, NULL));
 
 	CKINT_O_LOG(DH_generate_key(dh), "DSA_generate_key() failed\n");
 
@@ -3628,7 +3623,8 @@ static int openssl_dh_keyver(struct dsa_keyver_data *data,
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
 
-	CKINT(openssl_dh_set_param(NULL, NULL, NULL, data->pqg.safeprime, dh));
+	CKINT(openssl_dh_set_param(NULL, NULL, NULL, data->pqg.safeprime, dh,
+				   NULL));
 
 	y = BN_bin2bn((const unsigned char *) data->Y.buf, (int)data->Y.len, y);
 	CKNULL(y, -ENOMEM);
@@ -3992,8 +3988,38 @@ static int _openssl_ecdsa_curves(uint64_t curve, int *out_nid)
 	logger(LOGGER_DEBUG, "curve : %u\n", curve);
 
 	switch(curve & ACVP_CURVEMASK) {
+	case ACVP_NISTB163:
+		nid = NID_sect163r2;
+		break;
+	case ACVP_NISTK163:
+		nid = NID_sect163k1;
+		break;
+	case ACVP_NISTB233:
+		nid = NID_sect233r1;
+		break;
+	case ACVP_NISTK233:
+		nid = NID_sect233k1;
+		break;
+	case ACVP_NISTB283:
+		nid = NID_sect283r1;
+		break;
+	case ACVP_NISTK283:
+		nid = NID_sect283k1;
+		break;
+	case ACVP_NISTB409:
+		nid = NID_sect409r1;
+		break;
+	case ACVP_NISTK409:
+		nid = NID_sect409k1;
+		break;
+	case ACVP_NISTB571:
+		nid = NID_sect571r1;
+		break;
+	case ACVP_NISTK571:
+		nid = NID_sect571k1;
+		break;
 	case ACVP_NISTP192:
-		nid = NID_secp192k1;
+		nid = NID_X9_62_prime192v1;
 		break;
 	case ACVP_NISTP224:
 		nid = NID_secp224r1;
@@ -4554,15 +4580,29 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 			memcpy(hashzz->buf, &hashzz_tmp, hashzz->len);
 		}
 	} else {
-		hashzz->buf = ss->buf;
-		hashzz->len = ss->len;
+		if (hashzz->len) {
+			if (ss->len != hashzz->len) {
+				logger(LOGGER_ERR, "expected shared secret length is different from calculated shared secret\n");
+				ret = -ENOENT;
+				goto out;
+			}
+			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
+				      "expexted shared secret hash");
+			if (memcmp(hashzz->buf, ss->buf, hashzz->len))
+				ret = -ENOENT;
+			else
+				ret = 0;
+		} else {
+			hashzz->buf = ss->buf;
+			hashzz->len = ss->len;
 
-		/* ensure that free_buf does not free the buffer */
-		ss->buf = NULL;
-		ss->len = 0;
+			/* ensure that free_buf does not free the buffer */
+			ss->buf = NULL;
+			ss->len = 0;
 
-		logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-			      "Shared secret");
+			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
+				"Shared secret");
+		}
 	}
 
 out:
@@ -4573,6 +4613,7 @@ out:
 }
 
 static int openssl_dh_ss_common(uint64_t cipher,
+				uint64_t safeprime,
 				struct buffer *P,
 				struct buffer *Q,
 				struct buffer *G,
@@ -4582,36 +4623,18 @@ static int openssl_dh_ss_common(uint64_t cipher,
 				struct buffer *hashzz)
 {
 	DH *dh = NULL;
-	BIGNUM *p = NULL, *q = NULL, *g = NULL, *bn_Yrem = NULL,
-	       *bn_Xloc = NULL, *bn_Yloc = NULL;
+	BIGNUM *bn_Yrem = NULL, *bn_Xloc = NULL, *bn_Yloc = NULL;
 	const BIGNUM *cbn_Xloc = NULL, *cbn_Yloc = NULL;
 	BUFFER_INIT(ss);
-	unsigned int pqg_consumed = 0, localkey_consumed = 0;
+	unsigned int localkey_consumed = 0;
+	size_t keylen = 0;
 	int ret = 0;
 
 	/* Generate the parameters to be used */
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed");
 
-	logger_binary(LOGGER_DEBUG, P->buf, P->len, "P");
-	logger_binary(LOGGER_DEBUG, Q->buf, Q->len, "Q");
-	logger_binary(LOGGER_DEBUG, G->buf, G->len, "G");
-
-	p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
-	CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
-
-	q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
-	CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
-
-	g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
-	CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
-
-	if (1 != openssl_dh_set0_pqg(dh, p, q, g)) {
-		logger(LOGGER_WARN, "DH_set0_pqg failed\n");
-		ret = -EFAULT;
-		goto out;
-	}
-	pqg_consumed = 1;
+	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh, &keylen));
 
 	logger_binary(LOGGER_DEBUG, Yrem->buf, Yrem->len, "Yrem");
 	bn_Yrem = BN_bin2bn((const unsigned char *)Yrem->buf, (int)Yrem->len,
@@ -4637,7 +4660,7 @@ static int openssl_dh_ss_common(uint64_t cipher,
 		localkey_consumed = 1;
 	}
 
-	CKINT_LOG(alloc_buf(P->len, &ss), "Cannot allocate ss\n");
+	CKINT_LOG(alloc_buf(keylen, &ss), "Cannot allocate ss\n");
 
 	/* Compute the shared secret */
 	if (0 > DH_compute_key_padded(ss.buf, bn_Yrem, dh)) {
@@ -4659,12 +4682,6 @@ static int openssl_dh_ss_common(uint64_t cipher,
 out:
 	if (dh)
 		DH_free(dh);
-	if (!pqg_consumed && p)
-		BN_free(p);
-	if (!pqg_consumed && q)
-		BN_free(q);
-	if (!pqg_consumed && g)
-		BN_free(g);
 
 	if (bn_Yrem)
 		BN_free(bn_Yrem);
@@ -4683,7 +4700,8 @@ static int openssl_dh_ss(struct dh_ss_data *data, flags_t parsed_flags)
 {
 	(void)parsed_flags;
 
-	return openssl_dh_ss_common(data->cipher, &data->P, &data->Q, &data->G,
+	return openssl_dh_ss_common(data->cipher, data->safeprime,
+				    &data->P, &data->Q, &data->G,
 				    &data->Yrem,
 				    &data->Xloc, &data->Yloc,
 				    &data->hashzz);
@@ -4692,7 +4710,8 @@ static int openssl_dh_ss(struct dh_ss_data *data, flags_t parsed_flags)
 static int openssl_dh_ss_ver(struct dh_ss_ver_data *data,
 			       flags_t parsed_flags)
 {
-	int ret = openssl_dh_ss_common(data->cipher, &data->P, &data->Q,
+	int ret = openssl_dh_ss_common(data->cipher, data->safeprime,
+				       &data->P, &data->Q,
 				       &data->G,
 				       &data->Yrem,
 				       &data->Xloc, &data->Yloc,

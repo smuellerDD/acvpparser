@@ -47,4 +47,6 @@
 #include "parser_sha.h"
 #include "parser_sym.h"
 
+#include "safeprimes.h"
+
 #endif /* _BACKEND_COMMON_H */

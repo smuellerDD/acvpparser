@@ -131,6 +131,36 @@ void ecdsa_get_bufferlen(uint64_t curve, size_t *dlen,
 			 size_t *xlen, size_t *ylen)
 {
 	switch (curve & ACVP_CURVEMASK) {
+		case ACVP_NISTB163:
+		case ACVP_NISTK163:
+			*xlen = 163 / 8 + 1;
+			*dlen = *xlen;
+			*ylen = *xlen;
+			break;
+		case ACVP_NISTB233:
+		case ACVP_NISTK233:
+			*xlen = 233 / 8 + 1;
+			*dlen = *xlen;
+			*ylen = *xlen;
+			break;
+		case ACVP_NISTB283:
+		case ACVP_NISTK283:
+			*xlen = 283 / 8 + 1;
+			*dlen = *xlen;
+			*ylen = *xlen;
+			break;
+		case ACVP_NISTB409:
+		case ACVP_NISTK409:
+			*xlen = 409 / 8 + 1;
+			*dlen = *xlen;
+			*ylen = *xlen;
+			break;
+		case ACVP_NISTB571:
+		case ACVP_NISTK571:
+			*xlen = 571 / 8 + 1;
+			*dlen = *xlen;
+			*ylen = *xlen;
+			break;
 		case ACVP_NISTP192:
 			*xlen = 192 / 8;
 			*dlen = *xlen;

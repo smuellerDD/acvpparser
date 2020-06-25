@@ -99,7 +99,9 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"hashDRBG", ACVP_DRBGHASH},
 	{"hmacDRBG", ACVP_DRBGHMAC},
 
+	{"KAS-ECC-SSC", ACVP_KAS_ECC_R3_SSC},
 	{"KAS-ECC", ACVP_ECDH},
+	{"KAS-FFC-SSC", ACVP_KAS_FFC_R3_SSC},
 	{"KAS-FFC", ACVP_DH},
 	{"KAS-ED", ACVP_ECDH_ED},
 
@@ -119,10 +121,12 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"P-256", ACVP_NISTP256},
 	{"P-384", ACVP_NISTP384},
 	{"P-521", ACVP_NISTP521},
+	{"K-163", ACVP_NISTK163},
 	{"K-233", ACVP_NISTK233},
 	{"K-283", ACVP_NISTK283},
 	{"K-409", ACVP_NISTK409},
 	{"K-571", ACVP_NISTK571},
+	{"B-163", ACVP_NISTB163},
 	{"B-233", ACVP_NISTB233},
 	{"B-283", ACVP_NISTB283},
 	{"B-409", ACVP_NISTB409},
@@ -187,16 +191,37 @@ uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
 	return (cipher | p_res);
 }
 
-int convert_cipher_algo(uint64_t cipher, const char **algo)
+int convert_cipher_match(uint64_t cipher1, uint64_t cipher2,
+			 uint64_t cipher_type_mask)
+{
+	uint64_t typemask = cipher_type_mask | ACVP_CIPHERDEF;
+
+	return ((cipher1 & typemask) == (cipher2 & typemask));
+}
+
+int convert_cipher_contain(uint64_t cipher1, uint64_t cipher2,
+			   uint64_t cipher_type_mask)
+{
+	uint64_t typemask = cipher_type_mask ? cipher_type_mask :
+					       ACVP_CIPHERTYPE;
+
+	return ((cipher1 & typemask) & ((cipher2) & typemask) &&
+	        (cipher1 & ACVP_CIPHERDEF) & ((cipher2) & ACVP_CIPHERDEF));
+}
+
+int convert_cipher_algo(uint64_t cipher, uint64_t cipher_type_mask,
+			const char **algo)
 {
 	unsigned int i;
 	unsigned int found = 0;
+
 
 	if (!algo)
 		return -EINVAL;
 
 	for (i = 0; i < ARRAY_SIZE(conv); i++) {
-		if (cipher == conv[i].cipher) {
+		if (convert_cipher_match(cipher, conv[i].cipher,
+					 cipher_type_mask)) {
 			*algo = conv[i].algo;
 			found = 1;
 			break;

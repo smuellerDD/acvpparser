@@ -41,6 +41,8 @@ static int aead_gcm_helper(const struct json_array *processdata,
 
 	(void)testvector;
 
+	CKNULL_LOG(callback, -EINVAL, "GCM handler missing\n");
+
 	CKINT(callback(vector, parsed_flags));
 
 	/* Free the buffer that may be left by the backend. */

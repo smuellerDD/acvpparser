@@ -44,13 +44,12 @@ OPENSSL_REMOVE_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
 if [ $(uname -m) = "s390x" ]; then
 	EXEC="$EXEC
-	      SHA_ASM SHA3_ASM AESASM AESASM_ASM"
-	EXEC_DRBG10X="SHA_ASM"
+	      SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM"
 elif [ $(uname -m) = "aarch64" ]; then
 	EXEC="$EXEC
-	      SHA_ASM SHA3_ASM
-	      VPAES VPAES_GCM CE CE_GCM"
-	EXEC_DRBG10X="SHA_ASM"
+	      SHA_ASM SHA3_ASM SSH_ASM
+	      AES_C AES_C_GCM
+	      NEON VPAES VPAES_GCM CE CE_GCM SHA_CE SHA3_CE"
 
 	# Unlike for x86, OPENSSL_armcap_P is taken at face value
 	# define ARMV7_NEON      (1<<0)
@@ -61,15 +60,20 @@ elif [ $(uname -m) = "aarch64" ]; then
 	# define ARMV8_PMULL     (1<<5)
 	# define ARMV8_SHA512    (1<<6)
 	OPENSSL_REMOVE_TDES_C="OPENSSL_armcap_P=0"
+	OPENSSL_REMOVE_AES_C_GCM="OPENSSL_armcap_P=0"
+	OPENSSL_REMOVE_AES_C="OPENSSL_armcap_P=0"
+	OPENSSL_REMOVE_SHA_ASM="OPENSSL_armcap_P=0"
+	OPENSSL_REMOVE_SHA3_ASM="OPENSSL_armcap_P=0"
 
 	# Set the NEON bit
 	OPENSSL_REMOVE_VPAES="OPENSSL_armcap_P=1"
+	OPENSSL_REMOVE_SHA_NEON="OPENSSL_armcap_P=1"
 
 	# Set the CE bits
-	OPENSSL_REMOVE_CE="OPENSSL_armcap_P=78"
-	OPENSSL_REMOVE_CE_GCM="OPENSSL_armcap_P=78"
-	OPENSSL_REMOVE_SHA_ASM="OPENSSL_armcap_P=78"
-	OPENSSL_REMOVE_SHA3_ASM="OPENSSL_armcap_P=78"
+	OPENSSL_REMOVE_CE="OPENSSL_armcap_P=7D"
+	OPENSSL_REMOVE_CE_GCM="OPENSSL_armcap_P=7D"
+	OPENSSL_REMOVE_SHA_CE="OPENSSL_armcap_P=7D"
+	OPENSSL_REMOVE_SHA3_CE="OPENSSL_armcap_P=7D"
 else
 	EXEC="$EXEC
 	      AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM
@@ -77,7 +81,6 @@ else
               BAES_CTASM BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM
               SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM SHA3_AVX2 SHA3_ASM SHA3_AVX512
               SSH_AVX2 SSH_AVX SSH_SSSE3 SSH_ASM"
-	EXEC_DRBG10X="AESNI AESASM BAES_CTASM SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM"
 
 	OPENSSL_REMOVE_AVX_SHA=":~0xe0200020"						# remove bits #64+21/29/30/31 (SHA512), #64+5 (AVX2)
 	OPENSSL_REMOVE_AVX=":~0x20"							# remove bit #64+5 (AVX2)
@@ -150,13 +153,9 @@ do_test_drbg10x() {
 
 		eval "$BUILD_FLAGS build_tool ${TARGET}"
 
-		for exec in $EXEC_DRBG10X; do
-			eval CIPHER_CALL=\$CIPHER_CALL_$exec
+		local modulename="${MODULE_PREFIX}${type}DRBG_10X${MODULE_POSTFIX}"
 
-			local modulename="${MODULE_PREFIX}${type}DRBG_10X_${exec}${MODULE_POSTFIX}"
-
-			eval "$CIPHER_CALL exec_module ${modulename}"
-		done
+		eval "exec_module ${modulename}"
 
 		clean_tool
 	done

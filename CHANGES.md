@@ -1,3 +1,13 @@
+v1.0.0
+- reorganization of cipher flags - for matching ciphers, you MUST use convert_cipher_match or convert_cipher_contains, respectively. See cipher_definitions.h for details
+- move safeprimes to parser/safeprime.h which is automatically included to backends with backend_common.h
+- addition of KAS_FFC_SSC parser
+- addition of KAS_ECC_SSC parser
+- OpenSSL: addition of KAS_FFC_SSC testing
+- OpenSSL: addition of KAS_ECC_SSC testing
+- enhancement: The parser can hand off the AES MCT inner loop to the backend. For that, the inner_loop_final_cj1 buffer is added to struct sym_data allowing the backend to decide whether it handles the inner loop of the MCT - an example how to extract the MCT inner loop is given with function openssl_mct_update_inner_loop
+- enhancement: add RFC7919 primes
+
 v0.8.0
 - add DH safeprime keygen test support
 - API change, enhancement: add DH safeprime keyver test support - struct dsa_backend now contains a dsa_keyver entry that must be filled in

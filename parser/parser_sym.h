@@ -45,6 +45,15 @@
  * @var xts_sequence_no [in] If XTS sequence number is requested, it is
  *			       stored in this variable. In this case, the IV
  *			       is NULL.
+ * @var inner_loop_final_cj1[out] This value is optional and contains the final
+ * 				  C[j-1] cipher text from the inner loop for
+ *				  AES. If this value is set the inner loop of
+ *				  the MCT testing implemented in the parser is
+ *				  skipped and only the outer loop is performed.
+ *				  If the backend does not implement the inner
+ *				  loop (which is assumed to be the default),
+ *				  this buffer should not be touched by the
+ *				  backend.
  * @var priv [storage] This pointer allows the backend to store private data
  *			 like a pointer to a cipher handle allocated during
  *			 the init call and used during update or fini calls.
@@ -60,6 +69,7 @@ struct sym_data {
 	struct buffer data;
 	uint32_t data_len_bits;
 	uint32_t xts_sequence_no;
+	struct buffer inner_loop_final_cj1;
 	void *priv;
 };
 

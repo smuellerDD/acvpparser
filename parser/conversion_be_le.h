@@ -19,17 +19,48 @@
 
 #include <stdint.h>
 
+#ifndef _CONVERSION_BE_LE_H
+#define _CONVERSION_BE_LE_H
+
+#undef TEST
+
+#define GCC_VERSION (__GNUC__ * 10000		\
+		     + __GNUC_MINOR__ * 100	\
+		     + __GNUC_PATCHLEVEL__)
+#if !defined(TEST) && (GCC_VERSION >= 40400 || defined(__clang__))
+# define __HAVE_BUILTIN_BSWAP16__
+# define __HAVE_BUILTIN_BSWAP32__
+# define __HAVE_BUILTIN_BSWAP64__
+#endif
+
 /****************
  * Rotate the 32 bit unsigned integer X by N bits left/right
  */
+/* Byte swap for 16-bit, 32-bit and 64-bit integers. */
+#ifndef __HAVE_BUILTIN_BSWAP16__
+static inline uint16_t rol16(uint16_t x, int n)
+{
+	return ( (x << (n&(16-1))) | (x >> ((16-n)&(16-1))) );
+}
+
+static inline uint16_t ror16(uint16_t x, int n)
+{
+	return ( (x >> (n&(16-1))) | (x << ((16-n)&(16-1))) );
+}
+
+static inline uint16_t _bswap16(uint16_t x)
+{
+	return ((rol16(x, 8) & 0x00ff) | (ror16(x, 8) & 0xff00));
+}
+# define _swap16(x) _bswap16(x)
+#else
+# define _swap16(x) (uint16_t)__builtin_bswap16((uint16_t)(x))
+#endif
+
+#if !defined(__HAVE_BUILTIN_BSWAP32__) || !defined(__HAVE_BUILTIN_BSWAP64__)
 static inline uint32_t rol(uint32_t x, int n)
 {
 	return ( (x << (n&(32-1))) | (x >> ((32-n)&(32-1))) );
-}
-
-static inline uint16_t rol16(uint16_t x, int n)
-{
-	return (uint16_t)( (x << (n&(16-1))) | (x >> ((16-n)&(16-1))) );
 }
 
 static inline uint32_t ror(uint32_t x, int n)
@@ -37,53 +68,23 @@ static inline uint32_t ror(uint32_t x, int n)
 	return ( (x >> (n&(32-1))) | (x << ((32-n)&(32-1))) );
 }
 
-static inline uint16_t ror16(uint16_t x, int n)
-{
-	return (uint16_t)( (x >> (n&(16-1))) | (x << ((16-n)&(16-1))) );
-}
-
-/* Byte swap for 16-bit, 32-bit and 64-bit integers. */
-static inline uint16_t _bswap16(uint16_t x)
-{
-	return (uint16_t)((rol16(x, 8) & 0x00ff) | (ror16(x, 8) & 0xff00));
-}
-
 static inline uint32_t _bswap32(uint32_t x)
 {
-	return (uint32_t)((rol(x, 8) & 0x00ff00ffL) | (ror(x, 8) & 0xff00ff00L));
+	return ((rol(x, 8) & 0x00ff00ffL) | (ror(x, 8) & 0xff00ff00L));
 }
+# define _swap32(x) _bswap32(x)
+#else
+# define _swap32(x) (uint32_t)__builtin_bswap32((uint32_t)(x))
+#endif
 
+#ifndef __HAVE_BUILTIN_BSWAP64__
 static inline uint64_t _bswap64(uint64_t x)
 {
-	return ((uint64_t)_bswap32((uint32_t)x) << 32) |
-		((uint64_t)_bswap32((uint32_t)x) >> 32);
+	return ((uint64_t)_bswap32(x) << 32) | (_bswap32(x >> 32));
 }
-
-#define GCC_VERSION (__GNUC__ * 10000		\
-		     + __GNUC_MINOR__ * 100	\
-		     + __GNUC_PATCHLEVEL__)
-#if GCC_VERSION >= 40400
-# define __HAVE_BUILTIN_BSWAP16__
-# define __HAVE_BUILTIN_BSWAP32__
-# define __HAVE_BUILTIN_BSWAP64__
-#endif
-
-#ifdef __HAVE_BUILTIN_BSWAP16__
-# define _swap16(x) (uint16_t)__builtin_bswap16((uint16_t)(x))
-#else
-# define _swap16(x) _bswap16(x)
-#endif
-
-#ifdef __HAVE_BUILTIN_BSWAP32__
-# define _swap32(x) (uint32_t)__builtin_bswap32((uint32_t)(x))
-#else
-# define _swap32(x) _bswap32(x)
-#endif
-
-#ifdef __HAVE_BUILTIN_BSWAP64__
-# define _swap64(x) (uint64_t)__builtin_bswap64((uint64_t)(x))
-#else
 # define _swap64(x) _bswap64(x)
+#else
+# define _swap64(x) (uint64_t)__builtin_bswap64((uint64_t)(x))
 #endif
 
 /* Endian dependent byte swap operations.  */
@@ -106,7 +107,7 @@ static inline uint64_t _bswap64(uint64_t x)
 # error "Endianess not defined"
 #endif
 
-#if 0
+#ifdef TEST
 #include <stdio.h>
 void compiler_test_le(void)
 {
@@ -170,3 +171,4 @@ int main(void)
 }
 #endif
 
+#endif /* _CONVERSION_BE_LE_H */

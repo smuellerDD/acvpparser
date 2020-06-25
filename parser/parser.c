@@ -80,7 +80,8 @@ static int test_algo(struct json_object *in, struct json_object *out,
 		curr_tester != NULL;
 		curr_tester = curr_tester->next) {
 		if ((curr_tester->testid && (cipher == curr_tester->testid)) ||
-		    (curr_tester->mask && (cipher & curr_tester->mask))) {
+		    (curr_tester->mask && (convert_cipher_contain(cipher,
+						curr_tester->mask, 0)))) {
 			logger(LOGGER_DEBUG, "Found test executor for %s\n",
 			       algo);
 			return curr_tester->process_req(in, out, cipher);

@@ -30,7 +30,12 @@ extern "C"
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher);
-int convert_cipher_algo(uint64_t cipher, const char **algo);
+int convert_cipher_algo(uint64_t cipher, uint64_t cipher_type_mask,
+			const char **algo);
+int convert_cipher_match(uint64_t cipher1, uint64_t cipher2,
+			 uint64_t cipher_type_mask);
+int convert_cipher_contain(uint64_t cipher1, uint64_t cipher2,
+			   uint64_t cipher_type_mask);
 
 #ifdef __cplusplus
 }
