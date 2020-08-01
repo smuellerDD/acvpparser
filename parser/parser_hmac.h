@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief Keyed message digest (HMAC / CMAC) cipher data structure holding
  *	  the data for the cipher operations specified in hmac_backend
@@ -63,5 +68,9 @@ struct hmac_backend {
 };
 
 void register_hmac_impl(struct hmac_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_HMAC_H */

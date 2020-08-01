@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief ECDSA key generation data structure holding the data for the cipher
  *	  operations specified in ecdsa_keygen. This test is used
@@ -215,5 +220,9 @@ void ecdsa_get_bufferlen(uint64_t curve, size_t *dlen,
 			 size_t *xlen, size_t *ylen);
 
 void register_ecdsa_impl(struct ecdsa_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_ECDSA_H */

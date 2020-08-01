@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief DH shashed shared secret generation
  *
@@ -102,5 +107,9 @@ struct dh_backend {
 };
 
 void register_dh_impl(struct dh_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_DH_H */

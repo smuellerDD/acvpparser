@@ -94,10 +94,9 @@ static void openssl_backend_init(void)
 #endif
 
 /*
- * Enable this option to compile the code for the RHEL 7 OpenSSL 1.0.x
- * FIPS code base.
+ * Compile the code for OpenSSL 1.0.x
  */
-#ifndef OPENSSL_10X_RHEL
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 # undef OPENSSL_10X_RHEL
 #endif
 
@@ -376,7 +375,7 @@ static int openssl_cipher(uint64_t cipher, size_t keylen,
 
 	CKINT(convert_cipher_algo(cipher, mask, &algo));
 
-	logger(LOGGER_DEBUG, "Key size = %u\n", keylen);
+	logger(LOGGER_DEBUG, "Key size = %zu\n", keylen);
 	logger(LOGGER_DEBUG, "Cipher = %s\n", algo);
 
 
@@ -536,7 +535,7 @@ static size_t openssl_entropy(RAND_DRBG *dctx, unsigned char **pout,
 # define DRBG_generate(a, b, c, d, e, f) FIPS_drbg_generate(a, b, c, d, e, f)
 # define DRBG_uninstantiate(a)		FIPS_drbg_uninstantiate(a)
 # define DRBG_DF_FLAG			(DRBG_FLAG_CTR_USE_DF | DRBG_FLAG_TEST)
-# define DRBG_NO_DF_FLAG		0
+# define DRBG_NO_DF_FLAG		(0 | DRBG_FLAG_TEST)
 
 static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
 			      int entropy, size_t min_len, size_t max_len)
@@ -688,7 +687,7 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	logger(LOGGER_DEBUG, "L = %u\n", L);
 	logger(LOGGER_DEBUG, "N = %u\n", N);
 
-	logger(LOGGER_DEBUG, "hash = %lu\n", cipher);
+	logger(LOGGER_DEBUG, "hash = %" PRIu64 "\n", cipher);
 	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
 
 	if (firstseed) {
@@ -1078,7 +1077,7 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	logger(LOGGER_DEBUG, "L = %u\n", L);
 	logger(LOGGER_DEBUG, "N = %u\n", N);
 
-	logger(LOGGER_DEBUG, "hash = %lu\n", cipher);
+	logger(LOGGER_DEBUG, "hash = %" PRIu64 "\n", cipher);
 	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
 
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, L, N, md, NULL, 0,
@@ -1149,7 +1148,7 @@ static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
 		    "DSA_set0_pqg failed\n");
 	pqg_consumed = 1;
 
-	logger(LOGGER_DEBUG, "hash = %lu\n", data->cipher);
+	logger(LOGGER_DEBUG, "hash = %" PRIu64 "\n", data->cipher);
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
@@ -1232,7 +1231,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 				 	 seed, &counter, &h, NULL);
 	if (ret < 0) {
 		ret = -EFAULT;
-		logger(LOGGER_ERR, "FIPS_dsa_builtin_paramgen2() failed %s\n");
+		logger(LOGGER_ERR, "FIPS_dsa_builtin_paramgen2() failed\n");
 		goto out;
 	} else if (ret == 0) {
 		ret = 1;
@@ -1416,7 +1415,7 @@ static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
 	    data->data_len_bits) {
 		if (data->data_len_bits > (data->data.len << 3)) {
 			logger(LOGGER_ERR,
-			       "Data length bits (%u bits) is larger than provided data (%u bytes)\n",
+			       "Data length bits (%u bits) is larger than provided data (%zu bytes)\n",
 			       data->data_len_bits, data->data.len);
 			return -EINVAL;
 		}
@@ -1717,7 +1716,7 @@ static int openssl_hmac_generate(struct hmac_data *data)
 
 	taglen = (unsigned int)data->mac.len;
 
-	logger(LOGGER_DEBUG, "taglen = %u\n", data->mac.len);
+	logger(LOGGER_DEBUG, "taglen = %zu\n", data->mac.len);
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
@@ -1877,7 +1876,7 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 	if (data->iv.len) {
 		CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
 						(int)data->iv.len, NULL),
-			    "EVP_CIPHER_CTX_ctrl() failed to set the IV length %u\n",
+			    "EVP_CIPHER_CTX_ctrl() failed to set the IV length %zu\n",
 			    data->iv.len);
 	} else {
 		if (ivlen < 4) {
@@ -1887,7 +1886,7 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		}
 		CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
 						(int)ivlen, NULL),
-			    "EVP_CIPHER_CTX_ctrl() failed to set the IV length %u\n",
+			    "EVP_CIPHER_CTX_ctrl() failed to set the IV length %zu\n",
 			    data->iv.len);
 
 		/*
@@ -1970,7 +1969,7 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 	/* Get the tag */
 	CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG,
 					(int)data->tag.len, data->tag.buf),
-		    "EVP_CIPHER_CTX_ctrl() failed with tag length %u\n",
+		    "EVP_CIPHER_CTX_ctrl() failed with tag length %zu\n",
 		    data->tag.len);
 
 	logger_binary(LOGGER_DEBUG, data->tag.buf, data->tag.len, "tag");
@@ -2131,7 +2130,7 @@ static int openssl_ccm_encrypt(struct aead_data *data, flags_t parsed_flags)
 	/* Get the tag */
 	if (0 == EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_CCM_GET_TAG,
 				     (int)data->tag.len, data->tag.buf)) {
-		logger(LOGGER_WARN, "EVP_CIPHER_CTX_ctrl failed (len: %u)\n",
+		logger(LOGGER_WARN, "EVP_CIPHER_CTX_ctrl failed (len: %zu)\n",
 		       data->tag.len);
 		ret = -EFAULT;
 		goto out;
@@ -2174,7 +2173,7 @@ static int openssl_ccm_decrypt(struct aead_data *data, flags_t parsed_flags)
 
 	CKINT_O_LOG(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_CCM_SET_TAG,
 					(int)data->tag.len, data->tag.buf),
-		    "EVP_CTRL_CCM_SET_TAG failed (%u)\n", data->tag.len);
+		    "EVP_CTRL_CCM_SET_TAG failed (%zu)\n", data->tag.len);
 
 	CKINT_O_LOG(EVP_CipherInit_ex(ctx, NULL, NULL, data->key.buf,
 				       data->iv.buf, 0),
@@ -2251,7 +2250,7 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
-	logger(LOGGER_DEBUG, "cipher: %lu\n", data->cipher);
+	logger(LOGGER_DEBUG, "cipher: %" PRIu64 "\n", data->cipher);
 
 	if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA1) {
 		nid = ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
@@ -2723,7 +2722,7 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 	int ret = 0;
 	(void)parsed_flags;
 
-	logger(LOGGER_VERBOSE, "data->kdfmode = %lx\n", data->kdfmode);
+	logger(LOGGER_VERBOSE, "data->kdfmode = %" PRIu64 "\n", data->kdfmode);
 	if (!(data->kdfmode & ACVP_CIPHERTYPE_KDF)) {
 		logger(LOGGER_ERR, "The cipher type isn't a KDF");
 		ret = -EINVAL;
@@ -2748,7 +2747,7 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 				 EVP_KDF_KB_MODE_FEEDBACK),
 		    "EVP_KDF_ctrl failed to set KB_MODE");
 
-	logger(LOGGER_VERBOSE, "data->mac = %lx\n", data->mac);
+	logger(LOGGER_VERBOSE, "data->mac = %" PRIu64 "\n", data->mac);
 	if (data->mac & ACVP_CIPHERTYPE_HMAC) {
 		CKINT(openssl_md_convert(data->mac, &md));
 		CKNULL(md, -ENOMEM);
@@ -3374,7 +3373,7 @@ static int openssl_dsa_pqg(struct dsa_pqg_data *data, flags_t parsed_flags)
 		return openssl_dsa_pqg_ver(data, parsed_flags);
 	else {
 		logger(LOGGER_WARN,
-		       "Unknown DSA PQG generation / verification definition (parsed flags: %lu)\n",
+		       "Unknown DSA PQG generation / verification definition (parsed flags: %" PRIu64 ")\n",
 		       parsed_flags);
 		return -EINVAL;
 	}
@@ -3747,7 +3746,7 @@ static int openssl_dsa_sigver(struct dsa_sigver_data *data,
 	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 
-	logger(LOGGER_DEBUG, "cipher = %lu\n", data->cipher);
+	logger(LOGGER_DEBUG, "cipher = %" PRIu64 "\n", data->cipher);
 
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 
@@ -3863,7 +3862,7 @@ static int openssl_dsa_siggen(struct dsa_siggen_data *data,
 
 	dsa = data->privkey;
 
-	logger(LOGGER_DEBUG, "cipher = %lu\n", data->cipher);
+	logger(LOGGER_DEBUG, "cipher = %" PRIu64 "\n", data->cipher);
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 
 	//logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
@@ -3985,7 +3984,7 @@ static int _openssl_ecdsa_curves(uint64_t curve, int *out_nid)
 {
 	int nid;
 
-	logger(LOGGER_DEBUG, "curve : %u\n", curve);
+	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
 
 	switch(curve & ACVP_CURVEMASK) {
 	case ACVP_NISTB163:
@@ -4552,7 +4551,7 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 			CKINT_LOG(alloc_buf((size_t)EVP_MD_size(md), hashzz),
 				  "Cannot allocate hashzz buffer\n");
 			logger(LOGGER_DEBUG,
-			       "Hash buffer of size %u allocated\n",
+			       "Hash buffer of size %zu allocated\n",
 			       hashzz->len);
 		}
 
@@ -5024,7 +5023,6 @@ out:
 	return ret;
 }
 
-
 static struct pbkdf_backend openssl_pbkdf =
 {
 	openssl_pbkdf_generate,
@@ -5034,4 +5032,68 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_pbkdf_backend)
 static void openssl_pbkdf_backend(void)
 {
 	register_pbkdf_impl(&openssl_pbkdf);
+}
+
+/************************************************
+ * SP800-56B rev 2 KTS IFC cipher interface functions
+ ************************************************/
+static int openssl_kts_ifc_generate(struct kts_ifc_data *data,
+				    flags_t parsed_flags)
+{
+	int ret;
+
+	(void)parsed_flags;
+
+	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+	    (parsed_flags & FLAG_OP_AFT)) {
+		struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
+
+		CKINT(alloc_buf(4, &init->iut_c));
+		CKINT(alloc_buf(4, &init->dkm));
+		CKINT(alloc_buf(4, &init->tag));
+
+		memcpy(init->iut_c.buf, "\x01\x01\x01\x01", init->iut_c.len);
+		memcpy(init->dkm.buf, "\x02\x02\x02\x02", init->dkm.len);
+		memcpy(init->tag.buf, "\x03\x03\x03\x03", init->tag.len);
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_AFT)) {
+		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
+
+		CKINT(alloc_buf(4, &resp->dkm));
+		CKINT(alloc_buf(4, &resp->tag));
+
+		memcpy(resp->dkm.buf, "\x04\x04\x04\x04", resp->dkm.len);
+		memcpy(resp->tag.buf, "\x05\x05\x05\x05", resp->tag.len);
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		struct kts_ifc_init_validation_data *init_val =
+					&data->u.kts_ifc_init_validation;
+
+		init_val->validation_success = 0;
+		ret = 0;
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		struct kts_ifc_resp_validation_data *resp_val =
+					&data->u.kts_ifc_resp_validation;
+
+		resp_val->validation_success = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_ERR, "Unknown test\n");
+		ret = -EINVAL;
+	}
+
+out:
+	return ret;
+}
+
+static struct kts_ifc_backend openssl_kts_ifc =
+{
+	openssl_kts_ifc_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_kts_ifc_backend)
+static void openssl_kts_ifc_backend(void)
+{
+	register_kts_ifc_impl(&openssl_kts_ifc);
 }

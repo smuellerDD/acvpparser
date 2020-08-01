@@ -26,6 +26,11 @@
 #include "parser.h"
 #include "ret_checkers.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 char* get_val(char *str, const char *delim);
 int get_intval(char *str, const char *delim, uint32_t *val);
 int get_hexval(char *str, const char *delim, uint32_t *val);
@@ -35,5 +40,9 @@ int alloc_buf(size_t size, struct buffer *buf);
 void copy_ptr_buf(struct buffer *dst, struct buffer *src);
 int left_pad_buf(struct buffer *buf, size_t required_len);
 int mpi_remove_pad(struct buffer *buf, size_t required_len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _STRINGHELPER_H */

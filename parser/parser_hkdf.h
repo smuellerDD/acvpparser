@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief RFC5869 KDF data structure
  *
@@ -56,5 +61,9 @@ struct hkdf_backend {
 };
 
 void register_hkdf_impl(struct hkdf_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_HKDF_H */

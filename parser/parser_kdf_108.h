@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief SP800-108 KDF data structure
  *
@@ -72,5 +77,9 @@ struct kdf_108_backend {
 };
 
 void register_kdf_108_impl(struct kdf_108_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_KDF_108_H */

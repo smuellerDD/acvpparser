@@ -31,18 +31,19 @@ extern "C"
 #endif
 
 struct safeprimes {
-	char *g;
-	char *q;
 	char *p;
-	struct buffer g_b;
-	struct buffer q_b;
+	char *q;
+	char *g;
 	struct buffer p_b;
+	struct buffer q_b;
+	struct buffer g_b;
 };
 
 /* q = (p - 1) / 2 */
 static struct safeprimes safeprimes[] = { {
 	/* rfc3526 group 14 "2048-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
 	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
 	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
 	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
@@ -53,7 +54,8 @@ static struct safeprimes safeprimes[] = { {
 	     "E39E772C" "180E8603" "9B2783A2" "EC07A28F" "B5C55DF0" "6F4C52C9"
 	     "DE2BCBF6" "95581718" "3995497C" "EA956AE5" "15D22618" "98FA0510"
 	     "15728E5A" "8AACAA68" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	.q = (char *)
+	     "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
 	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
 	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
 	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
@@ -64,13 +66,14 @@ static struct safeprimes safeprimes[] = { {
 	     "f1cf3b96" "0c074301" "cd93c1d1" "7603d147" "dae2aef8" "37a62964"
 	     "ef15e5fb" "4aac0b8c" "1ccaa4be" "754ab572" "8ae9130c" "4c7d0288"
 	     "0ab9472d" "45565534" "7fffffff" "ffffffff",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 }, {
 	/* rfc3526 group 15 "3072-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
 	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
 	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
 	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
@@ -86,7 +89,8 @@ static struct safeprimes safeprimes[] = { {
 	     "F12FFA06" "D98A0864" "D8760273" "3EC86A64" "521F2B18" "177B200C"
 	     "BBE11757" "7A615D6C" "770988C0" "BAD946E2" "08E24FA0" "74E5AB31"
 	     "43DB5BFC" "E0FD108E" "4B82D120" "A93AD2CA" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	.q = (char *)
+	     "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
 	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
 	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
 	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
@@ -102,13 +106,14 @@ static struct safeprimes safeprimes[] = { {
 	     "f897fd03" "6cc50432" "6c3b0139" "9f643532" "290f958c" "0bbd9006"
 	     "5df08bab" "bd30aeb6" "3b84c460" "5d6ca371" "047127d0" "3a72d598"
 	     "a1edadfe" "707e8847" "25c16890" "549d6965" "7fffffff" "ffffffff",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 }, {
 	/* rfc3526 group 16 "4096-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
 	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
 	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
 	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
@@ -130,7 +135,8 @@ static struct safeprimes safeprimes[] = { {
 	     "1F612970" "CEE2D7AF" "B81BDD76" "2170481C" "D0069127" "D5B05AA9"
 	     "93B4EA98" "8D8FDDC1" "86FFB7DC" "90A6C08F" "4DF435C9" "34063199"
 	     "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	.q = (char *)
+	     "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
 	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
 	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
 	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
@@ -152,13 +158,14 @@ static struct safeprimes safeprimes[] = { {
 	     "8fb094b8" "67716bd7" "dc0deebb" "10b8240e" "68034893" "ead82d54"
 	     "c9da754c" "46c7eee0" "c37fdbee" "48536047" "a6fa1ae4" "9a0318cc"
 	     "ffffffff" "ffffffff",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 }, {
 	/* rfc3526 group 17 "6144-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
 	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
 	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
 	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
@@ -190,7 +197,8 @@ static struct safeprimes safeprimes[] = { {
 	     "06A1D58B" "B7C5DA76" "F550AA3D" "8A1FBFF0" "EB19CCB1" "A313D55C"
 	     "DA56C9EC" "2EF29632" "387FE8D7" "6E3C0468" "043E8F66" "3F4860EE"
 	     "12BF2D5B" "0B7474D6" "E694F91E" "6DCC4024" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	.q = (char *)
+	     "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
 	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
 	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
 	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
@@ -222,13 +230,14 @@ static struct safeprimes safeprimes[] = { {
 	     "0350eac5" "dbe2ed3b" "7aa8551e" "c50fdff8" "758ce658" "d189eaae"
 	     "6d2b64f6" "17794b19" "1c3ff46b" "b71e0234" "021f47b3" "1fa43077"
 	     "095f96ad" "85ba3a6b" "734a7c8f" "36e62012" "7fffffff" "ffffffff",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 }, {
 	/* rfc3526 group 18 "8192-bit MODP Group" */
-	.p = "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "C90FDAA2" "2168C234" "C4C6628B" "80DC1CD1"
 	     "29024E08" "8A67CC74" "020BBEA6" "3B139B22" "514A0879" "8E3404DD"
 	     "EF9519B3" "CD3A431B" "302B0A6D" "F25F1437" "4FE1356D" "6D51C245"
 	     "E485B576" "625E7EC6" "F44C42E9" "A637ED6B" "0BFF5CB6" "F406B7ED"
@@ -271,7 +280,8 @@ static struct safeprimes safeprimes[] = { {
 	     "4009438B" "481C6CD7" "889A002E" "D5EE382B" "C9190DA6" "FC026E47"
 	     "9558E447" "5677E9AA" "9E3050E2" "765694DF" "C81F56E8" "80B96E71"
 	     "60C980DD" "98EDD3DF" "FFFFFFFF" "FFFFFFFF",
-	.q = "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
+	.q = (char *)
+	     "7fffffff" "ffffffff" "e487ed51" "10b4611a" "62633145" "c06e0e68"
 	     "94812704" "4533e63a" "0105df53" "1d89cd91" "28a5043c" "c71a026e"
 	     "f7ca8cd9" "e69d218d" "98158536" "f92f8a1b" "a7f09ab6" "b6a8e122"
 	     "f242dabb" "312f3f63" "7a262174" "d31bf6b5" "85ffae5b" "7a035bf6"
@@ -314,14 +324,15 @@ static struct safeprimes safeprimes[] = { {
 	     "2004a1c5" "a40e366b" "c44d0017" "6af71c15" "e48c86d3" "7e013723"
 	     "caac7223" "ab3bf4d5" "4f182871" "3b2b4a6f" "e40fab74" "405cb738"
 	     "b064c06e" "cc76e9ef" "ffffffff" "ffffffff",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 
 }, {
 	/* rfc71919 ffdhe2048 */
-	.p = "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
 	     "D8B9C583" "CE2D3695" "A9E13641" "146433FB" "CC939DCE" "249B3EF9"
 	     "7D2FE363" "630C75D8" "F681B202" "AEC4617A" "D3DF1ED5" "D5FD6561"
 	     "2433F51F" "5F066ED0" "85636555" "3DED1AF3" "B557135E" "7F57C935"
@@ -332,7 +343,8 @@ static struct safeprimes safeprimes[] = { {
 	     "9172FE9C" "E98583FF" "8E4F1232" "EEF28183" "C3FE3B1B" "4C6FAD73"
 	     "3BB5FCBC" "2EC22005" "C58EF183" "7D1683B2" "C6F34A26" "C1B2EFFA"
 	     "886B4238" "61285C97" "FFFFFFFF" "FFFFFFFF",
-	.q = "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
+	.q = (char *)
+	     "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
 	     "EC5CE2C1" "E7169B4A" "D4F09B20" "8A3219FD" "E649CEE7" "124D9F7C"
 	     "BE97F1B1" "B1863AEC" "7B40D901" "576230BD" "69EF8F6A" "EAFEB2B0"
 	     "9219FA8F" "AF833768" "42B1B2AA" "9EF68D79" "DAAB89AF" "3FABE49A"
@@ -343,14 +355,15 @@ static struct safeprimes safeprimes[] = { {
 	     "C8B97F4E" "74C2C1FF" "C7278919" "777940C1" "E1FF1D8D" "A637D6B9"
 	     "9DDAFE5E" "17611002" "E2C778C1" "BE8B41D9" "6379A513" "60D977FD"
 	     "4435A11C" "30942E4B" "FFFFFFFF" "FFFFFFFF",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 
 }, {
 	/* rfc71919 ffdhe3072 */
-	.p = "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
 	     "D8B9C583" "CE2D3695" "A9E13641" "146433FB" "CC939DCE" "249B3EF9"
 	     "7D2FE363" "630C75D8" "F681B202" "AEC4617A" "D3DF1ED5" "D5FD6561"
 	     "2433F51F" "5F066ED0" "85636555" "3DED1AF3" "B557135E" "7F57C935"
@@ -366,7 +379,8 @@ static struct safeprimes safeprimes[] = { {
 	     "64F2E21E" "71F54BFF" "5CAE82AB" "9C9DF69E" "E86D2BC5" "22363A0D"
 	     "ABC52197" "9B0DEADA" "1DBF9A42" "D5C4484E" "0ABCD06B" "FA53DDEF"
 	     "3C1B20EE" "3FD59D7C" "25E41D2B" "66C62E37" "FFFFFFFF" "FFFFFFFF",
-	.q = "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
+	.q = (char *)
+	     "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
 	     "EC5CE2C1" "E7169B4A" "D4F09B20" "8A3219FD" "E649CEE7" "124D9F7C"
 	     "BE97F1B1" "B1863AEC" "7B40D901" "576230BD" "69EF8F6A" "EAFEB2B0"
 	     "9219FA8F" "AF833768" "42B1B2AA" "9EF68D79" "DAAB89AF" "3FABE49A"
@@ -382,14 +396,15 @@ static struct safeprimes safeprimes[] = { {
 	     "B279710F" "38FAA5FF" "AE574155" "CE4EFB4F" "743695E2" "911B1D06"
 	     "D5E290CB" "CD86F56D" "0EDFCD21" "6AE22427" "055E6835" "FD29EEF7"
 	     "9E0D9077" "1FEACEBE" "12F20E95" "B363171B" "FFFFFFFF" "FFFFFFFF",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 
 }, {
 	/* rfc71919 ffdhe4096 */
-	.p = "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
 	     "D8B9C583" "CE2D3695" "A9E13641" "146433FB" "CC939DCE" "249B3EF9"
 	     "7D2FE363" "630C75D8" "F681B202" "AEC4617A" "D3DF1ED5" "D5FD6561"
 	     "2433F51F" "5F066ED0" "85636555" "3DED1AF3" "B557135E" "7F57C935"
@@ -411,7 +426,8 @@ static struct safeprimes safeprimes[] = { {
 	     "1A1DB93D" "7140003C" "2A4ECEA9" "F98D0ACC" "0A8291CD" "CEC97DCF"
 	     "8EC9B55A" "7F88A46B" "4DB5A851" "F44182E1" "C68A007E" "5E655F6A"
 	     "FFFFFFFF" "FFFFFFFF",
-	.q = "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
+	.q = (char *)
+	     "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
 	     "EC5CE2C1" "E7169B4A" "D4F09B20" "8A3219FD" "E649CEE7" "124D9F7C"
 	     "BE97F1B1" "B1863AEC" "7B40D901" "576230BD" "69EF8F6A" "EAFEB2B0"
 	     "9219FA8F" "AF833768" "42B1B2AA" "9EF68D79" "DAAB89AF" "3FABE49A"
@@ -433,14 +449,15 @@ static struct safeprimes safeprimes[] = { {
 	     "0D0EDC9E" "B8A0001E" "15276754" "FCC68566" "054148E6" "E764BEE7"
 	     "C764DAAD" "3FC45235" "A6DAD428" "FA20C170" "E345003F" "2F32AFB5"
 	     "7FFFFFFF" "FFFFFFFF",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 
 }, {
 	/* rfc71919 ffdhe6144 */
-	.p = "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
 	     "D8B9C583" "CE2D3695" "A9E13641" "146433FB" "CC939DCE" "249B3EF9"
 	     "7D2FE363" "630C75D8" "F681B202" "AEC4617A" "D3DF1ED5" "D5FD6561"
 	     "2433F51F" "5F066ED0" "85636555" "3DED1AF3" "B557135E" "7F57C935"
@@ -472,7 +489,8 @@ static struct safeprimes safeprimes[] = { {
 	     "E49F5235" "C95B9117" "8CCF2DD5" "CACEF403" "EC9D1810" "C6272B04"
 	     "5B3B71F9" "DC6B80D6" "3FDD4A8E" "9ADB1E69" "62A69526" "D43161C1"
 	     "A41D570D" "7938DAD4" "A40E329C" "D0E40E65" "FFFFFFFF" "FFFFFFFF",
-	.q = "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
+	.q = (char *)
+	     "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
 	     "EC5CE2C1" "E7169B4A" "D4F09B20" "8A3219FD" "E649CEE7" "124D9F7C"
 	     "BE97F1B1" "B1863AEC" "7B40D901" "576230BD" "69EF8F6A" "EAFEB2B0"
 	     "9219FA8F" "AF833768" "42B1B2AA" "9EF68D79" "DAAB89AF" "3FABE49A"
@@ -504,14 +522,15 @@ static struct safeprimes safeprimes[] = { {
 	     "724FA91A" "E4ADC88B" "C66796EA" "E5677A01" "F64E8C08" "63139582"
 	     "2D9DB8FC" "EE35C06B" "1FEEA547" "4D6D8F34" "B1534A93" "6A18B0E0"
 	     "D20EAB86" "BC9C6D6A" "5207194E" "68720732" "FFFFFFFF" "FFFFFFFF",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 
 }, {
 	/* rfc71919 ffdhe8192 */
-	.p = "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
+	.p = (char *)
+	     "FFFFFFFF" "FFFFFFFF" "ADF85458" "A2BB4A9A" "AFDC5620" "273D3CF1"
 	     "D8B9C583" "CE2D3695" "A9E13641" "146433FB" "CC939DCE" "249B3EF9"
 	     "7D2FE363" "630C75D8" "F681B202" "AEC4617A" "D3DF1ED5" "D5FD6561"
 	     "2433F51F" "5F066ED0" "85636555" "3DED1AF3" "B557135E" "7F57C935"
@@ -554,7 +573,8 @@ static struct safeprimes safeprimes[] = { {
 	     "FAFABE1C" "5D71A87E" "2F741EF8" "C1FE86FE" "A6BBFDE5" "30677F0D"
 	     "97D11D49" "F7A8443D" "0822E506" "A9F4614E" "011E2A94" "838FF88C"
 	     "D68C8BB7" "C5C6424C" "FFFFFFFF" "FFFFFFFF",
-	.q = "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
+	.q = (char *)
+	     "7FFFFFFF" "FFFFFFFF" "D6FC2A2C" "515DA54D" "57EE2B10" "139E9E78"
 	     "EC5CE2C1" "E7169B4A" "D4F09B20" "8A3219FD" "E649CEE7" "124D9F7C"
 	     "BE97F1B1" "B1863AEC" "7B40D901" "576230BD" "69EF8F6A" "EAFEB2B0"
 	     "9219FA8F" "AF833768" "42B1B2AA" "9EF68D79" "DAAB89AF" "3FABE49A"
@@ -597,10 +617,10 @@ static struct safeprimes safeprimes[] = { {
 	     "7D7D5F0E" "2EB8D43F" "17BA0F7C" "60FF437F" "535DFEF2" "9833BF86"
 	     "CBE88EA4" "FBD4221E" "84117283" "54FA30A7" "008F154A" "41C7FC46"
 	     "6B4645DB" "E2E32126" "7FFFFFFF" "FFFFFFFF",
-	.g = "2",
-	.p_b.buf = NULL, .p_b.len = 0,
-	.q_b.buf = NULL, .q_b.len = 0,
-	.g_b.buf = NULL, .g_b.len = 0,
+	.g = (char *) "2",
+	.p_b = { NULL, 0, },
+	.q_b = { NULL, 0, },
+	.g_b = { NULL, 0, },
 } };
 
 static void acvp_safeprime_clear(void)

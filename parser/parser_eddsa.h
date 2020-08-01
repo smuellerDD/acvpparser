@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief EDDSA key generation data structure holding the data for the cipher
  *	  operations specified in eddsa_keygen. This test is used
@@ -165,5 +170,9 @@ struct eddsa_backend {
 };
 
 void register_eddsa_impl(struct eddsa_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_EDDSA_H */

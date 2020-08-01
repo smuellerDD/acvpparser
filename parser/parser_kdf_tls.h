@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief TLS PRF testing context
  *
@@ -72,5 +77,9 @@ struct kdf_tls_backend {
 };
 
 void register_kdf_tls_impl(struct kdf_tls_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_KDF_TLS_H */

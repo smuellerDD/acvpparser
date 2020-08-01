@@ -22,6 +22,11 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /*
  * Flags definition for the parser.
  *
@@ -175,5 +180,9 @@ typedef uint64_t	flags_t;
 /* Flags that are only set in the parser code */
 /* Optional entry */
 #define FLAG_OPTIONAL					(0x8000000000000000ULL)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_FLAGS_H */

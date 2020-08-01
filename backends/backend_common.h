@@ -46,6 +46,7 @@
 #include "parser_rsa.h"
 #include "parser_sha.h"
 #include "parser_sym.h"
+#include "parser_ifc.h"
 
 #include "safeprimes.h"
 

@@ -42,7 +42,7 @@ extern "C"
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 0   /* API compatible, ABI may change,
+#define MINVERSION 1   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
@@ -92,6 +92,8 @@ struct main_extension {
 void register_main_extension(struct main_extension *extension);
 
 void register_tester(struct cavs_tester *curr_tester, const char *log);
+
+extern int generate_testvector;
 
 #ifdef __cplusplus
 }

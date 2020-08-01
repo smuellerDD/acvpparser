@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief AEAD cipher data structure holding the data for the cipher
  *	  operations specified in aead_backend
@@ -111,5 +116,9 @@ struct aead_backend {
 };
 
 void register_aead_impl(struct aead_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_AEAD_H */

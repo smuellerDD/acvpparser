@@ -106,6 +106,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"KAS-ED", ACVP_ECDH_ED},
 
 	{"kdf-components", ACVP_KDF_COMPONENT},
+	{"PBKDF", ACVP_PBKDF},
 	{"HKDF", ACVP_HKDF},
 	{"KDF", ACVP_KDF_800_108},
 	{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
@@ -145,6 +146,26 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ffdhe-4096", ACVP_DH_FFDHE_4096},
 	{"ffdhe-6144", ACVP_DH_FFDHE_6144},
 	{"ffdhe-8192", ACVP_DH_FFDHE_8192},
+
+	{"KTS-IFC", ACVP_KTS_IFC},
+	/* KTS schema */
+	{"KTS-OAEP-basic", ACVP_KTS_SCHEMA_OAEP_BASIC},
+	{"KTS-OAEP-Party_V-confirmation", ACVP_KTS_SCHEMA_OAEP_PARTY_V_CONF},
+	{"KAS1-basic", ACVP_KAS1_SCHEMA_BASIC},
+	{"KAS1-Party_V-confirmation", ACVP_KAS1_SCHEMA_PARTY_V_CONF},
+	{"KAS2-basic", ACVP_KAS2_SCHEMA_BASIC},
+	{"KAS2-bilateral-confirmation", ACVP_KAS2_SCHEMA_BILATERAL_CONF},
+	{"KAS2-Party_U-confirmation", ACVP_KAS2_SCHEMA_PARTY_U_CONF},
+	{"KAS2-Party_V-confirmation", ACVP_KAS2_SCHEMA_PARTY_V_CONF},
+	/* KTS key generation method */
+	{"rsakpg1-basic", ACVP_KAS_KEYGEN_RSAKPG1_BASIC},
+	{"rsakpg1-prime-factor", ACVP_KAS_KEYGEN_RSAKPG1_PRIME_FACTOR},
+	{"rsakpg1-crt", ACVP_KAS_KEYGEN_RSAKPG1_CRT},
+	{"rsakpg2-basic", ACVP_KAS_KEYGEN_RSAKPG2_BASIC},
+	{"rsakpg2-prime-factor", ACVP_KAS_KEYGEN_RSAKPG2_PRIME_FACTOR},
+	{"rsakpg2-crt", ACVP_KAS_KEYGEN_RSAKPG2_CRT},
+	{"None", ACVP_KAS_ENCODING_NONE},
+	{"concatenation", ACVP_KAS_ENCODING_CONCATENATION},
 
 	/* SSH */
 	{"TDES", ACVP_TDESECB},

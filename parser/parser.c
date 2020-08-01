@@ -32,6 +32,8 @@
 /* no locking -> single threaded */
 struct cavs_tester *tester = NULL;
 
+int generate_testvector = 0;
+
 static struct main_extension *main_extension = NULL;
 
 void register_main_extension(struct main_extension* extension)
@@ -260,6 +262,7 @@ static void usage(void)
 	fprintf(stderr, "\t\t\t\t(return code 0 - both files match)\n");
 	fprintf(stderr, "\t\t\t\t(return code 1 - both files mismatch)\n");
 	fprintf(stderr, "\t-r --regression\tPerform a JSON regression testing\n");
+	fprintf(stderr, "\t-t --testvector\tGenerate testvector\n");
 
 	fprintf(stderr, "\n\t-v --verbose\tVerbose logging, multiple options increase verbosity\n");
 	fprintf(stderr, "\t-h --help\tPrint this help information\n");
@@ -285,11 +288,12 @@ int main(int argc, char *argv[])
 			{"verbose",		no_argument,		0, 'v'},
 			{"expected",		no_argument,		0, 'e'},
 			{"regression",		no_argument,		0, 'r'},
+			{"testvector",		no_argument,		0, 't'},
 			{"help",		no_argument,		0, 'h'},
 
 			{0, 0, 0, 0}
 		};
-		c = getopt_long(argc, argv, "verh", options, &opt_index);
+		c = getopt_long(argc, argv, "verth", options, &opt_index);
 		if (-1 == c)
 			break;
 		switch (c) {
@@ -305,6 +309,9 @@ int main(int argc, char *argv[])
 				regression = 1;
 				break;
 			case 3:
+				generate_testvector = 1;
+				break;
+			case 4:
 				usage();
 				return 0;
 
@@ -327,6 +334,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			regression = 1;
+			break;
+		case 't':
+			generate_testvector = 1;
 			break;
 		case 'h':
 			usage();

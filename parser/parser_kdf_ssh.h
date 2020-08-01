@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief SSH PRF testing context
  *
@@ -115,5 +120,9 @@ struct kdf_ssh_backend {
 };
 
 void register_kdf_ssh_impl(struct kdf_ssh_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_KDF_SSH_H */

@@ -11,7 +11,7 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -std=gnu99 -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
 OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)
@@ -238,14 +238,14 @@ endif
 ################## CONFIGURE BACKEND BouncyCastle ########
 
 ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
-	BC_DEVEL_DIR := /usr/lib/jvm/java-11-openjdk-11.0.1.13-11.rolling.fc29.x86_64
+	BC_DEVEL_DIR := /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.252.b09-1.fc32.x86_64
 	BC_BACKEND_DIR := ${CURDIR}/backend_interfaces/bouncycastle
 	BC_LIB_FILE := /usr/share/java/bcprov.jar
 
 	CFLAGS += -Wno-pedantic -DBC_BACKEND_DIR=\"$(BC_BACKEND_DIR)\" -DBC_LIB_FILE=\"$(BC_LIB_FILE)\"
 	C_SRCS += backends/backend_bouncycastle.c
 	INCLUDE_DIRS += $(BC_DEVEL_DIR)/include $(BC_DEVEL_DIR)/include/linux
-	LIBRARY_DIRS += $(BC_DEVEL_DIR)/lib/server
+	LIBRARY_DIRS += $(BC_DEVEL_DIR)/jre/lib/amd64/server
 	LIBRARIES += jvm
 endif
 
@@ -271,11 +271,13 @@ endif
 ######################################################
 
 C_OBJS := ${C_SRCS:.c=.o}
+CXX_OBJS := ${CXX_SRCS:.cpp=.o}
 C_ASM := ${C_SRCS:.c=.s}
-OBJS := $(C_OBJS)
+OBJS := $(C_OBJS) $(CXX_OBJS)
 ASM := $(C_ASM)
 
 CFLAGS += $(foreach includedir,$(INCLUDE_DIRS),-I$(includedir))
+CXXFLAGS += ${CFLAGS} -Wno-pedantic
 LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir))
 LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 
@@ -365,6 +367,7 @@ $(GNUTLS_CONFIG_SRCS):
 ###############################################################################
 show_vars:
 	@echo C_SRCS=$(C_SRCS)
+	@echo OBJS=$(OBJS)
 	@echo PARSERDIR=$(PARSERDIR)
 	@echo LIBDIR=$(LIBDIR)
 	@echo USRLIBDIR=$(USRLIBDIR)

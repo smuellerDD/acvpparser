@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief DRBG cipher data structure holding the data for the cipher
  *	  operations specified in drbg_backend.
@@ -115,5 +120,9 @@ struct drbg_backend {
 };
 
 void register_drbg_impl(struct drbg_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_DRBG_H */

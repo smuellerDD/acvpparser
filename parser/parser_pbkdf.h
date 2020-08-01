@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief PBKDF data structure
  *
@@ -62,5 +67,9 @@ struct pbkdf_backend {
 };
 
 void register_pbkdf_impl(struct pbkdf_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_PBKDF_H */

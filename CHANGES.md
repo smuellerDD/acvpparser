@@ -1,3 +1,10 @@
+v1.1.0
+- split out PBKDF from kdf-components to comply with ACVP server structure
+- enhancement: add -t - this currently only applies to ECDSA siggen to create a sigver test vector
+- enhancement: add KTS IFC testing (note, the OpenSSL backend currently is intended to show that the KTS IFC parsing works)
+- enhancement: allow compilation with C++
+- fix: OpenSSL 1.0.2 DRBG without DF works
+
 v1.0.0
 - reorganization of cipher flags - for matching ciphers, you MUST use convert_cipher_match or convert_cipher_contains, respectively. See cipher_definitions.h for details
 - move safeprimes to parser/safeprime.h which is automatically included to backends with backend_common.h

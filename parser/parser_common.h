@@ -44,6 +44,12 @@
 #include "parser_kdf_108.h"
 #include "parser_pbkdf.h"
 #include "parser_hkdf.h"
+#include "parser_ifc.h"
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 struct json_array;
 
@@ -80,7 +86,7 @@ struct json_array;
  * PARSER_CIPHER parses a cipher algo string from JSON into data.largeint by
  *		 ORing the the parsed value with the existing value
  * PARSER_CIPHER_ARRAY parses an array of cipher algo strings from JSON into
-*		       data.cipherarray by ORing the the parsed value with the
+ *		       data.cipherarray by ORing the the parsed value with the
  *		       existing value
  * PARSER_ARRAY parses a JSON array as defined by data.array
  * PARSER_ARRAY_BUFFERARRAY parses a JSON array that will contain BUFFERARRAYs
@@ -106,6 +112,7 @@ enum json_data_type {
 	PARSER_CIPHER_ARRAY,
 	PARSER_ARRAY,
 	PARSER_ARRAY_BUFFERARRAY,
+	PARSER_OBJECT,
 	PARSER_MPINT,
 	PARSER_STRING,
 	WRITER_BIN,
@@ -113,6 +120,10 @@ enum json_data_type {
 	WRITER_UINT,
 	WRITER_BOOL,
 	WRITER_BOOL_TRUE_TO_FALSE,
+	WRITER_STRING_NOFREE,
+
+	WRITER_ECC,
+	WRITER_HASH,
 };
 
 struct json_data {
@@ -214,6 +225,7 @@ DEF_CALLBACK_TYPE(kdf_ikev2)
 DEF_CALLBACK_TYPE(kdf_108)
 DEF_CALLBACK_TYPE(pbkdf)
 DEF_CALLBACK_TYPE(hkdf)
+DEF_CALLBACK_TYPE(kts_ifc)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -267,6 +279,7 @@ enum {
 	CB_TYPE_kdf_108,
 	CB_TYPE_pbkdf,
 	CB_TYPE_hkdf,
+	CB_TYPE_kts_ifc,
 };
 struct json_callback {
 	union {
@@ -309,6 +322,7 @@ struct json_callback {
 		struct kdf_108_callback kdf_108;
 		struct pbkdf_callback pbkdf;
 		struct hkdf_callback hkdf;
+		struct kts_ifc_callback kts_ifc;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;
@@ -444,5 +458,9 @@ int write_one_entry(const struct json_entry *entry,
 
 #define DEF_CALLBACK(type, name, flags)					\
 	DEF_CALLBACK_HELPER(type, name, flags, NULL)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_COMMON_H */

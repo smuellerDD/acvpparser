@@ -362,8 +362,78 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_array ecdsa_testanchor = SET_ARRAY(ecdsa_testanchor_entries, NULL);
 
+
+	/**********************************************************************
+	 * ECDSA signature generation for test vector generation
+	 **********************************************************************/
+	const struct json_entry gen_ecdsa_siggen_testresult_entries[] = {
+		{"r",		{.data.buf = &ecdsa_siggen_vector.R, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"s",		{.data.buf = &ecdsa_siggen_vector.S, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"qx",		{.data.buf = &ecdsa_siggen_vector.Qx, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"qy",		{.data.buf = &ecdsa_siggen_vector.Qy, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"message",	{.data.buf = &ecdsa_siggen_vector.msg, WRITER_BIN },
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+	};
+	const struct json_testresult gen_ecdsa_siggen_testresult = SET_ARRAY(gen_ecdsa_siggen_testresult_entries, &ecdsa_siggen_callbacks);
+
+	const struct json_entry gen_ecdsa_siggen_test_entries[] = {
+		{"message",		{.data.buf = &ecdsa_siggen_vector.msg, PARSER_BIN},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+	};
+
+	const struct json_entry gen_ecdsa_siggen_testgroup_result_entries[] = {
+		{"qx",		{.data.buf = &ecdsa_siggen_vector.Qx, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"qy",		{.data.buf = &ecdsa_siggen_vector.Qy, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"curve",	{.data.largeint = &ecdsa_siggen_vector.cipher, WRITER_ECC},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"hashAlg",	{.data.largeint = &ecdsa_siggen_vector.cipher, WRITER_HASH},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+	};
+	/*
+	 * The NULL for the function callbacks implies that the qx and qy
+	 * are printed at the same hierarchy level as tgID
+	 */
+	const struct json_testresult gen_ecdsa_siggen_testgroup_result = SET_ARRAY(gen_ecdsa_siggen_testgroup_result_entries, NULL);
+
+	/* search for empty arrays */
+	const struct json_array gen_ecdsa_siggen_test = SET_ARRAY(gen_ecdsa_siggen_test_entries, &gen_ecdsa_siggen_testresult);
+
+	const struct json_entry gen_ecdsa_siggen_testgroup_entries[] = {
+		{"curve",	{.data.largeint = &ecdsa_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"hashAlg",	{.data.largeint = &ecdsa_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"componentTest",	{.data.integer = &ecdsa_siggen_vector.component, PARSER_BOOL},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OPTIONAL},
+		{"tests",	{.data.array = &gen_ecdsa_siggen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+	};
+	const struct json_array gen_ecdsa_siggen_testgroup = SET_ARRAY(gen_ecdsa_siggen_testgroup_entries, 		  &gen_ecdsa_siggen_testgroup_result);
+
+	/**********************************************************************
+	 * ECDSA common test group
+	 **********************************************************************/
+	struct buffer ecdsa_algo = { .buf = (unsigned char *)"ECDSA",
+				     .len = 5 };
+	struct buffer ecdsa_sigver_mode = { .buf = (unsigned char *)"sigVer",
+					    .len = 6 };
+	struct buffer ecdsa_revision = { .buf = (unsigned char *)"1.0",
+					 .len = 6 };
+	const struct json_entry gen_ecdsa_testgroup_result_entries[] = {
+		{"algorithm",	{.data.buf = &ecdsa_algo,  WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"mode",	{.data.buf = &ecdsa_sigver_mode, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"revision",	{.data.buf = &ecdsa_revision, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+	};
+	/*
+	 * The NULL for the function callbacks implies that the qx and qy
+	 * are printed at the same hierarchy level as tgID
+	 */
+	const struct json_testresult gen_ecdsa_testgroup_result = SET_ARRAY(gen_ecdsa_testgroup_result_entries, NULL);
+
+	const struct json_entry gen_ecdsa_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &gen_ecdsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
+	};
+	const struct json_array gen_ecdsa_testanchor = SET_ARRAY(gen_ecdsa_testanchor_entries, &gen_ecdsa_testgroup_result);
+
 	/* Process all. */
-	return process_json(&ecdsa_testanchor, "1.0", in, out);
+	if (generate_testvector)
+		return process_json(&gen_ecdsa_testanchor, "1.0", in, out);
+	else
+		return process_json(&ecdsa_testanchor, "1.0", in, out);
 }
 
 static struct cavs_tester ecdsa =

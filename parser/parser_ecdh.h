@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief ECC CDH primitive and hashed Shared Secret generation
  *
@@ -93,5 +98,9 @@ struct ecdh_backend {
 };
 
 void register_ecdh_impl(struct ecdh_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_ECDH_H */

@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief: Data structure exchanged with backend for PQG operation
  *
@@ -356,5 +361,9 @@ struct dsa_backend {
 };
 
 void register_dsa_impl(struct dsa_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_DSA_H */

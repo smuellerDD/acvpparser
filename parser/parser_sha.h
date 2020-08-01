@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief Hash cipher data structure holding the data for the cipher
  *	  operations specified in sha_backend
@@ -72,5 +77,9 @@ struct sha_backend {
 };
 
 void register_sha_impl(struct sha_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_SHA_H */

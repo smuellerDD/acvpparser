@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief ECDH based on Edwards Curve KDF Shared Secret generation
  *
@@ -85,5 +90,9 @@ struct ecdh_ed_backend {
 };
 
 void register_ecdh_ed_impl(struct ecdh_ed_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_ECDH_ED_H */

@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief IKEV1 PRF testing context
  *
@@ -65,5 +70,9 @@ struct kdf_ikev1_backend {
 };
 
 void register_kdf_ikev1_impl(struct kdf_ikev1_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_KDF_IKEV1_H */

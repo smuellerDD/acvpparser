@@ -44,7 +44,8 @@ enum logger_verbosity {
  * @severity: maximum severity level that causes the log entry to be logged
  * @fmt: format string as defined by fprintf(3)
  */
-void logger(enum logger_verbosity severity, const char *fmt, ...);
+void logger(enum logger_verbosity severity, const char *fmt, ...)
+__attribute__((format(printf, 2, 3)));
 
 /**
  * logger - log status if LOGGER_WARN or LOGGER_ERR is found

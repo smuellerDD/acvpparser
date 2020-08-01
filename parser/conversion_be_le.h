@@ -22,6 +22,11 @@
 #ifndef _CONVERSION_BE_LE_H
 #define _CONVERSION_BE_LE_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #undef TEST
 
 #define GCC_VERSION (__GNUC__ * 10000		\
@@ -168,6 +173,10 @@ int main(void)
 #endif
 
 	return 0;
+}
+#endif
+
+#ifdef __cplusplus
 }
 #endif
 

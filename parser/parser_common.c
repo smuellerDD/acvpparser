@@ -45,14 +45,14 @@ static int match_entry(flags_t parsed_flags, flags_t search, const char *log)
 
 	if (not_matched) {
 		logger(LOGGER_DEBUG,
-			"Not matching %s (parsed_flags %lu, entry flags %lu, result %lu)\n",
+			"Not matching %s (parsed_flags %" PRIu64 ", entry flags %llu, result %" PRIu64 ")\n",
 			log, parsed_flags, (search & FLAG_OP_MASK),
 			not_matched);
 		return 0;
 	}
 
 	logger(LOGGER_DEBUG,
-	       "Matching %s (parsed_flags %lu, entry flags %lu)\n",
+	       "Matching %s (parsed_flags %" PRIu64 ", entry flags %llu)\n",
 	       log ? log : "(unnamed)", parsed_flags, (search & FLAG_OP_MASK));
 
 	return 1;
@@ -102,6 +102,8 @@ static void vector_free_entry(const struct json_entry *entry)
 	case PARSER_BOOL:
 	case WRITER_BOOL:
 	case WRITER_BOOL_TRUE_TO_FALSE:
+	case WRITER_ECC:
+	case WRITER_HASH:
 		logger(LOGGER_DEBUG, "Freeing entry %s with data type %d\n",
 		       entry->name, data->datatype);
 		*data->data.integer = 0;
@@ -122,8 +124,10 @@ static void vector_free_entry(const struct json_entry *entry)
 		cipher_array->arraysize = 0;
 		break;
 	case PARSER_ARRAY:
+	case WRITER_STRING_NOFREE:
 		/* PARSER_ARRAY should be freed in subordinate levels */
 		break;
+	case PARSER_OBJECT:
 	case PARSER_ARRAY_BUFFERARRAY:
 		/* Do the freeing found in parse_array */
 		processdata = entry->data.data.array;
@@ -182,6 +186,7 @@ int write_one_entry(const struct json_entry *entry,
 		    flags_t parsed_flags)
 {
 	const struct json_data *data = &entry->data;
+	const char *algo;
 	int ret = 0;
 
 	CKNULL_LOG(entry, -EINVAL,
@@ -217,9 +222,32 @@ int write_one_entry(const struct json_entry *entry,
 		break;
 	case WRITER_UINT:
 		logger(LOGGER_DEBUG, "Add integer to test result %u\n",
-		       data->data.integer);
+		       *data->data.integer);
 		json_object_object_add(testresult, entry->name,
 				json_object_new_int((int32_t)(*data->data.integer)));
+		break;
+	case WRITER_STRING_NOFREE:
+		logger(LOGGER_DEBUG, "Add string %s to test result\n",
+		       data->data.buf->buf);
+		json_object_object_add(testresult, entry->name,
+			json_object_new_string(
+				(const char *)data->data.buf->buf));
+		break;
+	case WRITER_ECC:
+		CKINT(convert_cipher_algo(*data->data.largeint & ACVP_CURVEMASK,
+					  ACVP_CIPHERTYPE_ECC, &algo));
+		logger(LOGGER_DEBUG, "Add ECC curve %s to test result\n",
+		       algo);
+		json_object_object_add(testresult, entry->name,
+				       json_object_new_string(algo));
+		break;
+	case WRITER_HASH:
+		CKINT(convert_cipher_algo(*data->data.largeint & ACVP_HASHMASK,
+					  ACVP_CIPHERTYPE_HASH, &algo));
+		logger(LOGGER_DEBUG, "Add hash %s to test result\n",
+		       algo);
+		json_object_object_add(testresult, entry->name,
+				       json_object_new_string(algo));
 		break;
 
 	default:
@@ -364,6 +392,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kdf_108)
 			CB_HANDLER(pbkdf)
 			CB_HANDLER(hkdf)
+			CB_HANDLER(kts_ifc)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -447,7 +476,7 @@ static void parse_flagblock(const struct json_object *obj,
 					 strlen(conv->val.string))) {
 				*parsed_flags |= conv->flag;
 				logger(LOGGER_VERBOSE,
-				       "Found JSON flag: %lu (%s)\n",
+				       "Found JSON flag: %" PRIu64 " (%s)\n",
 				       *parsed_flags, conv->log);
 
 				found = true;
@@ -457,7 +486,7 @@ static void parse_flagblock(const struct json_object *obj,
 			if (conv->val.boolean == json_object_get_boolean(o)) {
 				*parsed_flags |= conv->flag;
 				logger(LOGGER_VERBOSE,
-				       "Found JSON flag: %lu (%s)\n",
+				       "Found JSON flag: %" PRIu64 " (%s)\n",
 				       *parsed_flags, conv->log);
 
 				found = true;
@@ -724,7 +753,7 @@ static int parse_array(const struct json_entry *entry,
 		logger(LOGGER_ERR,
 		       "Parsing of entry %s with expected array failed\n",
 		      entry->name);
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	/* Iterate over all array members and parse each individually. */
@@ -732,7 +761,7 @@ static int parse_array(const struct json_entry *entry,
 		struct json_object *testvector =
 			json_object_array_get_idx(json_nobj, i);
 
-		CKNULL_LOG(testvector, EINVAL, "No vector\n");
+		CKNULL_LOG(testvector, -EINVAL, "No vector\n");
 
 		/* Find out about flags and operation types */
 		CKINT_LOG(parse_flags(testvector, &parsed_flags),
@@ -784,7 +813,7 @@ static int parse_buffer_array(const struct json_entry *entry,
 		logger(LOGGER_ERR,
 		       "Parsing of entry %s with expected array failed\n",
 		      entry->name);
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	/* Iterate over all array members and parse each individually. */
@@ -792,7 +821,7 @@ static int parse_buffer_array(const struct json_entry *entry,
 		struct json_object *testvector =
 			json_object_array_get_idx(json_nobj, i);
 
-		CKNULL(testvector, EINVAL);
+		CKNULL(testvector, -EINVAL);
 
 		/* Find out about flags and operation types */
 		CKINT(parse_flags(testvector, &parsed_flags));
@@ -801,6 +830,36 @@ static int parse_buffer_array(const struct json_entry *entry,
 		CKINT(parse_all_processdata(processdata, testvector,
 					    parsed_flags, testresults));
 	}
+
+out:
+	/* We do not count here, so do not relay positive integers */
+	return (ret < 0) ? ret : 0;
+}
+
+static int parse_object(const struct json_entry *entry,
+			const struct json_object *readdata,
+			flags_t parsed_flags,
+			struct json_object *testresults)
+{
+	struct json_object *json_nobj;
+	const struct json_array *processdata = entry->data.data.array;
+	int ret = 0;
+
+	CKNULL_LOG(entry->name, -EINVAL, "Entry name missing\n");
+
+	CKINT_LOG(json_find_key(readdata, entry->name, &json_nobj,
+				json_type_object),
+		  "Name %s not found\n", entry->name);
+
+	if (!json_nobj) {
+		logger(LOGGER_ERR,
+		       "Parsing of entry %s with expected array failed\n",
+		      entry->name);
+		return -EINVAL;
+	}
+
+	CKINT(parse_all_processdata(processdata, json_nobj, parsed_flags,
+				    testresults));
 
 out:
 	/* We do not count here, so do not relay positive integers */
@@ -843,6 +902,7 @@ static int parse_one_entry(const struct json_entry *entry,
 	/* Process different types of search entries. */
 	switch (data->datatype) {
 	case PARSER_BIN:
+		logger(LOGGER_DEBUG, "Get binary data for %s\n", entry->name);
 		ret = json_get_bin(readdata, entry->name, data->data.buf);
 		break;
 	case PARSER_BIN_BUFFERARRAY:
@@ -929,6 +989,11 @@ static int parse_one_entry(const struct json_entry *entry,
 		logger(LOGGER_DEBUG, "Parsing array for JSON key %s\n",
 		       entry->name ? entry->name : "(unnamed)");
 		ret = parse_array(entry, readdata, parsed_flags, testresults);
+		break;
+	case PARSER_OBJECT:
+		logger(LOGGER_DEBUG, "Parsing object for JSON key %s\n",
+		       entry->name ? entry->name : "(unnamed)");
+		ret = parse_object(entry, readdata, parsed_flags, testresults);
 		break;
 	case PARSER_ARRAY_BUFFERARRAY:
 		logger(LOGGER_DEBUG, "Parsing array for JSON key %s\n",
@@ -1030,9 +1095,11 @@ out:
 int process_json(const struct json_array *processdata, const char *exp_version,
 		 struct json_object *in, struct json_object *out)
 {
+	const struct json_entry *entry;
 	struct json_object *testresults, *acvpdata, *versiondata,
 			   *outversion, *outresults;
 	flags_t parsed_flags = 0;
+	uint32_t i;
 	int ret;
 
 	CKNULL_LOG(processdata, -EINVAL,
@@ -1073,6 +1140,14 @@ int process_json(const struct json_array *processdata, const char *exp_version,
 	/* We do not count any more */
 	if (ret > 0)
 		ret = 0;
+
+	/* Iterate over each write definition and invoke it. */
+	if (processdata->testresult) {
+		for_each_testresult(processdata->testresult, entry, i)
+			CKINT(write_one_entry(entry, outresults,
+					      parsed_flags));
+	}
+
 
 out:
 	/* Clean all allocated data, if any. */

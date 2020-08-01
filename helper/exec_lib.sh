@@ -11,6 +11,8 @@ then
 else
 	_LIB_EXEC="./acvp-parser"
 fi
+
+_LIB_IUT_USER="$1"
 _LIB_IUT="testvectors"
 _LIB_IUT_PROD="testvectors-production"
 _LIB_REQ="testvector-request.json"
@@ -136,13 +138,15 @@ get_proc_family() {
 
 # List of JSON keyword:value pairs to search for JSON test vectors known
 # to be no known answer test and thus are unfit for regression testing
+# TODO: ECDSA siggen: use -t
 REGRESSION_VECTOR_SKIP="
 	mode:keyGen
 	mode:sigGen
 	mode:pqgGen
 	algorithm:KAS-FFC
 	algorithm:KAS-ECC
-	ivGen:internal"
+	ivGen:internal
+	algorithm:KDF"
 
 #
 # Execute testing
@@ -179,7 +183,10 @@ exec_module()
 		return
 	fi
 
-	if [ ! -d "${_LIB_IUT}" ]
+	if [ ! -z "${_LIB_IUT_USER}" ]
+	then
+		lib_iut_dir=${_LIB_IUT_USER}
+	elif [ ! -d "${_LIB_IUT}" ]
 	then
 		if [ -d "${_LIB_IUT_PROD}" ]
 		then

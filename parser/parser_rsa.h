@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief RSA key generation data structure holding the data for the cipher
  *	  operations specified in rsa_keygen_prime_data. This test is used
@@ -329,5 +334,9 @@ struct rsa_backend {
 };
 
 void register_rsa_impl(struct rsa_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_RSA_H */

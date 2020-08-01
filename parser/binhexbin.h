@@ -23,6 +23,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 void hex2bin(const char *hex, size_t hexlen,
 	     uint8_t *bin, size_t binlen);
 int hex2bin_alloc(const char *hex, size_t hexlen,
@@ -33,5 +38,9 @@ void bin2print(const unsigned char *bin, size_t binlen,
 	       FILE *out, const char *explanation);
 void bin2hex(const uint8_t *bin, size_t binlen,
 	     char *hex, size_t hexlen, int u);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _BINHEXBIN_H */

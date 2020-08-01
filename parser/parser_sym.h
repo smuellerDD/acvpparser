@@ -23,6 +23,11 @@
 #include "parser.h"
 #include "parser_flags.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**
  * @brief Symmetric cipher data structure holding the data for the cipher
  *	  operations specified in sym_backend
@@ -118,5 +123,9 @@ struct sym_backend {
 };
 
 void register_sym_impl(struct sym_backend *implementation);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _PARSER_SYM_H */

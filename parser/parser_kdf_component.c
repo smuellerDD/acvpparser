@@ -243,55 +243,6 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 }
 
 /******************************************************************************
- * PBKDF callback definitions
- ******************************************************************************/
-static struct pbkdf_backend *pbkdf_backend = NULL;
-
-static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
-			    uint64_t cipher)
-{
-	(void)cipher;
-
-	/**********************************************************************
-	 * PBKDF operation
-	 **********************************************************************/
-	DEF_CALLBACK(pbkdf, pbkdf, FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT);
-
-	const struct json_entry pbkdf_testresult_entries[] = {
-		{"derivedKey",		{.data.buf = &pbkdf_vector.derived_key, WRITER_BIN},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-	};
-	const struct json_testresult pbkdf_testresult =
-		SET_ARRAY(pbkdf_testresult_entries, &pbkdf_callbacks);
-
-	const struct json_entry pbkdf_test_entries[] = {
-		{"keyLen",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT},FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"salt",		{.data.buf = &pbkdf_vector.salt, PARSER_BIN},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"password",		{.data.buf = &pbkdf_vector.password, PARSER_STRING},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"iterationCount",	{.data.integer = &pbkdf_vector.iteration_count, PARSER_UINT},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-	};
-
-	/* search for empty arrays */
-	const struct json_array pbkdf_test = SET_ARRAY(pbkdf_test_entries, &pbkdf_testresult);
-
-	const struct json_entry pbkdf_testgroup_entries[] = {
-		{"hmacAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"tests",		{.data.array = &pbkdf_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-	};
-	const struct json_array pbkdf_testgroup = SET_ARRAY(pbkdf_testgroup_entries, NULL);
-
-	/**********************************************************************
-	 * KDF common test group
-	 **********************************************************************/
-	const struct json_entry pbkdf_testanchor_entries[] = {
-		{"testGroups",			{.data.array = &pbkdf_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_PBKDF},
-	};
-	const struct json_array pbkdf_testanchor = SET_ARRAY(pbkdf_testanchor_entries, NULL);
-
-	/* Process all. */
-	return process_json(&pbkdf_testanchor, "1.0", in, out);
-}
-
-/******************************************************************************
  * KDF generic parser definitions
  ******************************************************************************/
 static int kdf_tester(struct json_object *in, struct json_object *out,
@@ -320,10 +271,6 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 	}
 	if (kdf_ikev2_backend && !strncmp(mode, "ikev2", 5)) {
 		CKINT(kdf_tester_ikev2(in, out, cipher));
-		executed = true;
-	}
-	if (pbkdf_backend && !strncmp(mode, "pbkdf", 5)) {
-		CKINT(kdf_tester_pbkdf(in, out, cipher));
 		executed = true;
 	}
 
@@ -374,9 +321,4 @@ void register_kdf_ikev1_impl(struct kdf_ikev1_backend *implementation)
 void register_kdf_ikev2_impl(struct kdf_ikev2_backend *implementation)
 {
 	register_backend(kdf_ikev2_backend, implementation, "KDF_IKEv2");
-}
-
-void register_pbkdf_impl(struct pbkdf_backend *implementation)
-{
-	register_backend(pbkdf_backend, implementation, "PBKDF");
 }
