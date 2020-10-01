@@ -164,7 +164,7 @@ struct eddsa_backend {
 	int (*eddsa_sigver)(struct eddsa_sigver_data *data,
 			    flags_t parsed_flags);
 
-	int (*eddsa_keygen_en)(struct buffer *qbuf, uint32_t curve,
+	int (*eddsa_keygen_en)(struct buffer *qbuf, uint64_t curve,
 			       void **privkey);
 	void (*eddsa_free_key)(void *privkey);
 };

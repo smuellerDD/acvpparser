@@ -195,7 +195,7 @@ endif
 ################## CONFIGURE BACKEND ACVPProxy ########
 
 ifeq (acvpproxy,$(firstword $(MAKECMDGOALS)))
-	C_SRCS += backends/backend_acvpproxy.c $(wildcard ../acvpproxy/lib/hash/*.c)
+	C_SRCS += backends/backend_acvpproxy.c ../acvpproxy/lib/hash/sha256.c ../acvpproxy/lib/hash/sha512.c ../acvpproxy/lib/hash/hmac.c ../acvpproxy/lib/hash/sha3.c
 	INCLUDE_DIRS += ../acvpproxy/lib/hash
 endif
 
@@ -268,6 +268,23 @@ ifeq (cpacf,$(firstword $(MAKECMDGOALS)))
 	INCLUDE_DIRS += backend_interfaces/cpacf/
 endif
 
+################## CONFIGURE BACKEND LRNG ########
+
+ifeq (lrng,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_lrng.c
+endif
+
+################## CONFIGURE BACKEND Jitter RNG ##
+
+ifeq (jent,$(firstword $(MAKECMDGOALS)))
+	CFLAGS += -DSHA256
+	C_SRCS += backends/backend_jent.c
+	INCLUDE_DIRS += /home/sm/hacking/sources/jitterentropy/jitterentropy-library
+endif
+
+######################################################
+
+################## CONFIGURE BACKEND libsodium ########
 ######################################################
 
 C_OBJS := ${C_SRCS:.c=.o}
@@ -287,7 +304,7 @@ analyze_plists = $(analyze_srcs:%.c=%.plist)
 .PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -311,6 +328,8 @@ boringssl: $(NAME)
 botan: $(NAME)
 libica: $(NAME)
 cpacf: $(NAME)
+lrng: $(NAME)
+jent: $(NAME)
 bouncycastle: $(NAME)
 	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 

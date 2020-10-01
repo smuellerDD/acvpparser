@@ -24,8 +24,9 @@
 
 static struct hkdf_backend *hkdf_backend = NULL;
 
+/* parser for home-grown data HKDF test data */
 static int hkdf_tester(struct json_object *in, struct json_object *out,
-			  uint64_t cipher)
+		       uint64_t cipher)
 {
 	(void)cipher;
 

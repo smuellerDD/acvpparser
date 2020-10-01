@@ -656,9 +656,12 @@ static void openssl_rsa_get0_factors(const RSA *r, const BIGNUM **p,
 void openssl_dsa_get0_pqg(const DSA *d, const BIGNUM **p,
 			  const BIGNUM **q, const BIGNUM **g)
 {
-	*p = d->p;
-	*q = d->q;
-	*g = d->g;
+	if (p)
+		*p = d->p;
+	if (q)
+		*q = d->q;
+	if (g)
+		*g = d->g;
 }
 
 static int openssl_dsa_set0_pqg(DSA *d, BIGNUM *p, BIGNUM *q, BIGNUM *g)
@@ -2639,31 +2642,31 @@ static int openssl_kdf_tls_op(struct kdf_tls_data *data, flags_t parsed_flags)
 
 	CKINT(alloc_buf(data->pre_master_secret.len, &data->master_secret));
 
-	CKINT_LOG(tls1_PRF(data->hashalg,
-			   TLS_MD_MASTER_SECRET_CONST,
-			   TLS_MD_MASTER_SECRET_CONST_SIZE,
-			   data->client_hello_random.buf,
-			   data->client_hello_random.len, NULL, 0,
-			   data->server_hello_random.buf,
-			   data->server_hello_random.len, NULL, 0,
-			   data->pre_master_secret.buf,
-			   data->pre_master_secret.len,
-			   data->master_secret.buf,
-			   data->master_secret.len),
+	CKINT_O_LOG(tls1_PRF(data->hashalg,
+			     TLS_MD_MASTER_SECRET_CONST,
+			     TLS_MD_MASTER_SECRET_CONST_SIZE,
+			     data->client_hello_random.buf,
+			     data->client_hello_random.len, NULL, 0,
+			     data->server_hello_random.buf,
+			     data->server_hello_random.len, NULL, 0,
+			     data->pre_master_secret.buf,
+			     data->pre_master_secret.len,
+			     data->master_secret.buf,
+			     data->master_secret.len),
 		  "Generation of master secret failed\n");
 
 	logger_binary(LOGGER_DEBUG, data->master_secret.buf,
 		      data->master_secret.len, "master_secret");
 
 	CKINT(alloc_buf(data->key_block_length / 8, &data->key_block));
-	CKINT_LOG(tls1_PRF(data->hashalg,
-			   TLS_MD_KEY_EXPANSION_CONST,
-			   TLS_MD_KEY_EXPANSION_CONST_SIZE,
-			   data->server_random.buf, data->server_random.len,
-			   data->client_random.buf, data->client_random.len,
-			   NULL, 0, NULL, 0,
-			   data->master_secret.buf, data->master_secret.len,
-			   data->key_block.buf, data->key_block.len),
+	CKINT_O_LOG(tls1_PRF(data->hashalg,
+			     TLS_MD_KEY_EXPANSION_CONST,
+			     TLS_MD_KEY_EXPANSION_CONST_SIZE,
+			     data->server_random.buf, data->server_random.len,
+			     data->client_random.buf, data->client_random.len,
+			     NULL, 0, NULL, 0,
+			     data->master_secret.buf, data->master_secret.len,
+			     data->key_block.buf, data->key_block.len),
 		  "Generation of key block failed\n");
 
 	logger_binary(LOGGER_DEBUG, data->key_block.buf, data->key_block.len,
@@ -3483,68 +3486,6 @@ out:
 	return ret;
 }
 
-static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
-			       struct buffer *Q /* [in] */,
-			       struct buffer *G /* [in] */,
-			       uint64_t safeprime /* [in] */,
-			       struct buffer *X /* [out] */,
-			       struct buffer *Y /* [out] */,
-			       DSA **dsa)
-{
-	BIGNUM *p = NULL, *q = NULL, *g = NULL;
-	const BIGNUM *x, *y;
-	int ret = 0, pqg_consumed = 0;
-
-	*dsa = DSA_new();
-	CKNULL_LOG(*dsa, -ENOMEM, "DSA_new() failed\n");
-
-	switch (safeprime) {
-	case ACVP_DH_MODP_2048:
-	case ACVP_DH_MODP_3072:
-	case ACVP_DH_MODP_4096:
-	case ACVP_DH_MODP_6144:
-	case ACVP_DH_MODP_8192:
-		logger(LOGGER_ERR, "Safeprime testing with DSA not supported (Q not set)\n");
-		ret = -EFAULT;
-		goto out;
-	default:
-		p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
-		CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
-
-		q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
-		CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
-
-		g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
-		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
-	}
-
-	CKINT_O_LOG(openssl_dsa_set0_pqg(*dsa, p, q, g),
-		    "DSA_set0_pqg failed\n");
-	pqg_consumed = 1;
-
-	CKINT_O_LOG(DSA_generate_key(*dsa), "DSA_generate_key() failed\n");
-
-	openssl_dsa_get0_key(*dsa, &y, &x);
-
-	CKINT(openssl_bn2buffer(x, X));
-	CKINT(openssl_bn2buffer(y, Y));
-
-	//logger_binary(LOGGER_DEBUG, X->buf, X->len, "X");
-	//logger_binary(LOGGER_DEBUG, Y->buf, Y->len, "Y");
-
-	ret = 0;
-
-out:
-	if (!pqg_consumed && p)
-		BN_free(p);
-	if (!pqg_consumed && q)
-		BN_free(q);
-	if (!pqg_consumed && g)
-		BN_free(g);
-
-	return ret;
-}
-
 static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 			      struct buffer *Q /* [in] */,
 			      struct buffer *G /* [in] */,
@@ -3576,6 +3517,67 @@ static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 out:
 	if (dh)
 		DH_free(dh);
+
+	return ret;
+}
+
+static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
+			       struct buffer *Q /* [in] */,
+			       struct buffer *G /* [in] */,
+			       uint64_t safeprime /* [in] */,
+			       struct buffer *X /* [out] */,
+			       struct buffer *Y /* [out] */,
+			       DSA **dsa)
+{
+	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	const BIGNUM *x, *y;
+	int ret = 0, pqg_consumed = 0;
+
+	switch (safeprime) {
+	case ACVP_DH_MODP_2048:
+	case ACVP_DH_MODP_3072:
+	case ACVP_DH_MODP_4096:
+	case ACVP_DH_MODP_6144:
+	case ACVP_DH_MODP_8192:
+		logger(LOGGER_WARN, "Automatically using Safeprime testing with DH operation - safeprime testing with DSA interface not supported (Q not set\n");
+		return _openssl_dh_keygen(P, Q, G, safeprime, X, Y);
+	default:
+		p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
+		CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
+
+		q = BN_bin2bn((const unsigned char *)Q->buf, (int)Q->len, NULL);
+		CKNULL_LOG(q, -ENOMEM, "BN_bin2bn() failed\n");
+
+		g = BN_bin2bn((const unsigned char *)G->buf, (int)G->len, NULL);
+		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
+	}
+
+	*dsa = DSA_new();
+	CKNULL_LOG(*dsa, -ENOMEM, "DSA_new() failed\n");
+
+	CKINT_O_LOG(openssl_dsa_set0_pqg(*dsa, p, q, g),
+		    "DSA_set0_pqg failed\n");
+	pqg_consumed = 1;
+
+	CKINT_O_LOG(DSA_generate_key(*dsa), "DSA_generate_key() failed\n");
+
+	openssl_dsa_get0_key(*dsa, &y, &x);
+
+	CKINT(openssl_bn2buffer(x, X));
+	CKINT(openssl_bn2buffer(y, Y));
+
+	//logger_binary(LOGGER_DEBUG, X->buf, X->len, "X");
+	//logger_binary(LOGGER_DEBUG, Y->buf, Y->len, "Y");
+
+	ret = 0;
+
+out:
+	if (!pqg_consumed && p)
+		BN_free(p);
+	if (!pqg_consumed && q)
+		BN_free(q);
+	if (!pqg_consumed && g)
+		BN_free(g);
 
 	return ret;
 }
@@ -3986,7 +3988,7 @@ static int _openssl_ecdsa_curves(uint64_t curve, int *out_nid)
 
 	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
 
-	switch(curve & ACVP_CURVEMASK) {
+	switch (curve & ACVP_CURVEMASK) {
 	case ACVP_NISTB163:
 		nid = NID_sect163r2;
 		break;
@@ -4641,7 +4643,8 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	CKNULL_LOG(bn_Yrem, -ENOMEM, "BN_bin2bn() failed\n");
 
 	if (!Xloc->len || !Yloc->len) {
-		CKINT_O_LOG(DH_generate_key(dh), "DH_generate_key failed\n");
+		CKINT_O_LOG(DH_generate_key(dh), "DH_generate_key failed: %s\n",
+			    ERR_error_string(ERR_get_error(), NULL));
 
 		openssl_dh_get0_key(dh, &cbn_Yloc, &cbn_Xloc);
 

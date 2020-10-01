@@ -372,6 +372,23 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 			}
 		}
 
+		if (vector->cipher == ACVP_TDESCFB8 ||
+		    vector->cipher == ACVP_TDESCFB1) {
+			if (parsed_flags & FLAG_OP_ENC)
+				memcpy(last_iv.buf,
+				       calc_data.buf + calc_data.len -
+								last_iv.len,
+				       last_iv.len);
+			/* Decryption last IV is generated in the loop above */
+		}
+
+		CKINT(sym_backend->mct_fini(vector, parsed_flags));
+
+		/* Iterate over each write definition and invoke it. */
+		for_each_testresult(processdata->testresult, entry, i)
+			CKINT(write_one_entry(entry, single_mct_result,
+					      parsed_flags));
+
 		if (vector->cipher == ACVP_TDESOFB) {
 			unsigned int idx;
 
@@ -389,23 +406,6 @@ static int sym_mct_tdes_helper(const struct json_array *processdata,
 				memcpy(vector->iv.buf, calc_data.buf,
 				       calc_data.len);
 		}
-
-		if (vector->cipher == ACVP_TDESCFB8 ||
-		    vector->cipher == ACVP_TDESCFB1) {
-			if (parsed_flags & FLAG_OP_ENC)
-				memcpy(last_iv.buf,
-				       calc_data.buf + calc_data.len -
-								last_iv.len,
-				       last_iv.len);
-			/* Decryption last IV is generated in the loop above */
-		}
-
-		CKINT(sym_backend->mct_fini(vector, parsed_flags));
-
-		/* Iterate over each write definition and invoke it. */
-		for_each_testresult(processdata->testresult, entry, i)
-			CKINT(write_one_entry(entry, single_mct_result,
-					      parsed_flags));
 
 		/* Append the output JSON stream with test results. */
 		json_object_array_add(resultsarray, single_mct_result);

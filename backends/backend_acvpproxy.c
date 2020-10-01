@@ -19,74 +19,72 @@
 
 #include <stdlib.h>
 
+#include "backend_common.h"
+
 #include <hash.h>
 #include <hmac.h>
-
-#include "backend_common.h"
+#include <sha256.h>
+#include <sha512.h>
+#include <sha3.h>
 
 /************************************************
  * SHA cipher interface functions
  ************************************************/
-
-static int acvpproxy_convert(uint64_t cipher, hash_type *hash)
+static int acvpproxy_hash_convert(uint64_t cipher, const struct hash **ret_hash)
 {
+	const struct hash *hash;
+
 	switch (cipher) {
-	case ACVP_SHA1:
-	case ACVP_HMACSHA1:
-		*hash = HASH_TYPE_SHA1;
-		break;
-	case ACVP_SHA224:
-	case ACVP_HMACSHA2_224:
-		*hash = HASH_TYPE_SHA224;
-		break;
 	case ACVP_SHA256:
 	case ACVP_HMACSHA2_256:
-		*hash = HASH_TYPE_SHA256;
-		break;
-	case ACVP_SHA384:
-	case ACVP_HMACSHA2_384:
-		*hash = HASH_TYPE_SHA384;
+		hash = sha256;
 		break;
 	case ACVP_SHA512:
 	case ACVP_HMACSHA2_512:
-		*hash = HASH_TYPE_SHA512;
+		hash = sha512;
+		break;
+	case ACVP_SHA3_224:
+	case ACVP_HMACSHA3_224:
+		hash = sha3_224;
+		break;
+	case ACVP_SHA3_256:
+	case ACVP_HMACSHA3_256:
+		hash = sha3_256;
+		break;
+	case ACVP_SHA3_384:
+	case ACVP_HMACSHA3_384:
+		hash = sha3_384;
+		break;
+	case ACVP_SHA3_512:
+	case ACVP_HMACSHA3_512:
+		hash = sha3_512;
 		break;
 	default:
-		logger(LOGGER_WARN, "Unknown cipher\n");
-		return -EINVAL;
+		logger(LOGGER_ERR, "Cipher implementation not found\n");
+		return -EOPNOTSUPP;
 	}
+
+	*ret_hash = hash;
 	return 0;
 }
 
 static int acvpproxy_sha_generate(struct sha_data *data, flags_t parsed_flags)
 {
-	const hash_spec *spec;
-	hash_ctx *ctx = NULL;
-	hash_type hash;
-	int ret = 0;
+	HASH_CTX_ON_STACK(ctx);
+	const struct hash *hash;
+	int ret;
 
 	(void)parsed_flags;
 
-	CKINT(acvpproxy_convert(data->cipher, &hash));
+	CKINT(acvpproxy_hash_convert(data->cipher, &hash));
 
-	spec = hash_spec_get(hash);
-	CKNULL_LOG(spec, -EINVAL, "Cannot find hash implementation\n");
+	CKINT(alloc_buf(hash->digestsize, &data->mac));
 
-	CKINT_LOG(alloc_buf(spec->hash, &data->mac),
-			    "SHA buffer cannot be allocated\n");
-
-	ctx = malloc(spec->ctx);
-	CKNULL_LOG(ctx, -ENOMEM, "Cannot allocate hash context\n");
-
-	spec->init(ctx);
-	spec->update(ctx, data->msg.buf, data->msg.len);
-	spec->finish(ctx, data->mac.buf);
-
-	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "hash");
+	hash->init(ctx);
+	hash->update(ctx, data->msg.buf, data->msg.len);
+	hash->final(ctx, data->mac.buf);
 
 out:
-	if (ctx)
-		free(ctx);
 	return ret;
 }
 
@@ -106,21 +104,18 @@ static void acvpproxy_sha_backend(void)
  ************************************************/
 static int acvpproxy_mac_generate(struct hmac_data *data, flags_t parsed_flags)
 {
-	hash_type hash;
-	int ret = 0;
+	const struct hash *hash;
+	int ret;
 
 	(void)parsed_flags;
 
-	CKINT(acvpproxy_convert(data->cipher, &hash));
+	CKINT(acvpproxy_hash_convert(data->cipher, &hash));
 
-	ret = hmac(hash, data->key.buf, data->key.len,
-		   data->msg.buf, data->msg.len,
-		   &data->mac.buf, &data->mac.len);
-	if (!ret) {
-		logger(LOGGER_WARN, "Cannot generate HMAC\n");
-		ret = EFAULT;
-		goto out;
-	}
+	CKINT(alloc_buf(hash->digestsize, &data->mac));
+
+	hmac(hash, data->key.buf, data->key.len,
+	     data->msg.buf, data->msg.len,
+	     data->mac.buf);
 
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "HMAC");
 

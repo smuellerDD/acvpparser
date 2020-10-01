@@ -338,7 +338,7 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	/* Referencing the backend functions */
 	const struct sha_callback sha_aft = { sha_backend->hash_generate, &vector, NULL};
 	const struct json_callback sha_callback_aft[] = {
-		{ .callback.sha = sha_aft, CB_TYPE_sha, FLAG_OP_MASK_SHA | FLAG_OP_AFT | FLAG_OP_VOT},
+		{ .callback.sha = sha_aft, CB_TYPE_sha, FLAG_OP_MASK_SHA | FLAG_OP_AFT | FLAG_OP_VOT | FLAG_OP_LDT },
 	};
 	const struct json_callbacks sha_callbacks_aft = SET_CALLBACKS(sha_callback_aft);
 
@@ -362,6 +362,11 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_testresult sha_testresult_mct = SET_ARRAY(sha_testresult_mct_entries, &sha_callbacks_mct);
 
+	const struct json_entry sha_testresult_ldt_entries[] = {
+		{"md",		{.data.buf = &vector.mac, WRITER_BIN}, FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+	};
+	const struct json_testresult sha_testresult_ldt = SET_ARRAY(sha_testresult_ldt_entries, &sha_callbacks_aft);
+
 	/*
 	 * Define one particular test vector that is expected in the JSON
 	 * file.
@@ -378,6 +383,17 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_array sha_test_mct = SET_ARRAY(sha_test_mct_entries, &sha_testresult_mct);
 
+	const struct json_entry sha_test_ldt_msg_entries[] = {
+		{"content",	{.data.buf = &vector.msg, PARSER_BIN},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+		{"fullLength",	{.data.integer = &vector.ldt_expansion_size, PARSER_UINT},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+	};
+	const struct json_array sha_test_ldt_msg = SET_ARRAY(sha_test_ldt_msg_entries, &sha_testresult_ldt);
+
+	const struct json_entry sha_test_ldt_entries[] = {
+		{"largeMsg",	{.data.array = &sha_test_ldt_msg, PARSER_ARRAY},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+	};
+	const struct json_array sha_test_ldt = SET_ARRAY(sha_test_ldt_entries, NULL);
+
 	/*
 	 * Define the test group which contains ancillary data and eventually
 	 * the array of individual test vectors.
@@ -388,6 +404,7 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry sha_testgroup_entries[] = {
 		{"tests",	{.data.array = &sha_test_aft, PARSER_ARRAY},	FLAG_OP_MASK_SHA | FLAG_OP_AFT},
 		{"tests",	{.data.array = &sha_test_mct, PARSER_ARRAY},	FLAG_OP_MASK_SHA | FLAG_OP_MCT},
+		{"tests",	{.data.array = &sha_test_ldt, PARSER_ARRAY},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
 	};
 	const struct json_array sha_testgroup = SET_ARRAY(sha_testgroup_entries, NULL);
 

@@ -38,27 +38,27 @@ static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * PBKDF operation
 	 **********************************************************************/
-	DEF_CALLBACK(pbkdf, pbkdf, FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT);
+	DEF_CALLBACK(pbkdf, pbkdf, FLAG_OP_AFT);
 
 	const struct json_entry pbkdf_testresult_entries[] = {
-		{"derivedKey",		{.data.buf = &pbkdf_vector.derived_key, WRITER_BIN},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"derivedKey",		{.data.buf = &pbkdf_vector.derived_key, WRITER_BIN},		FLAG_OP_AFT},
 	};
 	const struct json_testresult pbkdf_testresult =
 		SET_ARRAY(pbkdf_testresult_entries, &pbkdf_callbacks);
 
 	const struct json_entry pbkdf_test_entries[] = {
-		{"keyLen",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT},FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"salt",		{.data.buf = &pbkdf_vector.salt, PARSER_BIN},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"password",		{.data.buf = &pbkdf_vector.password, PARSER_STRING},		FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"iterationCount",	{.data.integer = &pbkdf_vector.iteration_count, PARSER_UINT},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"keyLen",		{.data.integer = &pbkdf_vector.derived_key_length, PARSER_UINT}, FLAG_OP_AFT},
+		{"salt",		{.data.buf = &pbkdf_vector.salt, PARSER_BIN},			FLAG_OP_AFT},
+		{"password",		{.data.buf = &pbkdf_vector.password, PARSER_STRING},		FLAG_OP_AFT},
+		{"iterationCount",	{.data.integer = &pbkdf_vector.iteration_count, PARSER_UINT},	FLAG_OP_AFT},
 	};
 
 	/* search for empty arrays */
 	const struct json_array pbkdf_test = SET_ARRAY(pbkdf_test_entries, &pbkdf_testresult);
 
 	const struct json_entry pbkdf_testgroup_entries[] = {
-		{"hmacAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
-		{"tests",		{.data.array = &pbkdf_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_PBKDF | FLAG_OP_AFT},
+		{"hmacAlg",		{.data.largeint = &pbkdf_vector.hash, PARSER_CIPHER},	FLAG_OP_AFT},
+		{"tests",		{.data.array = &pbkdf_test, PARSER_ARRAY},			FLAG_OP_AFT},
 	};
 	const struct json_array pbkdf_testgroup = SET_ARRAY(pbkdf_testgroup_entries, NULL);
 
@@ -66,7 +66,7 @@ static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 	 * KDF common test group
 	 **********************************************************************/
 	const struct json_entry pbkdf_testanchor_entries[] = {
-		{"testGroups",			{.data.array = &pbkdf_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_PBKDF},
+		{"testGroups",			{.data.array = &pbkdf_testgroup, PARSER_ARRAY},	0},
 	};
 	const struct json_array pbkdf_testanchor = SET_ARRAY(pbkdf_testanchor_entries, NULL);
 

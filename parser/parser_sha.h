@@ -41,6 +41,16 @@ extern "C"
  *		       @var msg. @var bitlen is per definition at most 7
  *		       bits smaller than the message buffer in @var msg and
  *		       never larger.
+ * @var ldt_expansion_size [in] If this value is larger than zero, the msg
+ *				data provided must be repeated until this
+ *				the amount of bits defined in
+ *				ldt_expansion_size is reached. Note, the
+ *				expansion of the msg data MUST be done
+ *				PRIOR to invoking the hash operation, as the
+ *				test is intended to verify that the hash
+ *				implementation can handle large data during
+ *				its processing. Note, this variable is only
+ *				set if an LDT test vector was requested.
  * @var outlen [in] Size of the output message digest to be created in bits.
  *		      This field is required for variable-sized output message
  *		      digests, such as SHAKE.
@@ -58,6 +68,7 @@ extern "C"
 struct sha_data {
 	struct buffer msg;
 	uint32_t bitlen;
+	uint32_t ldt_expansion_size;
 	uint32_t outlen;
 	uint32_t minoutlen;
 	uint32_t maxoutlen;

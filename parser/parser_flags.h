@@ -53,6 +53,8 @@ typedef uint64_t	flags_t;
 /* ECDH validation */
 #define FLAG_OP_VAL					(0x0000000000000010ULL)
 #define FLAG_OP_VOT					(0x0000000000000020ULL)
+/* Hash operation */
+#define FLAG_OP_LDT					FLAG_OP_VOT
 #define FLAG_OP_MASK_BASE				(0x000000000000003fULL)
 
 /* Symmetric Ciphers: JSON field is expected during enc. */
@@ -168,7 +170,7 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_KDF_TYPE_IKEV1_DSA			(0x0200000000000000ULL)
 #define FLAG_OP_KDF_TYPE_IKEV1_PKE			(0x0400000000000000ULL)
 #define FLAG_OP_KDF_TYPE_800_108			(0x0800000000000000ULL)
-#define FLAG_OP_KDF_TYPE_PBKDF				(0x1000000000000000ULL)
+#define FLAG_OP_KDF_TYPE_HKDF				(0x1000000000000000ULL)
 
 /* DRBG other input flag */
 #define FLAG_OP_DRBG_RESEED				(0x2000000000000000ULL)

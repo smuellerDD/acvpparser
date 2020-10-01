@@ -171,6 +171,37 @@ out:
 	return ret;
 }
 
+int remove_leading_zeroes(struct buffer *buf)
+{
+	int ret = 0;
+	size_t i = 0, required_len = buf->len;
+
+	if (!buf->len)
+		return ret;
+
+	while (buf->buf[i++] == 0)
+		required_len--;
+	/* The test above increments i one extra time, we bring it back */
+	i--;
+
+	if (buf->len > required_len) {
+		struct buffer cpy_tmp;
+		BUFFER_INIT(tmp);
+
+		CKINT(alloc_buf(required_len, &tmp));
+
+		if (!tmp.buf)
+			goto out;
+
+		memcpy(tmp.buf, buf->buf + i, required_len);
+		copy_ptr_buf(&cpy_tmp, buf);
+		copy_ptr_buf(buf, &tmp);
+		free_buf(&cpy_tmp);
+	}
+out:
+	return ret;
+}
+
 int mpi_remove_pad(struct buffer *buf, size_t required_len)
 {
 	int ret = 0;

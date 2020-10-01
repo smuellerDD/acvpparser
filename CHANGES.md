@@ -1,3 +1,7 @@
+v1.2.0
+- fix: TDES CFB64 and OFB produce the right IVs
+- enhancement: add LDT support
+
 v1.1.0
 - split out PBKDF from kdf-components to comply with ACVP server structure
 - enhancement: add -t - this currently only applies to ECDSA siggen to create a sigver test vector

@@ -141,11 +141,11 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"MODP-4096", ACVP_DH_MODP_4096},
 	{"MODP-6144", ACVP_DH_MODP_6144},
 	{"MODP-8192", ACVP_DH_MODP_8192},
-	{"ffdhe-2048", ACVP_DH_FFDHE_2048},
-	{"ffdhe-3072", ACVP_DH_FFDHE_3072},
-	{"ffdhe-4096", ACVP_DH_FFDHE_4096},
-	{"ffdhe-6144", ACVP_DH_FFDHE_6144},
-	{"ffdhe-8192", ACVP_DH_FFDHE_8192},
+	{"ffdhe2048", ACVP_DH_FFDHE_2048},
+	{"ffdhe3072", ACVP_DH_FFDHE_3072},
+	{"ffdhe4096", ACVP_DH_FFDHE_4096},
+	{"ffdhe6144", ACVP_DH_FFDHE_6144},
+	{"ffdhe8192", ACVP_DH_FFDHE_8192},
 
 	{"KTS-IFC", ACVP_KTS_IFC},
 	/* KTS schema */

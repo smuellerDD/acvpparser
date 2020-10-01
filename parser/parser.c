@@ -278,12 +278,16 @@ int main(int argc, char *argv[])
 	const char *infile, *outfile = NULL;
 	int ret, expected = 0, regression = 0, c = 0;
 
+#define ACVP_PARSER_WITH_GETOPTLONG
+
 	opterr = 0;
 
 	logger_set_verbosity(LOGGER_ERR);
 
 	while (1) {
 		int opt_index = 0;
+
+#ifdef ACVP_PARSER_WITH_GETOPTLONG
 		static struct option options[] = {
 			{"verbose",		no_argument,		0, 'v'},
 			{"expected",		no_argument,		0, 'e'},
@@ -294,6 +298,9 @@ int main(int argc, char *argv[])
 			{0, 0, 0, 0}
 		};
 		c = getopt_long(argc, argv, "verth", options, &opt_index);
+#else
+		c = getopt(argc, argv, "verth");
+#endif
 		if (-1 == c)
 			break;
 		switch (c) {
