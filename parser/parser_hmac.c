@@ -161,6 +161,7 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry mac_testgroup_entries[] = {
+		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT},
 		{"tests",	{.data.array = &hmac_test, PARSER_ARRAY},	FLAG_OP_AFT},
 	};
 	const struct json_array mac_testgroup = SET_ARRAY(mac_testgroup_entries, NULL);
@@ -268,8 +269,9 @@ static int cmac_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry mac_testgroup_entries[] = {
+		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_CMAC_GEN_TEST | FLAG_OP_CMAC_VER_TEST},
 		{"tests",	{.data.array = &cmac_test_gen, PARSER_ARRAY},	FLAG_OP_AFT | FLAG_OP_CMAC_GEN_TEST},
-		{"tests",	{.data.array = &cmac_test_ver, PARSER_ARRAY},	 FLAG_OP_AFT | FLAG_OP_CMAC_VER_TEST},
+		{"tests",	{.data.array = &cmac_test_ver, PARSER_ARRAY},	FLAG_OP_AFT | FLAG_OP_CMAC_VER_TEST},
 	};
 	const struct json_array mac_testgroup = SET_ARRAY(mac_testgroup_entries, NULL);
 

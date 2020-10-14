@@ -36,13 +36,13 @@ extern "C"
 {
 #endif
 
-#define MAJVERSION 1   /* API / ABI incompatible changes,
+#define MAJVERSION 2   /* API / ABI incompatible changes,
 			* functional changes that require consumer
 			* to be updated (as long as this number is
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 2   /* API compatible, ABI may change,
+#define MINVERSION 0   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */

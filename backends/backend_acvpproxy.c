@@ -91,6 +91,7 @@ out:
 static struct sha_backend acvpproxy_sha =
 {
 	acvpproxy_sha_generate,   /* hash_generate */
+	NULL
 };
 
 ACVP_DEFINE_CONSTRUCTOR(acvpproxy_sha_backend)

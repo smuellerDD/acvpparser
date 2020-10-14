@@ -97,7 +97,7 @@ static void openssl_backend_init(void)
  * Compile the code for OpenSSL 1.0.x
  */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-# undef OPENSSL_10X_RHEL
+# define OPENSSL_10X
 #endif
 
 /*
@@ -105,6 +105,13 @@ static void openssl_backend_init(void)
  */
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
 # define OPENSSL_SSH_SHA3
+#endif
+
+/*
+ * Enable Keywrap support
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+# define OPENSSL_AESKW
 #endif
 
 /*
@@ -552,7 +559,7 @@ static size_t openssl_entropy(DRBG_CTX *dctx, unsigned char **pout,
 
 #endif
 
-#ifdef OPENSSL_10X_RHEL
+#ifdef OPENSSL_10X
 int
 private_tls1_PRF(long digest_mask,
 		 const void *seed1, int seed1_len,
@@ -681,11 +688,26 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 {
 	int ret = 0;
 	BIGNUM *p = NULL, *q = NULL, *g = NULL;
+	DSA *dsa = NULL;
 	BN_CTX *ctx = NULL;
 	const EVP_MD *md = NULL;
+	uint8_t buf[32];
+	unsigned long h;
 
-	ctx = BN_CTX_new();
-	CKNULL_LOG(ctx, 1, "BN_CTX_new() failed");
+	if (N > sizeof(buf)) {
+		logger(LOGGER_ERR, "Insufficient temporary buffer space\n");
+		return -EINVAL;
+	}
+
+	switch (cipher & (ACVP_HASHMASK | ACVP_HMACMASK | ACVP_SHAKEMASK)) {
+	case ACVP_SHA1:
+	case ACVP_SHA224:
+	case ACVP_SHA256:
+		break;
+	default:
+		logger(LOGGER_ERR, "OpenSSL FIPS_dsa_generate_pq allocates only up to SHA2-256 buffer space - larger hashes are not supported\n");
+		return -EINVAL;
+	}
 
 	logger(LOGGER_DEBUG, "L = %u\n", L);
 	logger(LOGGER_DEBUG, "N = %u\n", N);
@@ -700,25 +722,56 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 			    "RAND_bytes() failed\n");
 
 		logger_binary(LOGGER_DEBUG, firstseed->buf,
-			firstseed->len, "domain_param_seed");
+			      firstseed->len, "domain_param_seed");
 	}
 
+#if 0
+	(void)ctx;
+
+	dsa = DSA_new();
+	CKNULL_LOG(dsa, 1, "DSA_new()");
+
+	CKINT_O_LOG(FIPS_dsa_builtin_paramgen(dsa, L, N, md,
+					      firstseed ? firstseed->buf : NULL,
+					      firstseed ? firstseed->len : 0,
+					      (int *)counter, &h, NULL),
+		    "FIPS_dsa_builtin_paramgen() failed");
+	CKINT(openssl_bn2buffer(dsa->p, P));
+	CKINT(openssl_bn2buffer(dsa->q, Q));
+	if (G)
+		CKINT(openssl_bn2buffer(dsa->g, G));
+#else
+	(void)dsa;
+
+	ctx = BN_CTX_new();
+	CKNULL_LOG(ctx, 1, "BN_CTX_new() failed");
+
 	CKINT_O_LOG(FIPS_dsa_generate_pq(ctx, L, N,
-					 md, firstseed ? firstseed->buf : NULL,
+					 md, firstseed ? firstseed->buf : buf,
 					 firstseed ? firstseed->len : 0,
 					 &p, &q,
-					 (int *) &counter, NULL),
+					 (int *)counter, NULL),
 		    "FIPS_dsa_generate_pq() failed");
 
 	CKINT(openssl_bn2buffer(p, P));
 	CKINT(openssl_bn2buffer(q, Q));
-	CKINT(openssl_bn2buffer(g, G));
+
+	if (G) {
+		CKINT_O_LOG(FIPS_dsa_generate_g(ctx, p, q, &g, &h, NULL),
+						"FIPS_dsa_generate_g() failed");
+		CKINT(openssl_bn2buffer(g, G));
+	}
+#endif
 
 out:
-	BN_CTX_free(ctx);
+	if (ctx)
+		BN_CTX_free(ctx);
 	BN_free(p);
 	BN_free(q);
 	BN_free(g);
+
+	if (dsa)
+		DSA_free(dsa);
 
 	return ret;
 }
@@ -862,6 +915,8 @@ out:
 	BN_free(q);
 	BN_free(g);
 	BN_free(rem);
+	if (dsa)
+		DSA_free(dsa);
 
 	return ret;
 }
@@ -1518,6 +1573,7 @@ static int openssl_mct_fini(struct sym_data *data, flags_t parsed_flags)
 	return 0;
 }
 
+#ifdef OPENSSL_AESKW
 static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
 {
 	AES_KEY AESkey;
@@ -1609,6 +1665,21 @@ static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
 out:
 	return ret;
 }
+#else
+static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	(void)data;
+	(void)parsed_flags;
+	return -EOPNOTSUPP;
+}
+
+static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	(void)data;
+	(void)parsed_flags;
+	return -EOPNOTSUPP;
+}
+#endif
 
 static int openssl_encrypt(struct sym_data *data, flags_t parsed_flags)
 {
@@ -1822,9 +1893,55 @@ out:
 	return ret;
 }
 
+/*
+ * Example for SHA MCT inner loop handling in backend
+ *
+ * This code is meant to be an example - it is meaningless for OpenSSL (but it
+ * works!), but when having, say, an HSM where ACVP handling code invoking the
+ * HSM crypto code is also found within the HSM, moving this function into that
+ * HSM handling code reduces the round trip between the host executing the ACVP
+ * parser code and the HSM executing the ACVP handling code a 1000-fold.
+ *
+ * This code should be invoked with the hash_mct_inner_loop function pointer.
+ */
+#if 0
+#include "parser_sha_mct_helper.h"
+
+static int openssl_hash_inner_loop(struct sha_data *data, flags_t parsed_flags)
+{
+	switch (data->cipher & (ACVP_HASHMASK |
+				ACVP_HMACMASK |
+				ACVP_SHAKEMASK)) {
+	case ACVP_SHA1:
+	case ACVP_SHA224:
+	case ACVP_SHA256:
+	case ACVP_SHA384:
+	case ACVP_SHA512:
+		return parser_sha2_inner_loop(data, parsed_flags,
+					      openssl_sha_generate);
+
+	case ACVP_SHA3_224:
+	case ACVP_SHA3_256:
+	case ACVP_SHA3_384:
+	case ACVP_SHA3_512:
+		return parser_sha3_inner_loop(data, parsed_flags,
+					      openssl_sha_generate);
+
+	case ACVP_SHAKE128:
+	case ACVP_SHAKE256:
+		return parser_shake_inner_loop(data, parsed_flags,
+					       openssl_sha_generate);
+
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+#endif
+
 static struct sha_backend openssl_sha =
 {
 	openssl_sha_generate,   /* hash_generate */
+	NULL,			/* or use openssl_hash_inner_loop */
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_sha_backend)
@@ -4572,7 +4689,7 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 
 		if (compare) {
 			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-				      "expexted shared secret hash");
+				      "expected shared secret hash");
 			if (memcmp(hashzz->buf, hashzz_tmp, hashzz->len))
 				ret = -ENOENT;
 			else
@@ -4588,7 +4705,7 @@ static int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 				goto out;
 			}
 			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-				      "expexted shared secret hash");
+				      "expected shared secret hash");
 			if (memcmp(hashzz->buf, ss->buf, hashzz->len))
 				ret = -ENOENT;
 			else
@@ -4809,6 +4926,7 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 	local_key = EC_KEY_new_by_curve_name(nid);
 	CKNULL_LOG(local_key, -ENOMEM, "EC_KEY_new_by_curve_name() failed\n");
+	EC_KEY_set_flags(local_key, EC_FLAG_COFACTOR_ECDH);
 
 	if (!privloc->len || !Qxloc->len || !Qyloc->len) {
 		/* Create our own local key */

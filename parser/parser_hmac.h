@@ -36,6 +36,9 @@ extern "C"
  * @var key2 [disregard] Parser-internal use.
  * @var key3 [disregard] Parser-internal use.
  * @var msg [in] Data buffer holding the message to be hashed in binary form.
+ * @var maclen [in] Length of the requested message digest in bits - depending
+ *		    on the cipher requests, the message digest length may
+ *		    deviate from the digest size.
  * @var mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
@@ -48,6 +51,7 @@ struct hmac_data {
 	struct buffer key2;
 	struct buffer key3;
 	struct buffer msg;
+	uint32_t maclen;
 	struct buffer mac;
 	uint32_t verify_result;
 	uint64_t cipher;

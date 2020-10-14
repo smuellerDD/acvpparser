@@ -1,3 +1,8 @@
+v2.0.0
+- fix OpenSSL ECDH with B/K curves
+- enhancement: allow SHA/SHAKE inner loop to be implemented in backend - note, this change mandates a backend to add an initializer to the SHA backend definition. Use the sha_backend->hash_mct_inner_loop function pointer to implement the inner loop in the backend. To support the MCT implementation, parser_sha_mct_helper.h may be used.
+- enhancement: parse the HMAC/CMAC MAC length field and provide it to backends
+
 v1.2.0
 - fix: TDES CFB64 and OFB produce the right IVs
 - enhancement: add LDT support

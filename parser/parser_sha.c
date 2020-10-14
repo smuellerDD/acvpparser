@@ -27,6 +27,7 @@
 
 #include "parser_common.h"
 #include "parser_sha.h"
+#include "parser_sha_mct_helper.h"
 
 static struct sha_backend *sha_backend = NULL;
 
@@ -40,8 +41,7 @@ static int shake_mct_helper(const struct json_array *processdata,
 					    flags_t parsed_flags),
 			    struct sha_data *vector)
 {
-	uint32_t minoutbytes = (vector->minoutlen + 7) / 8,
-		 maxoutbytes = vector->maxoutlen / 8;
+	uint32_t maxoutbytes = vector->maxoutlen / 8;
 	unsigned int i;
 	int ret;
 	struct json_object *testresult, *resultsarray = NULL;
@@ -50,7 +50,6 @@ static int shake_mct_helper(const struct json_array *processdata,
 	(void)processdata;
 
 	CKNULL(sha_backend->hash_generate, -EOPNOTSUPP);
-	CKNULL(minoutbytes, -EOPNOTSUPP);
 	CKNULL(maxoutbytes, -EOPNOTSUPP);
 
 	/* Create output stream. */
@@ -69,10 +68,6 @@ static int shake_mct_helper(const struct json_array *processdata,
 	vector->msg.len = min(vector->msg.len, 16);
 
 	for (i = 0; i < 100; i++) {
-		uint32_t range;
-		unsigned int j = 0;
-		size_t read_outbits;
-		uint16_t outbits = 0;
 		struct json_object *single_mct_result;
 
 		/*
@@ -84,33 +79,25 @@ static int shake_mct_helper(const struct json_array *processdata,
 		/* Append the output JSON stream with test results. */
 		CKINT(json_object_array_add(resultsarray, single_mct_result));
 
-		for (j = 0; j < 1000; j++) {
-			free_buf(&vector->mac);
-			CKINT_LOG(sha_backend->hash_generate(vector,
-							     parsed_flags),
-				  "SHAKE operation failed\n");
-
-			/* hash becomes new message */
-			memset(vector->msg.buf, 0, vector->msg.len);
-			memcpy(vector->msg.buf, vector->mac.buf,
-			       min(vector->msg.len, vector->mac.len));
-
-			read_outbits = min(vector->mac.len, sizeof(outbits));
+		if (sha_backend->hash_mct_inner_loop) {
+			ret = sha_backend->hash_mct_inner_loop(vector,
+							parsed_flags);
 
 			/*
-			 * Rightmost_Output_bits = rightmost 16 bits of
-			 * Output_i.
+			 * If the execution failed, we fall back
+			 * to execute the inner loop with the code
+			 * below.
 			 */
-			memcpy(&outbits + sizeof(outbits) - read_outbits,
-			       vector->mac.buf + vector->mac.len - read_outbits,
-			       read_outbits);
+			if (ret != 0) {
+				CKINT(parser_shake_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
+			}
 
-			/* Convert read value into an integer */
-			outbits = be_bswap16(outbits);
-
-			range = maxoutbytes - minoutbytes + 1;
-			vector->outlen = minoutbytes + (outbits % range);
-			vector->outlen *= 8;
+		} else {
+			CKINT(parser_shake_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
 		}
 
 		CKINT(json_add_bin2hex(single_mct_result, "md",
@@ -164,7 +151,6 @@ static int sha3_mct_helper(const struct json_array *processdata,
 	CKINT(json_add_test_data(testvector, testresult));
 
 	for (i = 0; i < 100; i++) {
-		unsigned int j = 0;
 		struct json_object *single_mct_result;
 
 		/*
@@ -176,15 +162,25 @@ static int sha3_mct_helper(const struct json_array *processdata,
 		/* Append the output JSON stream with test results. */
 		CKINT(json_object_array_add(resultsarray, single_mct_result));
 
-		for (j = 0; j < 1000; j++) {
-			free_buf(&vector->mac);
-			CKINT_LOG(sha_backend->hash_generate(vector,
-							     parsed_flags),
-				  "SHA operation failed\n");
+		if (sha_backend->hash_mct_inner_loop) {
+			ret = sha_backend->hash_mct_inner_loop(vector,
+							parsed_flags);
 
-			/* hash becomes new message */
-			memcpy(vector->msg.buf, vector->mac.buf,
-			       vector->mac.len);
+			/*
+			 * If the execution failed, we fall back
+			 * to execute the inner loop with the code
+			 * below.
+			 */
+			if (ret != 0) {
+				CKINT(parser_sha3_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
+			}
+
+		} else {
+			CKINT(parser_sha3_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
 		}
 
 		CKINT(json_add_bin2hex(single_mct_result, "md",
@@ -246,7 +242,6 @@ static int sha2_mct_helper(const struct json_array *processdata,
 	CKINT(json_add_test_data(testvector, testresult));
 
 	for (i = 0; i < 100; i++) {
-		unsigned int j = 0;
 		struct json_object *single_mct_result;
 
 		/*
@@ -259,21 +254,25 @@ static int sha2_mct_helper(const struct json_array *processdata,
 		/* Append the output JSON stream with test results. */
 		CKINT(json_object_array_add(resultsarray, single_mct_result));
 
-		for (j = 0; j < 1000; j++) {
-			unsigned int k = 0;
+		if (sha_backend->hash_mct_inner_loop) {
+			ret = sha_backend->hash_mct_inner_loop(vector,
+							parsed_flags);
 
-			free_buf(&vector->mac);
-			CKINT_LOG(sha_backend->hash_generate(vector,
-							     parsed_flags),
-				  "SHA operation failed\n");
+			/*
+			 * If the execution failed, we fall back
+			 * to execute the inner loop with the code
+			 * below.
+			 */
+			if (ret != 0) {
+				CKINT(parser_sha2_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
+			}
 
-			/* move the two last blocks to the front */
-			for (k = 0; k < vector->mac.len * 2; k++)
-				vector->msg.buf[k] =
-					vector->msg.buf[(k + vector->mac.len)];
-			/* place newly calculated message to the end */
-			memcpy(vector->msg.buf + vector->mac.len * 2,
-			       vector->mac.buf, vector->mac.len);
+		} else {
+			CKINT(parser_sha2_inner_loop(vector,
+					parsed_flags,
+					sha_backend->hash_generate));
 		}
 
 		CKINT(json_add_bin2hex(single_mct_result, "md",

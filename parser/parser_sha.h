@@ -82,9 +82,20 @@ struct sha_data {
  * All functions return 0 on success or != 0 on error.
  *
  * @var hash_generate Perform a message digest operation with the given data.
+ * @var hash_mct_inner_loop Perform inner loop of the hash MCT. The returned
+ *	message digest buffer must contain the data of the last iteration.
+ *	Note: SHA1/2 have a different MCT definition compared to SHAKE and
+ *	SHA3! If this pointer is set to NULL, the parser will perform the
+ *	task of executing the MCT using the hash_generate function. Thus, this
+ *	callback is a convenience callback to allow developers the reduction of
+ *	the number of invocations of an IUT.
+ *	Note 2: If this function returns an error, the parser will fall back
+ *	to use hash_generate. This way it is possible to implement an innner
+ *	loop in the IUT for, say, SHA1/2 but not for SHA3.
  */
 struct sha_backend {
 	int (*hash_generate)(struct sha_data *data, flags_t parsed_flags);
+	int (*hash_mct_inner_loop)(struct sha_data *data, flags_t parsed_flags);
 };
 
 void register_sha_impl(struct sha_backend *implementation);
