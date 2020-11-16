@@ -107,8 +107,9 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 
 	{"kdf-components", ACVP_KDF_COMPONENT},
 	{"PBKDF", ACVP_PBKDF},
-	{"HKDF", ACVP_HKDF},
+	{"KAS-KDF", ACVP_HKDF},
 	{"KDF", ACVP_KDF_800_108},
+	{"TLS-v1.3", ACVP_KDF_TLS13},
 	{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
 	{"feedback", ACVP_KDF_108_FEEDBACK},
 	{"counter", ACVP_KDF_108_COUNTER},

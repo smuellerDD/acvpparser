@@ -965,8 +965,8 @@ JSON_EXPORT int json_object_set_string_len(json_object* obj, const char* new_val
  *   contained objects referenced by their key are equal,
  *   regardless their order.
  *
- * @param obj1 the first json_object instance
- * @param obj2 the second json_object instance
+ * @param jso1 the first json_object instance
+ * @param jso2 the second json_object instance
  * @param str_cmp comparison function (e.g. memcmp, strncmp)
  * @returns whether both objects are equal or not
  */

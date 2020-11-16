@@ -1,3 +1,10 @@
+v2.1.0
+- fix: KTS OAEP responder validation test result reporting
+- enhancement: add TLS v1.3 parser
+- enhancement: add SP800-56C rev 1 parser
+- enhancement: add SP800-56C rev 1 test (in lieu for TLS v1.3 KDF) for OpenSSL
+- enhancement: add working RSADP test
+
 v2.0.0
 - fix OpenSSL ECDH with B/K curves
 - enhancement: allow SHA/SHAKE inner loop to be implemented in backend - note, this change mandates a backend to add an initializer to the SHA backend definition. Use the sha_backend->hash_mct_inner_loop function pointer to implement the inner loop in the backend. To support the MCT implementation, parser_sha_mct_helper.h may be used.

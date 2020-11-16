@@ -21,8 +21,55 @@
 
 #include "logger.h"
 #include "parser_common.h"
+#include "stringhelper.h"
+
+#define HKDF_DEF_CALLBACK_HELPER(name, flags, helper)			       \
+				 DEF_CALLBACK_HELPER(hkdf, name, flags, helper)
 
 static struct hkdf_backend *hkdf_backend = NULL;
+
+static int hkdf_helper(const struct json_array *processdata,
+		       flags_t parsed_flags,
+		       struct json_object *testvector,
+		       struct json_object *testresults,
+	int (*callback)(struct hkdf_data *vector, flags_t parsed_flags),
+			struct hkdf_data *vector)
+{
+
+	int ret = 0;
+
+	(void)testvector;
+	(void)processdata;
+	(void)testresults;
+
+	/* Create fixed info field */
+	CKINT(alloc_buf(vector->fi_partyU.len + vector->fi_partyU_ephem.len +
+			vector->fi_partyV.len + vector->fi_partyV_ephem.len,
+			&vector->info));
+
+	/* Concatenate data */
+	memcpy(vector->info.buf, vector->fi_partyU.buf, vector->fi_partyU.len);
+	if (vector->fi_partyU_ephem.len)
+		memcpy(vector->info.buf + vector->fi_partyU.len,
+		       vector->fi_partyU_ephem.buf,
+		       vector->fi_partyU_ephem.len);
+	memcpy(vector->info.buf +
+	       vector->fi_partyU.len + vector->fi_partyU_ephem.len,
+	       vector->fi_partyV.buf, vector->fi_partyV.len);
+	if (vector->fi_partyV_ephem.len)
+		memcpy(vector->info.buf + vector->fi_partyU.len +
+		       vector->fi_partyU_ephem.len + vector->fi_partyV.len,
+		       vector->fi_partyV_ephem.buf,
+		       vector->fi_partyV_ephem.len);
+
+	logger_binary(LOGGER_DEBUG, vector->info.buf, vector->info.len, "info");
+
+	CKINT(callback(vector, parsed_flags));
+
+out:
+	free_buf(&vector->info);
+	return ret;
+}
 
 /* parser for home-grown data HKDF test data */
 static int hkdf_tester(struct json_object *in, struct json_object *out,
@@ -35,28 +82,59 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 		return -EOPNOTSUPP;
 	}
 
-	DEF_CALLBACK(hkdf, hkdf, FLAG_OP_AFT);
+	HKDF_DEF_CALLBACK_HELPER(hkdf, FLAG_OP_AFT | FLAG_OP_VAL, hkdf_helper);
 
 	/*
 	 * Define which test result data should be written to the test result
 	 * JSON file.
 	 */
 	const struct json_entry hkdf_testresult_entries[] = {
-		{"okm",	{.data.buf = &hkdf_vector.okm, WRITER_BIN}, FLAG_OP_AFT},
-		{"salt",{.data.buf = &hkdf_vector.salt, WRITER_BIN}, FLAG_OP_AFT},
-		{"info",{.data.buf = &hkdf_vector.info, WRITER_BIN}, FLAG_OP_AFT},
+		{"dkm",		{.data.buf = &hkdf_vector.dkm,			WRITER_BIN},	FLAG_OP_AFT},
+		{"testPassed",	{.data.integer = &hkdf_vector.validity_success,	WRITER_BOOL},	FLAG_OP_VAL},
 	};
 	const struct json_testresult hkdf_testresult = SET_ARRAY(hkdf_testresult_entries, &hkdf_callbacks);
+
+	/* fixed info party V */
+	const struct json_entry hkdf_fi_partyV_entries[] = {
+		{"partyId",		{.data.buf = &hkdf_vector.fi_partyV,		PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL },
+		{"ephemeralData",	{.data.buf = &hkdf_vector.fi_partyV_ephem,	PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OPTIONAL},
+	};
+	const struct json_array hkdf_fi_partyV_test =
+		SET_ARRAY(hkdf_fi_partyV_entries, NULL);
+
+	/* fixed info party U */
+	const struct json_entry hkdf_fi_partyU_entries[] = {
+		{"partyId",		{.data.buf = &hkdf_vector.fi_partyU,		PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"ephemeralData",	{.data.buf = &hkdf_vector.fi_partyU_ephem,	PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OPTIONAL},
+	};
+	const struct json_array hkdf_fi_partyU_test =
+		SET_ARRAY(hkdf_fi_partyU_entries, NULL);
+
+	/* kdfParameter */
+	const struct json_entry hkdf_kdf_entries[] = {
+		{"salt",		{.data.buf = &hkdf_vector.salt,			PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"z",			{.data.buf = &hkdf_vector.z,			PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"l",			{.data.integer = &hkdf_vector.dkmlen,		PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"fixedInfoPattern",	{.data.buf = &hkdf_vector.fixed_info_pattern,	PARSER_STRING},	FLAG_OP_AFT | FLAG_OP_VAL},
+		{"hmacAlg",		{.data.largeint = &hkdf_vector.hash,		PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_VAL},
+	};
+	const struct json_array hkdf_kdf_test =
+		SET_ARRAY(hkdf_kdf_entries, NULL);
+
 
 	/*
 	 * Define one particular test vector that is expected in the JSON
 	 * file.
 	 */
 	const struct json_entry hkdf_test_entries[] = {
-		{"ikm",	{.data.buf = &hkdf_vector.ikm, PARSER_BIN}, FLAG_OP_AFT},
+		{"kdfParameter",	{.data.array = &hkdf_kdf_test, PARSER_OBJECT}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"fixedInfoPartyU",	{.data.array = &hkdf_fi_partyU_test, PARSER_OBJECT}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"fixedInfoPartyV",	{.data.array = &hkdf_fi_partyV_test, PARSER_OBJECT}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"dkm",			{.data.buf = &hkdf_vector.dkm,	PARSER_BIN}, FLAG_OP_VAL},
 	};
 	const struct json_array hkdf_test =
 		SET_ARRAY(hkdf_test_entries, &hkdf_testresult);
+
 
 	/*
 	 * Define the test group which contains ancillary data and eventually
@@ -66,11 +144,7 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry hkdf_testgroup_entries[] = {
-		{"macMode",	{.data.largeint = &hkdf_vector.mac, PARSER_CIPHER}, FLAG_OP_AFT},
-
-		{"okmLength",	{.data.integer = &hkdf_vector.okmlen, PARSER_UINT}, FLAG_OP_AFT},
-
-		{"tests",	{.data.array = &hkdf_test, PARSER_ARRAY}, FLAG_OP_AFT},
+		{"tests",	{.data.array = &hkdf_test, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_VAL},
 	};
 	const struct json_array hkdf_testgroup = SET_ARRAY(hkdf_testgroup_entries, NULL);
 

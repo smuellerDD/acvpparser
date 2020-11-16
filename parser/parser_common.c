@@ -393,6 +393,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(pbkdf)
 			CB_HANDLER(hkdf)
 			CB_HANDLER(kts_ifc)
+			CB_HANDLER(tls13)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -667,6 +668,13 @@ static const struct parser_flagsconv flagsconv_drbg_otherinput[] = {
 	{0, {NULL}, NULL}
 };
 
+static const struct parser_flagsconv flagsconv_tls13_runningmode[] = {
+	{FLAG_OP_TLS13_RUNNING_MODE_DHE, {.string = "DHE"}, "TLS v1.3 DHE running mode"},
+	{FLAG_OP_TLS13_RUNNING_MODE_PSK, {.string = "PSK"}, "TLS v1.3 PSK running mode"},
+	{FLAG_OP_TLS13_RUNNING_MODE_PSKDHE, {.string = "PSK-DHE"}, "TLS v1.3 PSK-DHE running mode"},
+	{0, {NULL}, NULL}
+};
+
 /**
  * @brief For each JSON hierarchy level, the flags are parsed and accumulated
  *	  in the parsed_flags variable.
@@ -728,6 +736,10 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 	/* DRBG */
 	parse_flagblock(obj, parsed_flags, "intendedUse", json_type_string,
 			flagsconv_drbg_otherinput);
+
+	/* TLS v1.3 */
+	parse_flagblock(obj, parsed_flags, "runningMode", json_type_string,
+			flagsconv_tls13_runningmode);
 
 	return 0;
 }

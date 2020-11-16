@@ -244,6 +244,7 @@ struct rsa_signature_primitive_data {
  * private key 'd', and calculates 's'.
  *
  * @var modulus [in] RSA modulus in bits
+ * @var num [in] Number of test cases (used internally by the parser, disregard)
  * @var num_failures [in] Number of failing RSA keys (used internally by the
  *			  parser, disregard)
  * @var tcid [in] (internal usage)
@@ -260,6 +261,7 @@ struct rsa_signature_primitive_data {
  */
 struct rsa_decryption_primitive_data {
 	uint32_t modulus;
+	uint32_t num;
 	uint32_t num_failures;
 	uint32_t tcid;
 	struct buffer msg;

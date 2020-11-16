@@ -42,7 +42,7 @@ extern "C"
 			* zero, the API is not considered stable
 			* and can change without a bump of the
 			* major version). */
-#define MINVERSION 0   /* API compatible, ABI may change,
+#define MINVERSION 1   /* API compatible, ABI may change,
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
@@ -77,6 +77,22 @@ struct mpint {
 	const char value[];
 };
 
+/**
+ * Data structure used to register a new parser
+ *
+ * @var testid defines the specific algorithm that is handled by the parser.
+ *	       It is permissible to provide a 0 here when the @var mask is
+ *	       non-null. Use a cipher definition from cipher_definitions.h.
+ * @var mask defines the group of cipher algorithms that is handled by the
+ *	     parser. It is permissible to provide a 0 here when the @var testid
+ *	     is non-null. Use a cipher mask from cipher_definitions.h.
+ * @var process_req function pointer that is the starting point of the parser
+ *		    which is invoked if the ACVP Parser framework identifies
+ *		    a test vector that is matched by either @var testid or
+ *		    @var mask.
+ * @var next initialize this field to NULL - it is used by the ACVP Parser
+ *	     framework.
+ */
 struct cavs_tester {
 	uint64_t testid;
 	uint64_t mask;

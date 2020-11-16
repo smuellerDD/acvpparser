@@ -176,6 +176,11 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_DRBG_RESEED				(0x2000000000000000ULL)
 #define FLAG_OP_DRBG_GENERATE				(0x4000000000000000ULL)
 
+/* TLS v1.3 flags */
+#define FLAG_OP_TLS13_RUNNING_MODE_DHE			(0x0000000000001000ULL)
+#define FLAG_OP_TLS13_RUNNING_MODE_PSK			(0x0000000000002000ULL)
+#define FLAG_OP_TLS13_RUNNING_MODE_PSKDHE		(0x0000000000004000ULL)
+
 /* Mask of the fields that can be found in entries */
 #define FLAG_OP_MASK					(0x7fffffffffffffffULL)
 

@@ -47,7 +47,7 @@ static int kts_ifc_tester(struct json_object *in, struct json_object *out,
 	 * KTS IFC Responder validation test
 	 *******************************************************************/
 	const struct json_entry kts_ifc_resp_val_testresult_entries[] = {
-		{"testPassed",	{.data.integer = &kts_ifc_vector.u.kts_ifc_init_validation.validation_success, WRITER_BOOL},
+		{"testPassed",	{.data.integer = &kts_ifc_vector.u.kts_ifc_resp_validation.validation_success, WRITER_BOOL},
 			         FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult kts_ifc_resp_val_testresult = SET_ARRAY(kts_ifc_resp_val_testresult_entries, &kts_ifc_callbacks);

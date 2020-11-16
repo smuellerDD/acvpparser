@@ -164,8 +164,8 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 {
 	struct json_object *testresult = NULL, *resultsarray = NULL,
 			   *resultsobject = NULL;
-	const struct json_entry *entry;
-	//unsigned int i;//, max;
+	static uint32_t failures = 0;
+	unsigned int max;
 	int ret;
 	void *rsa_privkey = NULL;
 
@@ -173,8 +173,11 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	(void)testvector;
 	(void)testresults;
 
-	/* We try at most 10 times */
-//	for (max = 0; max < 5; max++) {
+	/* We try at most 30 times */
+	for (max = 0; max < 30; max++) {
+		vector->dec_result = false;
+		free_buf(&vector->s);
+
 		if (rsa_backend->rsa_keygen_en && rsa_backend->rsa_free_key) {
 			CKINT(rsa_decprim_keygen(vector, &rsa_privkey));
 		}
@@ -183,20 +186,18 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 
 		CKINT(callback(vector, parsed_flags));
 
-// 		if (vector->num_failures) {
-// 			if (vector->dec_result) {
-// 				free_buf(&vector->s);
-// 				continue;
-// 			}
-// 			vector->num_failures--;
-// 		} else {
-// 			if (!vector->dec_result) {
-// 				free_buf(&vector->s);
-// 				continue;
-// 			}
-// 		}
-// 		break;
-// 	}
+		if (failures < vector->num_failures) {
+			/* We still have failures to create, so try it */
+			if (vector->dec_result)
+				continue;
+			failures++;
+		} else {
+			/* We only have successes to create, so try it */
+			if (!vector->dec_result)
+				continue;
+		}
+		break;
+	}
 
 	/*
 	 * Create object with following structure:
@@ -219,38 +220,77 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 					"testPassed": false
 				},
 	 */
-	testresult = json_object_new_object();
-	CKNULL(testresult, -ENOMEM);
-	/* Append the output JSON stream with test results. */
-	json_object_array_add(testresults, testresult);
 
-	CKINT(json_add_test_data(testvector, testresult));
+	if (json_object_array_length(testresults) > 1) {
+		logger(LOGGER_ERR, "Unexpected\n");
+		ret = -EFAULT;
+		goto out;
+	} else if (json_object_array_length(testresults) < 1) {
+		testresult = json_object_new_object();
+		CKNULL(testresult, -ENOMEM);
+		/* Append the output JSON stream with test results. */
+		json_object_array_add(testresults, testresult);
+	} else {
+		testresult = json_object_array_get_idx(testresults, 0);
+	}
 
-	/* Results-array */
-	resultsarray = json_object_new_array();
-	CKNULL(resultsarray, -ENOMEM);
-	json_object_object_add(testresult, "resultsArray", resultsarray);
+	if (json_find_key(testresult, "tcId", &resultsarray,
+			  json_type_int) < 0) {
+		CKINT(json_object_object_add(testresult, "tcId",
+				json_object_new_int((int)vector->tcid)));
+	}
+
+	if (json_find_key(testresult, "resultsArray", &resultsarray,
+			  json_type_array) < 0) {
+		/* Results-array */
+		resultsarray = json_object_new_array();
+		CKNULL(resultsarray, -ENOMEM);
+		json_object_object_add(testresult, "resultsArray", resultsarray);
+	}
 
 	/* One object holding the test results */
 	resultsobject = json_object_new_object();
 	CKNULL(resultsobject, -ENOMEM);
 	json_object_array_add(resultsarray, resultsobject);
 
-	/* Iterate over each write definition and invoke it. */
-	//for_each_testresult(processdata->testresult, entry, i)
-	//	CKINT(write_one_entry(entry, resultsobject, parsed_flags));
-	(void)entry;
 	CKINT(json_add_bin2hex(resultsobject, "e", &vector->e));
 	CKINT(json_add_bin2hex(resultsobject, "n", &vector->n));
 
 	if (vector->dec_result) {
 		CKINT(json_add_bin2hex(resultsobject, "plainText",
 				       &vector->s));
-	} else {
-		CKINT(json_object_object_add(resultsobject, "testPassed",
-					     json_object_new_boolean(false)));
 	}
+
+	CKINT(json_object_object_add(resultsobject, "testPassed",
+			json_object_new_boolean((int)vector->dec_result)));
 	free_buf(&vector->s);
+
+	/*
+	 * Sanity check that we have the exact number of expected failures.
+	 *
+	 * If we have a different number of failures (e.g. the number of
+	 * attempts in the loop above is insufficient), the test vector must
+	 * be rerun.
+	 */
+	if (json_object_array_length(resultsarray) == vector->num) {
+		uint32_t i, boolean, count = 0;
+
+		for (i = 0; i < vector->num; i++) {
+			testresult = json_object_array_get_idx(resultsarray, i);
+
+			if (!json_get_bool(testresult, "testPassed", &boolean) &&
+			    !boolean)
+				count++;
+		}
+
+		if (count != vector->num_failures) {
+			logger(LOGGER_ERR,
+			       "Rerun RSA decryption primitive test as the number of test failures (%u) does not match with the expected number of failures (%u)!\n",
+			       count, vector->num_failures);
+			ret = -EFAULT;
+			goto out;
+		}
+	}
 
 	ret = FLAG_RES_DATA_WRITTEN;
 
@@ -503,11 +543,12 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 		{"n",		{.data.buf = &rsa_decryption_primitive_vector.n, WRITER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
-		{"tcId",	{.data.integer = &rsa_decryption_primitive_vector.tcid, WRITER_UINT},
+		{"plainText",	{.data.buf = &rsa_decryption_primitive_vector.s, WRITER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"testPassed",	{.data.integer = &rsa_decryption_primitive_vector.dec_result, WRITER_BOOL},
+			         FLAG_OP_ASYM_TYPE_SIGVER | FLAG_OP_GDT | FLAG_OP_RSA_SIG_MASK},
 	};
 	const struct json_testresult rsa_decryption_primitive_testresult = SET_ARRAY(rsa_decryption_primitive_testresult_entries, &rsa_decryption_primitive_callbacks);
-
 
 	const struct json_entry rsa_decryption_primitive_test_entries[] = {
 		{"cipherText",	{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
@@ -603,6 +644,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry rsa_decryption_primitive_testgroup_entries[] = {
 		{"modulo",	{.data.integer = &rsa_decryption_primitive_vector.modulus, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 		{"totalFailingCases",	{.data.integer = &rsa_decryption_primitive_vector.num_failures, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+		{"totalTestCases",	{.data.integer = &rsa_decryption_primitive_vector.num, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
 		{"tests",	{.data.array = &rsa_decryption_primitive_testresults, PARSER_ARRAY},
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
 	};

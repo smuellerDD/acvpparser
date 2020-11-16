@@ -31,22 +31,40 @@ extern "C"
 /**
  * @brief RFC5869 KDF data structure
  *
- * @var mac [in] HMAC to be used for the KDF
- * @var okmlen [in] Length of output keying material in bits
- * @var ikm [in] input key material
- * @var salt [out] salt for the HKDF - the HKDF implementation shall provide
- *		   the used salt
- * @var info [out] Additional information for the HKDF - the HKDF implementation
- *		   shall provide the used salt
- * @var okm [out] The output keying material
+ * @var hash [in] hash to be used for the KDF - note, the backend must
+ *		    use the hash to initialize the HMAC cipher as required by
+ *		    the HKDF specification.
+ * @var dkmlen [in] Length of output keying material in bits
+ * @var z [in] Shared secret (input key material)
+ * @var salt [in] salt for the HKDF
+ * @var info [in] Additional information for the HKDF
+ * @var dkm [in/out] The derived keying material (if buffer is non-NULL, a
+		     the backend shall validate the DKM with its own data
+		     and report via @val validity_success - if the buffer is
+		     NULL, the generated DKM is to be returned)
+ * @var validity_success [out] Does the derived key material match with
+ *			 @var dkm (1) or whether it does not match (0).
+ *
+ * @var fixed_info_pattern [disregard]
+ * @var fi_partyU [disregard]
+ * @var fi_partyU_ephem [disregard]
+ * @var fi_partyV [disregard]
+ * @var fi_partyV_ephem [disregard]
  */
 struct hkdf_data {
-	uint64_t mac;
-	uint32_t okmlen;
-	struct buffer ikm;
+	uint64_t hash;
+	uint32_t dkmlen;
+	struct buffer z;
 	struct buffer salt;
 	struct buffer info;
-	struct buffer okm;
+	struct buffer dkm;
+	uint32_t validity_success;
+
+	struct buffer fixed_info_pattern;
+	struct buffer fi_partyU;
+	struct buffer fi_partyU_ephem;
+	struct buffer fi_partyV;
+	struct buffer fi_partyV_ephem;
 };
 
 /**
