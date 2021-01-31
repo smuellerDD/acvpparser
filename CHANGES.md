@@ -1,3 +1,8 @@
+v2.1.1
+- fix: update TLS v1.3 response following the spec update
+- enhancement: RSA OAEP testing added
+- enhancement: add FB/FC support for SP800-56A rev 3
+
 v2.1.0
 - fix: KTS OAEP responder validation test result reporting
 - enhancement: add TLS v1.3 parser

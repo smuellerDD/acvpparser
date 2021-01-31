@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2020 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -53,13 +53,15 @@ static int kts_ifc_tester(struct json_object *in, struct json_object *out,
 	const struct json_testresult kts_ifc_resp_val_testresult = SET_ARRAY(kts_ifc_resp_val_testresult_entries, &kts_ifc_callbacks);
 
 	const struct json_entry kts_ifc_resp_val_test_entries[] = {
-		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.n, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.e, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.p, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.q, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.d, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.c, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"dkm",		{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.n, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.e, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.p, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.q, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.d, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.c, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"dkm",		{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"z",		{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"hashZ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dkm_hash, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 	};
 	const struct json_array kts_ifc_resp_val_tests = SET_ARRAY(kts_ifc_resp_val_test_entries, &kts_ifc_resp_val_testresult);
 
@@ -142,7 +144,7 @@ static int kts_ifc_tester(struct json_object *in, struct json_object *out,
 		{"serverId",		{.data.buf = &kts_ifc_vector.server_id, PARSER_STRING}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
 		{"ktsConfiguration",	{.data.array = &kts_configuration, PARSER_OBJECT},	FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"macConfiguration",	{.data.array = &kts_mac_configuration, PARSER_OBJECT},	FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"macConfiguration",	{.data.array = &kts_mac_configuration, PARSER_OBJECT},	FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 
 		/* Generation tests */
 		{"tests",	{.data.array = &kts_ifc_init_tests, PARSER_ARRAY},

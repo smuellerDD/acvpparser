@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2019 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *

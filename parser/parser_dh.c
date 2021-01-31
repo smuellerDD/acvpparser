@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -461,8 +461,16 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 		{"hashFunctionZ",	{.data.largeint = &dh_ss_vector.cipher, PARSER_CIPHER},		FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"domainParameterGenerationMode",	{.data.largeint = &dh_ss_vector.safeprime, PARSER_CIPHER},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
+		{"p",	{.data.buf = &dh_ss_vector.P, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"q",	{.data.buf = &dh_ss_vector.Q, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"g",	{.data.buf = &dh_ss_vector.G, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+
 		{"hashFunctionZ",	{.data.largeint = &dh_ss_ver_vector.cipher, PARSER_CIPHER},		FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"domainParameterGenerationMode",	{.data.largeint = &dh_ss_ver_vector.safeprime, PARSER_CIPHER},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+
+		{"p",	{.data.buf = &dh_ss_ver_vector.P, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"q",	{.data.buf = &dh_ss_ver_vector.Q, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"g",	{.data.buf = &dh_ss_ver_vector.G, PARSER_BIN},	 FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 
 		{"tests",	{.data.array = &dh_e_test, PARSER_ARRAY},			FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_DH_SCHEME_EPHEMERAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"tests",	{.data.array = &dh_e_ver_test, PARSER_ARRAY},			FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_DH_SCHEME_EPHEMERAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},

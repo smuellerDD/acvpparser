@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -46,7 +46,7 @@ extern "C"
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
-#define PATCHLEVEL 0   /* API / ABI compatible, no functional
+#define PATCHLEVEL 1   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
 

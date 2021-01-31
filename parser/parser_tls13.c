@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -42,7 +42,7 @@ static int kdf_tester_tls13(struct json_object *in, struct json_object *out,
 
 	const struct json_entry tls13_testresult_entries[] = {
 		{"clientEarlyTrafficSecret",		{.data.buf = &tls13_vector.client_early_traffic_secret, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_TLS13_RUNNING_MODE_DHE | FLAG_OP_TLS13_RUNNING_MODE_PSK | FLAG_OP_TLS13_RUNNING_MODE_PSKDHE},
-		{"earlyExporterTrafficSecret",		{.data.buf = &tls13_vector.early_exporter_master_secret, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_TLS13_RUNNING_MODE_DHE | FLAG_OP_TLS13_RUNNING_MODE_PSK | FLAG_OP_TLS13_RUNNING_MODE_PSKDHE},
+		{"earlyExporterMasterSecret",		{.data.buf = &tls13_vector.early_exporter_master_secret, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_TLS13_RUNNING_MODE_DHE | FLAG_OP_TLS13_RUNNING_MODE_PSK | FLAG_OP_TLS13_RUNNING_MODE_PSKDHE},
 
 		{"clientHandshakeTrafficSecret",	{.data.buf = &tls13_vector.client_handshake_traffic_secret, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_TLS13_RUNNING_MODE_DHE | FLAG_OP_TLS13_RUNNING_MODE_PSK | FLAG_OP_TLS13_RUNNING_MODE_PSKDHE},
 		{"serverHandshakeTrafficSecret",	{.data.buf = &tls13_vector.server_handshake_traffic_secret, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_TLS13_RUNNING_MODE_DHE | FLAG_OP_TLS13_RUNNING_MODE_PSK | FLAG_OP_TLS13_RUNNING_MODE_PSKDHE},

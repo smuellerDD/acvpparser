@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2020, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2021, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -130,6 +130,21 @@ static void openssl_backend_init(void)
  */
 #ifndef OPENSSL_KBKDF
 # define OPENSSL_KBKDF
+#endif
+
+/*
+ * Enable this option if your OpenSSL code base implements the HKDF.
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+# define OPENSSL_ENABLE_HKDF
+#else
+# undef OPENSSL_ENABLE_HKDF
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+# define OPENSSL_ENABLE_TLS13
+#else
+# undef OPENSSL_ENABLE_TLS13
 #endif
 
 /************************************************
@@ -694,7 +709,7 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	uint8_t buf[32];
 	unsigned long h;
 
-	if (N > sizeof(buf)) {
+	if (((N >> 3) > sizeof(buf)) {
 		logger(LOGGER_ERR, "Insufficient temporary buffer space\n");
 		return -EINVAL;
 	}
@@ -3557,18 +3572,7 @@ static int openssl_dh_set_param(struct buffer *P /* [in] */,
 	 * BIGNUM *BN_get_rfc3526_prime_6144(BIGNUM *bn);
 	 * BIGNUM *BN_get_rfc3526_prime_8192(BIGNUM *bn);
 	 */
-	if (safeprime) {
-		struct safeprimes *p_safeprime;
-
-		CKINT(acvp_safeprime_get(safeprime, &p_safeprime));
-
-		CKINT_O0(BN_hex2bn(&p, p_safeprime->p));
-		CKINT_O0(BN_hex2bn(&q, p_safeprime->q));
-		CKINT_O0(BN_hex2bn(&g, p_safeprime->g));
-
-		if (keylen)
-			*keylen = p_safeprime->p_b.len;
-	} else {
+	if (P && P->len && Q && Q->len && G && G->len) {
 		if (!P || !Q || !G) {
 			logger(LOGGER_ERR, "Unknown PQG reference\n");
 			ret = -EINVAL;
@@ -3584,6 +3588,17 @@ static int openssl_dh_set_param(struct buffer *P /* [in] */,
 		CKNULL_LOG(g, -ENOMEM, "BN_bin2bn() failed\n");
 		if (keylen)
 			*keylen = P->len;
+	} else {
+		struct safeprimes *p_safeprime;
+
+		CKINT(acvp_safeprime_get(safeprime, &p_safeprime));
+
+		CKINT_O0(BN_hex2bn(&p, p_safeprime->p));
+		CKINT_O0(BN_hex2bn(&q, p_safeprime->q));
+		CKINT_O0(BN_hex2bn(&g, p_safeprime->g));
+
+		if (keylen)
+			*keylen = p_safeprime->p_b.len;
 	}
 
 	CKINT_O_LOG(openssl_dh_set0_pqg(dh, p, q, g),
@@ -5158,6 +5173,163 @@ static void openssl_pbkdf_backend(void)
 /************************************************
  * SP800-56B rev 2 KTS IFC cipher interface functions
  ************************************************/
+
+static int openssl_rsa_oaep_encrypt(struct kts_ifc_data *data)
+{
+	struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
+	const EVP_MD *md = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pk = NULL;
+	RSA *rsa = NULL;
+	BIGNUM *n = NULL, *e = NULL;
+	size_t outlen;
+	int ret;
+
+	if (data->keylen > data->modulus)
+		return -EINVAL;
+
+	CKINT(left_pad_buf(&init->n, data->modulus >> 3));
+	CKINT(alloc_buf(data->keylen >> 3, &init->dkm));
+	RAND_bytes(init->dkm.buf, (int)init->dkm.len);
+
+	CKINT(openssl_md_convert(data->kts_hash, &md));
+
+	n = BN_bin2bn((const unsigned char *)init->n.buf, (int)init->n.len, n);
+	CKNULL(n, -ENOMEM);
+	e = BN_bin2bn((const unsigned char *)init->e.buf, (int)init->e.len, e);
+	CKNULL(e, -ENOMEM);
+
+	rsa = RSA_new();
+	CKNULL(rsa, -ENOMEM);
+
+	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, NULL),
+		    "Assembly of RSA key failed\n");
+
+	pk = EVP_PKEY_new();
+	CKNULL(pk, -ENOMEM);
+
+	EVP_PKEY_set1_RSA(pk, rsa);
+
+	ctx = EVP_PKEY_CTX_new(pk, NULL);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+	CKINT_O_LOG(EVP_PKEY_encrypt_init(ctx), "PKEY encrypt init failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING),
+		    "Setting OAEP padding failed\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
+		    "Setting of OAEP MD failed\n");
+
+	/* Determine buffer length */
+	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &outlen, init->dkm.buf,
+				     init->dkm.len),
+		    "Getting ciphertext length failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
+
+	CKINT(alloc_buf(outlen, &init->iut_c));
+
+	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, init->iut_c.buf, &outlen,
+				     init->dkm.buf, init->dkm.len),
+		    "RSA OAEP encryption failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
+
+out:
+	if (pk)
+		EVP_PKEY_free(pk);
+	if (rsa)
+		RSA_free(rsa);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_rsa_oaep_decrypt(struct kts_ifc_data *data)
+{
+	struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
+	const EVP_MD *md = NULL;
+	BUFFER_INIT(tmp);
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pk = NULL;
+	RSA *rsa = NULL;
+	BIGNUM *n = NULL, *e = NULL, *d = NULL, *p = NULL, *q = NULL;
+	size_t outlen;
+	int ret;
+
+	if (data->keylen > data->modulus)
+		return -EINVAL;
+
+	CKINT(left_pad_buf(&resp->n, data->modulus >> 3));
+
+	CKINT(openssl_md_convert(data->kts_hash, &md));
+
+	n = BN_bin2bn((const unsigned char *)resp->n.buf, (int)resp->n.len, n);
+	CKNULL(n, -ENOMEM);
+	e = BN_bin2bn((const unsigned char *)resp->e.buf, (int)resp->e.len, e);
+	CKNULL(e, -ENOMEM);
+	d = BN_bin2bn((const unsigned char *)resp->d.buf, (int)resp->d.len, d);
+	CKNULL(d, -ENOMEM);
+	p = BN_bin2bn((const unsigned char *)resp->p.buf, (int)resp->p.len, p);
+	CKNULL(p, -ENOMEM);
+	q = BN_bin2bn((const unsigned char *)resp->q.buf, (int)resp->q.len, q);
+	CKNULL(q, -ENOMEM);
+
+	rsa = RSA_new();
+	CKNULL(rsa, -ENOMEM);
+
+	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, d),
+		    "Assembly of RSA key failed\n");
+	CKINT_O_LOG(openssl_rsa_set0_factors(rsa, p, q),
+		    "Assembly of RSA factors failed\n");
+
+	pk = EVP_PKEY_new();
+	CKNULL(pk, -ENOMEM);
+
+	EVP_PKEY_set1_RSA(pk, rsa);
+
+	ctx = EVP_PKEY_CTX_new(pk, NULL);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx), "PKEY decrypt init failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING),
+		    "Setting OAEP padding failed\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
+		    "Setting of OAEP MD failed\n");
+
+	/* Determine buffer length */
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, resp->c.buf,
+				     resp->c.len),
+		    "Getting plaintext length failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
+
+	CKINT(alloc_buf(outlen, &tmp));
+
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, tmp.buf, &tmp.len,
+				     resp->c.buf, resp->c.len),
+		    "RSA OAEP decryption failed %s\n",
+		    ERR_error_string(ERR_get_error(), NULL));
+
+	if (tmp.len < (data->keylen >> 3)) {
+		logger(LOGGER_ERR,
+		       "RSA OAEP decrypted data has insufficient size\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	CKINT(alloc_buf(data->keylen >> 3, &resp->dkm));
+	memcpy(resp->dkm.buf, tmp.buf, resp->dkm.len);
+
+out:
+	if (pk)
+		EVP_PKEY_free(pk);
+	if (rsa)
+		RSA_free(rsa);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	free_buf(&tmp);
+	return ret;
+}
+
 static int openssl_kts_ifc_generate(struct kts_ifc_data *data,
 				    flags_t parsed_flags)
 {
@@ -5167,38 +5339,24 @@ static int openssl_kts_ifc_generate(struct kts_ifc_data *data,
 
 	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
 	    (parsed_flags & FLAG_OP_AFT)) {
-		struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
-
-		CKINT(alloc_buf(4, &init->iut_c));
-		CKINT(alloc_buf(4, &init->dkm));
-		CKINT(alloc_buf(4, &init->tag));
-
-		memcpy(init->iut_c.buf, "\x01\x01\x01\x01", init->iut_c.len);
-		memcpy(init->dkm.buf, "\x02\x02\x02\x02", init->dkm.len);
-		memcpy(init->tag.buf, "\x03\x03\x03\x03", init->tag.len);
+		CKINT(openssl_rsa_oaep_encrypt(data));
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
 		   (parsed_flags & FLAG_OP_AFT)) {
-		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
-
-		CKINT(alloc_buf(4, &resp->dkm));
-		CKINT(alloc_buf(4, &resp->tag));
-
-		memcpy(resp->dkm.buf, "\x04\x04\x04\x04", resp->dkm.len);
-		memcpy(resp->tag.buf, "\x05\x05\x05\x05", resp->tag.len);
+		CKINT(openssl_rsa_oaep_decrypt(data));
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
 		   (parsed_flags & FLAG_OP_VAL)) {
 		struct kts_ifc_init_validation_data *init_val =
 					&data->u.kts_ifc_init_validation;
 
 		init_val->validation_success = 0;
-		ret = 0;
+		ret = -EOPNOTSUPP;
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
 		   (parsed_flags & FLAG_OP_VAL)) {
 		struct kts_ifc_resp_validation_data *resp_val =
 					&data->u.kts_ifc_resp_validation;
 
 		resp_val->validation_success = 1;
-		ret = 0;
+		ret = -EOPNOTSUPP;
 	} else {
 		logger(LOGGER_ERR, "Unknown test\n");
 		ret = -EINVAL;
@@ -5219,6 +5377,7 @@ static void openssl_kts_ifc_backend(void)
 	register_kts_ifc_impl(&openssl_kts_ifc);
 }
 
+#ifdef OPENSSL_ENABLE_TLS13
 /************************************************
  * RFC8446 TLS v1.3 KDF
  ************************************************/
@@ -5609,6 +5768,9 @@ static void openssl_tls13_backend(void)
 	register_tls13_impl(&openssl_tls13);
 }
 
+#endif /* OPENSSL_ENABLE_TLS13 */
+
+#ifdef OPENSSL_ENABLE_HKDF
 /************************************************
  * SP800-56C rev1 cipher interface functions
  ************************************************/
@@ -5673,3 +5835,4 @@ static void openssl_hkdf_backend(void)
 {
 	register_hkdf_impl(&openssl_hkdf);
 }
+#endif /* PENSSL_ENABLE_HKDF */

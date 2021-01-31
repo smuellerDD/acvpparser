@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -860,9 +860,8 @@ static int parse_object(const struct json_entry *entry,
 
 	CKNULL_LOG(entry->name, -EINVAL, "Entry name missing\n");
 
-	CKINT_LOG(json_find_key(readdata, entry->name, &json_nobj,
-				json_type_object),
-		  "Name %s not found\n", entry->name);
+	CKINT(json_find_key(readdata, entry->name, &json_nobj,
+			    json_type_object));
 
 	if (!json_nobj) {
 		logger(LOGGER_ERR,

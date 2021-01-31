@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -98,16 +98,14 @@ out:
 
 static int get_algorithm(struct json_object *obj, const char **algo)
 {
-	struct json_object *o, *acvpdata, *versiondata;
+	struct json_object *acvpdata, *versiondata;
 	int ret;
 
 	*algo = NULL;
 
 	CKINT(json_split_version(obj, &acvpdata, &versiondata));
 
-	CKINT(json_find_key(acvpdata, "algorithm", &o, json_type_string));
-
-	*algo = json_object_to_json_string(o);
+	CKINT(json_get_string(acvpdata, "algorithm", algo));
 
 out:
 	return ret;
@@ -255,7 +253,7 @@ static void usage(void)
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, " acvp-parser [OPTIONS] <testvector-request.json> <testvector-response.json>\n");
 	fprintf(stderr, " acvp-parser [OPTIONS] -e <expected-response.json> <testvector-response.json>\n\n");
-	fprintf(stderr, " acvp-parser [OPTIONS] -r <testvector-request.json> <testvector-response.json>\n\n");
+	fprintf(stderr, " acvp-parser [OPTIONS] -r <testvector-request.json> <expected-response.json>\n\n");
 
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "\t-e --expected\tPerform a JSON matching between the two files\n");
@@ -357,6 +355,12 @@ int main(int argc, char *argv[])
 			}
 			goto out;
 		}
+	}
+
+	if (expected && regression) {
+		logger(LOGGER_ERR, "The options of -r and -e are mutually exclusive\n");
+		ret = -EINVAL;
+		goto out;
 	}
 
 	if (argc != optind + 2) {

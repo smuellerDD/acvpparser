@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2019 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -58,6 +58,9 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"3keyTDEA", ACVP_TDESCTR},
 
 	{"CMAC-AES", ACVP_AESCMAC},
+	{"CMAC-AES128", ACVP_AESCMAC},
+	{"CMAC-AES192", ACVP_AESCMAC},
+	{"CMAC-AES256", ACVP_AESCMAC},
 	{"CMAC-TDES", ACVP_TDESCMAC},
 	{"HMAC-SHA-1", ACVP_HMACSHA1},
 	{"HMAC-SHA2-224", ACVP_HMACSHA2_224},
@@ -137,17 +140,6 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ED-25519", ACVP_ED25519},
 	{"ED-448", ACVP_ED448},
 
-	{"MODP-2048", ACVP_DH_MODP_2048},
-	{"MODP-3072", ACVP_DH_MODP_3072},
-	{"MODP-4096", ACVP_DH_MODP_4096},
-	{"MODP-6144", ACVP_DH_MODP_6144},
-	{"MODP-8192", ACVP_DH_MODP_8192},
-	{"ffdhe2048", ACVP_DH_FFDHE_2048},
-	{"ffdhe3072", ACVP_DH_FFDHE_3072},
-	{"ffdhe4096", ACVP_DH_FFDHE_4096},
-	{"ffdhe6144", ACVP_DH_FFDHE_6144},
-	{"ffdhe8192", ACVP_DH_FFDHE_8192},
-
 	{"KTS-IFC", ACVP_KTS_IFC},
 	/* KTS schema */
 	{"KTS-OAEP-basic", ACVP_KTS_SCHEMA_OAEP_BASIC},
@@ -189,6 +181,19 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"hmacDRBG_SHA-512", ACVP_DRBGHMAC | ACVP_SHA512},
 	{"hmacDRBG_SHA-512224", ACVP_DRBGHMAC | ACVP_SHA512224},
 	{"hmacDRBG_SHA-512256", ACVP_DRBGHMAC | ACVP_SHA512256},
+
+	{"MODP-2048", ACVP_DH_MODP_2048},
+	{"MODP-3072", ACVP_DH_MODP_3072},
+	{"MODP-4096", ACVP_DH_MODP_4096},
+	{"MODP-6144", ACVP_DH_MODP_6144},
+	{"MODP-8192", ACVP_DH_MODP_8192},
+	{"ffdhe2048", ACVP_DH_FFDHE_2048},
+	{"ffdhe3072", ACVP_DH_FFDHE_3072},
+	{"ffdhe4096", ACVP_DH_FFDHE_4096},
+	{"ffdhe6144", ACVP_DH_FFDHE_6144},
+	{"ffdhe8192", ACVP_DH_FFDHE_8192},
+	{"FB", ACVP_DH_FB},
+	{"FC", ACVP_DH_FC},
 };
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
@@ -202,7 +207,10 @@ uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
 	if (!algo) return ACVP_UNKNOWN;
 
 	for (i = 0; i < ARRAY_SIZE(conv); i++) {
-		if (strstr(algo, conv[i].algo)) {
+		size_t len = strlen(conv[i].algo);
+
+		if ((strlen(algo) == len) &&
+		    !strncasecmp(algo, conv[i].algo, len)) {
 			p_res = conv[i].cipher;
 			break;
 		}
@@ -236,7 +244,6 @@ int convert_cipher_algo(uint64_t cipher, uint64_t cipher_type_mask,
 {
 	unsigned int i;
 	unsigned int found = 0;
-
 
 	if (!algo)
 		return -EINVAL;

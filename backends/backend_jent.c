@@ -1,6 +1,6 @@
 /* Jitter RNG ACVP Test Tool for SHA-3 256 conditioner
  *
- * Copyright (C) 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2020 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -16,13 +16,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
  * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
- */
-
-/*
- * Usage: Point to the directory holding the jitterentropy-base.c used
- * for the production environment using the -I compiler option. That
- * file needs to be included here so that the ACVP test harness can
- * access the SHA-3 functions
  */
 
 #include <stdlib.h>

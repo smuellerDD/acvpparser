@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -296,7 +296,11 @@ int json_get_string_buf(const struct json_object *obj, const char *name,
 
 	buf->len--;
 
+#ifdef __APPLE__
+	strlcpy((char *)buf->buf, string, buf->len);
+#else
 	strncpy((char *)buf->buf, string, buf->len);
+#endif
 
 	return 0;
 }

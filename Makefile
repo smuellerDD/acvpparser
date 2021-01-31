@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2020, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 
@@ -97,15 +97,12 @@ ifeq (nettle,$(firstword $(MAKECMDGOALS)))
 endif
 
 ################## CONFIGURE BACKEND GNUTLS ################
-GNUTLS_SRCS = gnutls_src
-GNUTLS_NETTLE_SRCS := $(GNUTLS_SRCS)/lib/nettle/int
-GNUTLS_CONFIG_SRCS := $(GNUTLS_SRCS)/config.h
+GNUTLS_INTERNAL_HEADERS = backend_interfaces/gnutls/
 
 ifeq (gnutls,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_gnutls.c
-	INCLUDE_DIRS += $(GNUTLS_SRCS)
+	INCLUDE_DIRS += $(GNUTLS_INTERNAL_HEADERS)
 	LIBRARIES += gnutls hogweed nettle gmp
-	REQUIED_FILES += $(GNUTLS_NETTLE_SRCS) $(GNUTLS_CONFIG_SRCS)
 
 endif
 
@@ -238,7 +235,7 @@ endif
 ################## CONFIGURE BACKEND BouncyCastle ########
 
 ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
-	BC_DEVEL_DIR := /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.252.b09-1.fc32.x86_64
+	BC_DEVEL_DIR := /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.275.b01-6.fc33.x86_64
 	BC_BACKEND_DIR := ${CURDIR}/backend_interfaces/bouncycastle
 	BC_LIB_FILE := /usr/share/java/bcprov.jar
 
