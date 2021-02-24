@@ -1779,6 +1779,14 @@ static int openssl_cmac_generate(struct hmac_data *data)
 
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "mac");
 
+	// Truncate to desired macLen, which is in bits
+	if (data->mac.len > data->maclen / 8) {
+		data->mac.buf[data->maclen / 8] = '\0';
+		data->mac.len = data->maclen / 8;
+		logger(LOGGER_DEBUG, "Truncated mac to maclen: %d\n", data->maclen);
+		logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "mac");
+	}
+
 	ret = 0;
 
 out:
