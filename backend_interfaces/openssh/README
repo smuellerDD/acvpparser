@@ -1,0 +1,23 @@
+SSHv2 KDF CAVS Test
+===================
+
+This code implements the CAVS test for the SSHv2 key derivation function that is
+implemented by kex_derive_keys_bn().
+
+Compile
+-------
+
+To compile the code, do the following:
+
+1. add ssh-cavs.c it to the OpenSSH code tree
+
+2. add the following to Makefile.in
+
+SSHCAVSOBJS := roaming_dummy.o
+ssh-cavs$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHCAVSOBJS) ssh-cavs.o
+        $(LD) -o $@ $(SSHCAVSOBJS) ssh-cavs.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+
+3. Add ssh-cavs$(EXEEXT) to the TARGETS line in Makefile.in
+
+4. configure and compile the SSH code
+
