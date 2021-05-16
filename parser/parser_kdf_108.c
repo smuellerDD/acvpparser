@@ -41,6 +41,7 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 	 * JSON file.
 	 */
 	const struct json_entry kdf_108_testresult_entries[] = {
+		{"breakLocation",{.data.integer = &kdf_108_vector.break_location, WRITER_UINT}, FLAG_OP_AFT},
 		{"fixedData",	{.data.buf = &kdf_108_vector.fixed_data, WRITER_BIN}, FLAG_OP_AFT},
 		{"keyOut",	{.data.buf = &kdf_108_vector.derived_key, WRITER_BIN}, FLAG_OP_AFT},
 	};

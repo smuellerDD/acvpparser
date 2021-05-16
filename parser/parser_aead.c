@@ -200,6 +200,7 @@ static int aead_gmac_tester(struct json_object *in, struct json_object *out,
 	 * JSON file.
 	 */
 	const struct json_entry aead_testresult_entries[] = {
+		{"iv",		{.data.buf = &vector->iv, WRITER_BIN},		FLAG_OP_ENC | FLAG_OP_AFT},
 		{"tag",		{.data.buf = &vector->tag, WRITER_BIN},		FLAG_OP_ENC | FLAG_OP_AFT},
 		{"testPassed",	{.data.integer = &vector->integrity_error, WRITER_BOOL_TRUE_TO_FALSE},	FLAG_OP_DEC | FLAG_OP_AFT},
 	};
@@ -394,6 +395,9 @@ static int ccm_decrypt_helper(const struct json_array *processdata,
 	if (ret)
 		goto out;
 
+	/* Release the IV to not print it */
+	free_buf(&vector->iv);
+
 	/*
 	 * If there is an integrity error, free the data now to prevent
 	 * an empty data entry being written to JSON.
@@ -446,6 +450,9 @@ static int ccm_encrypt_helper(const struct json_array *processdata,
 
 	/* The concatenation of ciphertext and tag is now the new data buffer */
 	copy_ptr_buf(&vector->data, &tmpbuf);
+
+	/* Release the IV to not print it */
+	free_buf(&vector->iv);
 
 out:
 	return ret;

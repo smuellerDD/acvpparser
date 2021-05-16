@@ -297,8 +297,10 @@ int json_get_string_buf(const struct json_object *obj, const char *name,
 	buf->len--;
 
 #ifdef __APPLE__
-	strlcpy((char *)buf->buf, string, buf->len);
+	/* strlcpy adds the trailing NULL terminator into last character */
+	strlcpy((char *)buf->buf, string, buf->len + 1);
 #else
+	/* strncpy does not add the trailing NULL terminator */
 	strncpy((char *)buf->buf, string, buf->len);
 #endif
 

@@ -21,3 +21,15 @@ ssh-cavs$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHCAVSOBJS) ssh-cavs.o
 
 4. configure and compile the SSH code
 
+Execute Test
+------------
+
+Use the provided ssh-cavs_driver.pl and ensure that the ssh-cavs application
+is in the current directory (ssh-cavs does not depend on any special library
+and can therefore be copied around).
+
+Now, execute:
+
+	ssh-cavs_driver.pl ssh.req
+
+and return the generated ssh.rsp file back to the FIPS lab for verification.

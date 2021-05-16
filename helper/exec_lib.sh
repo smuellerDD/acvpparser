@@ -59,9 +59,10 @@ color()
 	done
 }
 
+pass_name="GENERATED"
 echo_pass()
 {
-	echo $(color "green")[GENERATED]$(color off) $@
+ 	echo $(color "green")[$pass_name]$(color off) $@
 }
 
 echo_fail()
@@ -165,6 +166,7 @@ exec_module()
 	shift
 	local vsid=${@}
 
+	local testvalidation=""
 	local vendordir
 	local i
 	local j
@@ -175,6 +177,16 @@ exec_module()
 	if $(echo $0 | grep -q "_regression")
        	then
 	       regression="regression"
+	       pass_name="VALIDATED"
+	fi
+
+	# If the script name contains "_validation" we switch into validation
+	# mode transparently
+	if $(echo $0 | grep -q "_validation")
+       	then
+	       testvalidation="validation"
+	       regression="regression"
+	       pass_name="VALIDATED"
 	fi
 
 	if [ -z "$module" ]
@@ -197,6 +209,7 @@ exec_module()
 		fi
 	fi
 
+	# Iterate over all directories
 	for vendordir in ${lib_iut_dir}/*
 	do
 		if [ ! -d "$vendordir" ]
@@ -212,6 +225,7 @@ exec_module()
 			continue
 		fi
 
+		# Iterate over all request files
 		for i in $(find ${iutdir} -name ${_LIB_REQ})
 		do
 			local dir=$(dirname $i)
@@ -252,19 +266,21 @@ exec_module()
 #				fi
 #			fi
 
-
+			# Sanity checking - no regular testing if response file exists
 			if [ -f $dir/$_LIB_RESP -a -z "$regression" ]
 			then
 				echo_deact "Response file exists - skipping $dir"
 				continue
 			fi
 
+			# Sanity checking - no regular testing if response file exists
 			if [ -f $dir/$_LIB_RESP -a x"$regression" = x"X" ]
 			then
 				echo_deact "Response file exists - skipping $dir"
 				continue
 			fi
 
+			# Regression testing: if no test response is there, use expected vector
 			if [ ! -f $dir/$_LIB_RESP -a -n "$regression" -a x"$regression" != x"X" ]
 			then
 				if [ -f $dir/$_LIB_EXPECTED ]
@@ -276,12 +292,30 @@ exec_module()
 				fi
 			fi
 
+			# Sanity checking: validation requires response and expected data
+			if [ x"$testvalidation" != x ]
+			then
+				if [ ! -f $dir/$_LIB_RESP ]
+				then
+					echo_deact "Response file missing but validation testing requested - skipping $dir"
+					continue
+				fi
+
+				if [ ! -f $dir/$_LIB_EXPECTED ]
+				then
+					echo_deact "Expected file missing but validation testing requested - skipping $dir"
+					continue
+				fi
+			fi
+
+			# Sanity checking: we need the request data
 			if [ ! -f $dir/$_LIB_REQ ]
 			then
 				echo_deact "Request file missing - skipping $dir"
 				continue
 			fi
 
+			# Sanity checking: does the request file contain valid data?
 			if (grep -q status $dir/$_LIB_REQ)
 			then
 				echo_deact "Request contains status information - skipping $dir"
@@ -305,7 +339,9 @@ exec_module()
 					echo_pass "Processed $dir"
 				fi
 			else
-				# Do regression testing
+				# Do regression testing / validation
+
+				local testname=""
 
 				# Skip vectors known to generate random numbers and
 				# thus will not work as KAT
@@ -334,16 +370,26 @@ exec_module()
 					continue
 				fi
 
-				$_LIB_EXEC -r $dir/$_LIB_REQ $dir/$_LIB_RESP
+				if [ -x"$testvalidation" != x ]
+				then
+					# Perform regression testing
+					testname="Regression testing"
+					$_LIB_EXEC -r $dir/$_LIB_REQ $dir/$respfile
+				else
+					# Perform test matching
+					testname="Vector validation"
+					$_LIB_EXEC -e $dir/$_LIB_RESP $dir/$_LIB_EXPECTED
+				fi
+
 				local ret=$?
 				if [ $ret -eq 95 ]	#EOPNOTSUPP
 				then
 					echo_deact "Operation not supported for $dir"
 				elif [ $ret -ne 0 ]
 				then
-					echo_fail "Regression testing for $dir"
+					echo_fail "${testname} for $dir"
 				else
-					echo_pass "Regression testing for $dir"
+					echo_pass "${testname} for $dir"
 				fi
 			fi
 		done

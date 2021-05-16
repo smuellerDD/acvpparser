@@ -73,6 +73,12 @@ ifeq (kcapi,$(firstword $(MAKECMDGOALS)))
 	LIBRARIES += gcrypt gpg-error
 endif
 
+################## CONFIGURE BACKEND KCAPI_LRNG ###################
+
+ifeq (kcapi_lrng,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_kcapi_lrng.c
+endif
+
 ################## CONFIGURE BACKEND LIBKCAPI ################
 
 ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
@@ -298,14 +304,15 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
 kcapi: $(NAME)
+kcapi_lrng: $(NAME)
 libkcapi: $(NAME)
 libgcrypt: $(NAME)
 nettle: $(NAME)

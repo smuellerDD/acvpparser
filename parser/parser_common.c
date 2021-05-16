@@ -250,6 +250,18 @@ int write_one_entry(const struct json_entry *entry,
 				       json_object_new_string(algo));
 		break;
 
+	case PARSER_ARRAY:
+	case PARSER_ARRAY_BUFFERARRAY:
+	case PARSER_BIN:
+	case PARSER_BIN_BUFFERARRAY:
+	case PARSER_BOOL:
+	case PARSER_CIPHER:
+	case PARSER_CIPHER_ARRAY:
+	case PARSER_MPINT:
+	case PARSER_OBJECT:
+	case PARSER_STRING:
+	case PARSER_UINT:
+	case PARSER_UINT_RANDOM:
 	default:
 		logger(LOGGER_ERR, "Unknown data type %u to be written\n",
 		       data->datatype);
@@ -493,6 +505,12 @@ static void parse_flagblock(const struct json_object *obj,
 				found = true;
 			}
 			break;
+
+		case json_type_array:
+		case json_type_double:
+		case json_type_int:
+		case json_type_null:
+		case json_type_object:
 		default:
 			logger(LOGGER_WARN, "Unhandled data type %s\n",
 			       json_type_to_name(type));
@@ -1020,6 +1038,15 @@ static int parse_one_entry(const struct json_entry *entry,
 		ret = json_get_string_buf(readdata, entry->name,
 					  data->data.buf);
 		break;
+
+	case WRITER_BIN:
+	case WRITER_BIN_ALWAYS:
+	case WRITER_BOOL:
+	case WRITER_BOOL_TRUE_TO_FALSE:
+	case WRITER_ECC:
+	case WRITER_HASH:
+	case WRITER_STRING_NOFREE:
+	case WRITER_UINT:
 	default:
 		logger(LOGGER_ERR, "Unknown data type %u to be parsed\n",
 		       data->datatype);

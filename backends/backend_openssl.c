@@ -33,13 +33,17 @@
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/fips.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
-#include <openssl/ssl.h>
 #include <openssl/modes.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+# include <openssl/ssl.h>
+#endif
 
 #include "backend_common.h"
 
@@ -709,7 +713,7 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	uint8_t buf[32];
 	unsigned long h;
 
-	if (((N >> 3) > sizeof(buf)) {
+	if ((N >> 3) > sizeof(buf)) {
 		logger(LOGGER_ERR, "Insufficient temporary buffer space\n");
 		return -EINVAL;
 	}
@@ -746,6 +750,10 @@ static int _openssl_dsa_pqg_gen(struct buffer *P,
 	dsa = DSA_new();
 	CKNULL_LOG(dsa, 1, "DSA_new()");
 
+	/*
+	 * NOTE: for old OpenSSL-FIPS 2.0.x, replace FIPS_dsa_builtin_paramgen
+	 * with dsa_builtin_paramgen.
+	 */
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen(dsa, L, N, md,
 					      firstseed ? firstseed->buf : NULL,
 					      firstseed ? firstseed->len : 0,
@@ -896,7 +904,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 		BUFFER_INIT(gen_p_buf);
 
 		CKINT(openssl_bn2buffer(dsa->p, &gen_p_buf));
-		logger(LOGGER_DEBUG, "P comparision failed\n");
+		logger(LOGGER_DEBUG, "P comparison failed\n");
 		logger_binary(LOGGER_DEBUG, gen_p_buf.buf, gen_p_buf.len,
 			      "gen P");
 		free_buf(&gen_p_buf);
@@ -906,7 +914,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 		BUFFER_INIT(gen_q_buf);
 
 		CKINT(openssl_bn2buffer(dsa->q, &gen_q_buf));
-		logger(LOGGER_DEBUG, "Q comparision failed\n");
+		logger(LOGGER_DEBUG, "Q comparison failed\n");
 		logger_binary(LOGGER_DEBUG, gen_q_buf.buf, gen_q_buf.len,
 			      "gen Q");
 		free_buf(&gen_q_buf);
@@ -914,7 +922,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	}
 	if (data->G.len) {
 		if (BN_cmp(dsa->g, g)) {
-			logger(LOGGER_DEBUG, "G comparision failed\n");
+			logger(LOGGER_DEBUG, "G comparison failed\n");
 			data->pqgver_success = 0;
 		}
 	}
@@ -1993,13 +2001,6 @@ static int openssl_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		return -EINVAL;
 	}
 
-#ifndef UBUNTU
-	if (!data->data.len) {
-		logger(LOGGER_WARN, "Zero length input data not supported\n");
-		return -EINVAL;
-	}
-#endif
-
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->assoc.buf, data->assoc.len, "AAD");
@@ -2140,13 +2141,6 @@ static int openssl_gcm_decrypt(struct aead_data *data, flags_t parsed_flags)
 		return -EINVAL;
 	}
 
-#ifndef UBUNTU
-	if (!data->data.len) {
-		logger(LOGGER_WARN, "Zero length input data not supported\n");
-		return -EINVAL;
-	}
-#endif
-
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->tag.buf, data->tag.len, "tag");
@@ -2220,6 +2214,11 @@ static int openssl_ccm_encrypt(struct aead_data *data, flags_t parsed_flags)
 		      "plaintext");
 
 	CKINT(alloc_buf(taglen, &data->tag));
+
+	if (!data->data.len) {
+		CKINT(alloc_buf(1, &data->data));
+		data->data.len = 0;
+	}
 
 	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
 
@@ -2304,7 +2303,7 @@ static int openssl_ccm_decrypt(struct aead_data *data, flags_t parsed_flags)
 
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
-	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len, "plaintext");
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len, "ciphertext");
 	logger_binary(LOGGER_DEBUG, data->tag.buf, data->tag.len, "tag");
 
 	CKINT_O_LOG(EVP_CipherInit_ex(ctx, type, NULL, NULL, NULL, 0),
@@ -2526,6 +2525,7 @@ static void openssl_drbg_backend(void)
 }
 
 #ifdef OPENSSL_SSH_KDF
+#include <openssl/ssl.h>
 #include <openssl/kdf.h>
 /************************************************
  * TLS cipher interface functions
@@ -3581,11 +3581,6 @@ static int openssl_dh_set_param(struct buffer *P /* [in] */,
 	 * BIGNUM *BN_get_rfc3526_prime_8192(BIGNUM *bn);
 	 */
 	if (P && P->len && Q && Q->len && G && G->len) {
-		if (!P || !Q || !G) {
-			logger(LOGGER_ERR, "Unknown PQG reference\n");
-			ret = -EINVAL;
-			goto out;
-		}
 		p = BN_bin2bn((const unsigned char *)P->buf, (int)P->len, NULL);
 		CKNULL_LOG(p, -ENOMEM, "BN_bin2bn() failed\n");
 
@@ -5843,4 +5838,4 @@ static void openssl_hkdf_backend(void)
 {
 	register_hkdf_impl(&openssl_hkdf);
 }
-#endif /* PENSSL_ENABLE_HKDF */
+#endif /* OPENSSL_ENABLE_HKDF */

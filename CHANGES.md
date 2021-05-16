@@ -1,3 +1,9 @@
+v2.1.2
+- fix: strlcpy behaves differently than strncpy leading to an off-by-one
+- fix: OpenSSL header files to allow it being built on the FIPS canister
+- fix: add IV to GMAC test result if an IV is provided
+- enhancement: add full LRNG testing
+
 v2.1.1
 - fix: update TLS v1.3 response following the spec update
 - enhancement: RSA OAEP testing added

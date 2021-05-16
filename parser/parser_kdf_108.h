@@ -47,6 +47,9 @@ extern "C"
  *				  produced by the KDF in bits.
  * @var key [in] Key derivation key
  * @var iv [in] For feedback mode KDF, use this IV.
+ * @var break_location [out] The bit location in the fixed_data where
+ *				the counter is placed. This is only needed for
+ *				ACVP_KDF_108_MIDDLE_FIXED test vectors.
  * @var fixed_data [out] Fixed input data string - this can be an arbitrary
  *			   string that is used as label/counter input. The
  *			   backend / IUT must generate that string and return
@@ -61,6 +64,7 @@ struct kdf_108_data {
 	uint32_t derived_key_length;
 	struct buffer key;
 	struct buffer iv;
+	uint32_t break_location;
 	struct buffer fixed_data;
 	struct buffer derived_key;
 };
