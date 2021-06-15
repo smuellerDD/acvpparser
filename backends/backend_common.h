@@ -48,6 +48,7 @@
 #include "parser_sym.h"
 #include "parser_ifc.h"
 #include "parser_tls13.h"
+#include "parser_kmac.h"
 
 #include "safeprimes.h"
 
