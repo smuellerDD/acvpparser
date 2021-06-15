@@ -67,6 +67,8 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_CMAC_GEN_TEST				(0x0000000000000100ULL)
 /* HMAC: CMAC verify test */
 #define FLAG_OP_CMAC_VER_TEST				(0x0000000000000200ULL)
+/* MAC verify test */
+#define FLAG_OP_MVT				(0x0000000000000400ULL)
 #define FLAG_OP_MASK_MAC				(0x0000000000000f00ULL)
 
 /* JSON field is expected for asymmetric keyGen operation */

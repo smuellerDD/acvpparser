@@ -406,6 +406,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(hkdf)
 			CB_HANDLER(kts_ifc)
 			CB_HANDLER(tls13)
+			CB_HANDLER(kmac)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -551,6 +552,7 @@ static const struct parser_flagsconv flagsconv_testtype[]= {
 	{FLAG_OP_AFT, {.string = "CTR"}, "CTR test type"},
 	{FLAG_OP_VOT, {.string = "VOT"}, "VOT test type"},
 	{FLAG_OP_LDT, {.string = "LDT"}, "LDT test type"},
+	{FLAG_OP_MVT, {.string = "MVT"}, "MVT test type"},
 	{0, {NULL}, NULL}
 };
 

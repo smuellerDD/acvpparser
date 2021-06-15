@@ -75,6 +75,8 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"HMAC-SHA3-256", ACVP_HMACSHA3_256},
 	{"HMAC-SHA3-384", ACVP_HMACSHA3_384},
 	{"HMAC-SHA3-512", ACVP_HMACSHA3_512},
+	{"KMAC-256", ACVP_KMAC256},
+	{"KMAC-128", ACVP_KMAC128},
 
 	{"RSA", ACVP_RSA},
 	{"ECDSA", ACVP_ECDSA},
