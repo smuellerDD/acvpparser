@@ -384,14 +384,14 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 
 	const struct json_entry sha_test_ldt_msg_entries[] = {
 		{"content",	{.data.buf = &vector.msg, PARSER_BIN},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
-		{"fullLength",	{.data.integer = &vector.ldt_expansion_size, PARSER_UINT},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+		{"fullLength",	{.data.largeint = &vector.ldt_expansion_size, PARSER_UINT64},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
 	};
-	const struct json_array sha_test_ldt_msg = SET_ARRAY(sha_test_ldt_msg_entries, &sha_testresult_ldt);
+	const struct json_array sha_test_ldt_msg = SET_ARRAY(sha_test_ldt_msg_entries, NULL);
 
 	const struct json_entry sha_test_ldt_entries[] = {
-		{"largeMsg",	{.data.array = &sha_test_ldt_msg, PARSER_ARRAY},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
+		{"largeMsg",	{.data.array = &sha_test_ldt_msg, PARSER_OBJECT},	FLAG_OP_MASK_SHA | FLAG_OP_LDT},
 	};
-	const struct json_array sha_test_ldt = SET_ARRAY(sha_test_ldt_entries, NULL);
+	const struct json_array sha_test_ldt = SET_ARRAY(sha_test_ldt_entries, &sha_testresult_ldt);
 
 	/*
 	 * Define the test group which contains ancillary data and eventually

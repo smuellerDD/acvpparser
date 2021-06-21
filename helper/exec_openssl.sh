@@ -74,6 +74,27 @@ elif [ $(uname -m) = "aarch64" ]; then
 	CIPHER_CALL_CE_GCM="OPENSSL_armcap_P=7D"
 	CIPHER_CALL_SHA_CE="OPENSSL_armcap_P=7D"
 	CIPHER_CALL_SHA3_CE="OPENSSL_armcap_P=7D"
+
+elif [ $(uname -m) = "ppc" -o $(uname -m) = "ppc64" -o $(uname -m) = "ppcle" -o $(uname -m) = "ppc64le" ]; then
+	EXEC="$EXEC
+	      SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM
+	      SHA_VMX SSH_VMX AES_VMX AES_VMX_ASM
+	      AES_Altivec AES_Altivec_ASM"
+
+	CIPHER_CALL_SHA_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_SHA3_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_SSH_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_AESASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_AESASM_ASM="OPENSSL_ppccap=0"
+
+	CIPHER_CALL_SHA_VMX="OPENSSL_ppccap=4"
+	CIPHER_CALL_SSH_VMX="OPENSSL_ppccap=4"
+	CIPHER_CALL_AES_VMX="OPENSSL_ppccap=4"
+	CIPHER_CALL_AES_VMX_ASM="OPENSSL_ppccap=4"
+
+	CIPHER_CALL_AES_Altivec="OPENSSL_ppccap=2"
+	CIPHER_CALL_AES_Altivec_ASM="OPENSSL_ppccap=2"
+
 else
 	EXEC="$EXEC
 	      AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM

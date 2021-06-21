@@ -127,6 +127,27 @@ int json_get_uint(const struct json_object *obj, const char *name,
 	return 0;
 }
 
+int json_get_uint64(const struct json_object *obj, const char *name,
+		    uint64_t *integer)
+{
+	struct json_object *o = NULL;
+	int64_t tmp;
+	int ret = json_find_key(obj, name, &o, json_type_int);
+
+	if (ret)
+		return ret;
+
+	tmp = json_object_get_int64(o);
+	if (tmp == LONG_MAX || tmp < 0)
+		return -EINVAL;
+
+	*integer = (uint64_t)tmp;
+
+	logger(LOGGER_DEBUG, "Found integer %s with value %" PRIu64 "\n", name, *integer);
+
+	return 0;
+}
+
 int json_get_bin(const struct json_object *obj, const char *name,
 		 struct buffer *buf)
 {

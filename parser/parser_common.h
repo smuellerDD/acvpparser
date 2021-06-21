@@ -80,6 +80,7 @@ struct json_array;
  * PARSER_BIN parses a hex string from JSON into data.buf but
  * PARSER_BIN_BUFFERARRAY parses a hex string into a struct buffer_array
  * PARSER_UINT parses a unsigned int from JSON into data.integer
+ * PARSER_UINT64 parses a unsigned long long from JSON into data.integer
  * PARSER_UINT_RANDOM parses a unsigned int from JSON into data.integer (if
  *		      the JSON value contains "random" instead of integer,
  *		      the parser function returns 0)
@@ -108,6 +109,7 @@ enum json_data_type {
 	PARSER_BIN,
 	PARSER_BIN_BUFFERARRAY,
 	PARSER_UINT,
+	PARSER_UINT64,
 	PARSER_UINT_RANDOM,
 	PARSER_BOOL,
 	PARSER_CIPHER,

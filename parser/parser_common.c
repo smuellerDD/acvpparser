@@ -97,6 +97,7 @@ static void vector_free_entry(const struct json_entry *entry)
 		array->arraysize = 0;
 		break;
 	case PARSER_UINT:
+	case PARSER_UINT64:
 	case WRITER_UINT:
 	case PARSER_UINT_RANDOM:
 	case PARSER_BOOL:
@@ -261,6 +262,7 @@ int write_one_entry(const struct json_entry *entry,
 	case PARSER_OBJECT:
 	case PARSER_STRING:
 	case PARSER_UINT:
+	case PARSER_UINT64:
 	case PARSER_UINT_RANDOM:
 	default:
 		logger(LOGGER_ERR, "Unknown data type %u to be written\n",
@@ -954,8 +956,11 @@ static int parse_one_entry(const struct json_entry *entry,
 		barray->arraysize++;
 		break;
 	case PARSER_UINT:
-		ret = json_get_uint(readdata, entry->name,
-				    data->data.integer);
+		ret = json_get_uint(readdata, entry->name, data->data.integer);
+		break;
+	case PARSER_UINT64:
+		ret = json_get_uint64(readdata, entry->name,
+				      data->data.largeint);
 		break;
 	case PARSER_UINT_RANDOM:
 		ret = json_get_uint_random(readdata, entry->name,

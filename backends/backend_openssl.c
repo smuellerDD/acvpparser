@@ -1899,8 +1899,23 @@ static int openssl_sha_generate(struct sha_data *data, flags_t parsed_flags)
 	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
 
-	CKINT_O_LOG(EVP_DigestUpdate(ctx, data->msg.buf, data->msg.len),
-		    "EVP_DigestUpdate() failed\n");
+	if (data->ldt_expansion_size) {
+		uint64_t exp = data->ldt_expansion_size >> 3;
+		if (exp % data->msg.len) {
+			logger(LOGGER_ERR, "Unexpected expansion size\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		while (exp) {
+			CKINT_O_LOG(EVP_DigestUpdate(ctx, data->msg.buf,
+						     data->msg.len),
+				    "EVP_DigestUpdate() failed\n");
+			exp -= data->msg.len;
+		}
+	} else {
+		CKINT_O_LOG(EVP_DigestUpdate(ctx, data->msg.buf, data->msg.len),
+			    "EVP_DigestUpdate() failed\n");
+	}
 
 	if (data->cipher & ACVP_SHAKEMASK) {
 		CKINT_O_LOG(openssl_shake_cb(ctx, data->mac.buf,

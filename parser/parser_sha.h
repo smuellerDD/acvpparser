@@ -68,7 +68,7 @@ extern "C"
 struct sha_data {
 	struct buffer msg;
 	uint32_t bitlen;
-	uint32_t ldt_expansion_size;
+	uint64_t ldt_expansion_size;
 	uint32_t outlen;
 	uint32_t minoutlen;
 	uint32_t maxoutlen;

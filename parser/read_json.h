@@ -48,6 +48,8 @@ int json_find_key(const struct json_object *inobj, const char *name,
  */
 int json_get_uint(const struct json_object *obj, const char *name,
 		  uint32_t *integer);
+int json_get_uint64(const struct json_object *obj, const char *name,
+		    uint64_t *integer);
 
 /*
  * Get the uint32_t representation of an integer referenced with the given key.

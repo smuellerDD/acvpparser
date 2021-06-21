@@ -1,3 +1,6 @@
+v2.1.3
+- fix: LDT
+
 v2.1.2
 - fix: strlcpy behaves differently than strncpy leading to an off-by-one
 - fix: OpenSSL header files to allow it being built on the FIPS canister

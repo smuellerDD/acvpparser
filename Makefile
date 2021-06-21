@@ -230,6 +230,19 @@ ifeq (boringssl,$(firstword $(MAKECMDGOALS)))
 	LDFLAGS += $(BORINGSSL_LIB_A) -lpthread
 endif
 
+################## CONFIGURE BACKEND BoringSSL for Apple ########
+
+BORINGSSL_LIB_A := /home/sm/hacking/repos/boringssl/build/crypto/libcrypto.a
+
+ifeq (apple-boringssl,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_apple_boringssl.c
+	CFLAGS :=-Wextra -Wall -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -Wno-gnu-zero-variadic-macro-arguments -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer-size=4
+	INCLUDE_DIRS += /home/sm/hacking/repos/boringssl/include	\
+			/home/sm/hacking/repos/boringssl
+	LDFLAGS :=-Wl,-z,relro,-z,now
+	LDFLAGS += $(BORINGSSL_LIB_A) -lpthread
+endif
+
 ################## CONFIGURE BACKEND Botan ########
 
 ifeq (botan,$(firstword $(MAKECMDGOALS)))
@@ -280,9 +293,10 @@ endif
 ################## CONFIGURE BACKEND Jitter RNG ##
 
 ifeq (jent,$(firstword $(MAKECMDGOALS)))
-	CFLAGS += -DSHA256
+	CFLAGS += -DSHA256 -O0 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
 	C_SRCS += backends/backend_jent.c
 	INCLUDE_DIRS += /home/sm/hacking/sources/jitterentropy/jitterentropy-library
+	LIBRARIES += pthread
 endif
 
 ######################################################
@@ -307,7 +321,7 @@ analyze_plists = $(analyze_srcs:%.c=%.plist)
 .PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -329,6 +343,7 @@ acvpproxy: $(NAME)
 libsodium: $(NAME)
 libnacl: $(NAME)
 boringssl: $(NAME)
+apple-boringssl: $(NAME)
 botan: $(NAME)
 libica: $(NAME)
 cpacf: $(NAME)
