@@ -175,12 +175,6 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_array mac_testanchor = SET_ARRAY(mac_testanchor_entries, NULL);
 
-	if (!hmac_backend) {
-		logger(LOGGER_ERR,
-		       "No backend implementation for message digests available\n");
-		return EOPNOTSUPP;
-	}
-
 	memset(&vector, 0, sizeof(struct hmac_data));
 	vector.cipher = cipher;
 
