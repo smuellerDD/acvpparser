@@ -790,6 +790,28 @@ out:
 	return ret;
 }
 
+static int sym_aft_aes_decrypt_helper(const struct json_array *processdata,
+			      flags_t parsed_flags,
+			      struct json_object *testvector,
+			      struct json_object *testresults,
+			      int (*callback)(struct sym_data *vector,
+					      flags_t parsed_flags),
+			      struct sym_data *vector)
+{
+	int ret = 0;
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	CKINT(callback(vector, parsed_flags));
+	/* Free the buffer that may be left by the backend. */
+	if (vector->integrity_error)
+		free_buf(&vector->data);
+
+out:
+	return ret;
+}
+
 static int sym_tdes_concatenate_keys(const struct json_array *processdata,
 				     flags_t parsed_flags,
 				     struct json_object *testvector,
@@ -973,7 +995,7 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 
 	/* Referencing the backend functions */
 	const struct sym_callback sym_encrypt_aft = { sym_backend->encrypt, &vector, NULL};
-	const struct sym_callback sym_decrypt_aft = { sym_backend->decrypt, &vector, NULL};
+	const struct sym_callback sym_decrypt_aft = { sym_backend->decrypt, &vector, sym_aft_aes_decrypt_helper};
 	const struct sym_callback sym_encrypt_mct = { sym_backend->encrypt, &vector, sym_mct_aes_helper};
 	const struct sym_callback sym_decrypt_mct = { sym_backend->decrypt, &vector, sym_mct_aes_helper};
 	const struct json_callback sym_callback_aft[] = {
@@ -995,6 +1017,7 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry sym_testresult_aft_entries[] = {
 		{"ct",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_ENC | FLAG_OP_AFT},
 		{"pt",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"testPassed",	{.data.integer = &vector.integrity_error, WRITER_BOOL_TRUE_TO_FALSE},	FLAG_OP_DEC | FLAG_OP_AFT},
 	};
 	const struct json_testresult sym_testresult_aft = SET_ARRAY(sym_testresult_aft_entries, &sym_callbacks_aft);
 
@@ -1063,6 +1086,8 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry sym_testgroup_entries[] = {
+		{"kwCipher",	{.data.buf = &vector.kwcipher, PARSER_STRING},	FLAG_OPTIONAL | FLAG_OP_ENC | FLAG_OP_AFT },
+		{"kwCipher",	{.data.buf = &vector.kwcipher, PARSER_STRING},	FLAG_OPTIONAL | FLAG_OP_DEC | FLAG_OP_AFT },
 		{"tests",	{.data.array = &sym_test_aft, PARSER_ARRAY},	FLAG_OP_ENC | FLAG_OP_AFT},
 		{"tests",	{.data.array = &sym_test_aft, PARSER_ARRAY},	FLAG_OP_DEC | FLAG_OP_AFT},
 		{"tests",	{.data.array = &sym_test_mct, PARSER_ARRAY},	FLAG_OP_ENC | FLAG_OP_MCT},
