@@ -59,6 +59,13 @@ extern "C"
  *				  loop (which is assumed to be the default),
  *				  this buffer should not be touched by the
  *				  backend.
+ * @var integrity_error [out] This variable is to be filled by the backend
+ *			      during a decryption operation to indicate
+ *			      whether the decryption was successful (0 value)
+ *			      or whether an integrity error occurred (value
+ *			      of 1). Note, in this case, the @var data
+ *			      buffer should be released.
+ * @var kwcipher [in] KW type - Inverse or Cipher
  * @var priv [storage] This pointer allows the backend to store private data
  *			 like a pointer to a cipher handle allocated during
  *			 the init call and used during update or fini calls.
@@ -75,6 +82,8 @@ struct sym_data {
 	uint32_t data_len_bits;
 	uint32_t xts_sequence_no;
 	struct buffer inner_loop_final_cj1;
+	uint32_t integrity_error;
+	struct buffer kwcipher;
 	void *priv;
 };
 
