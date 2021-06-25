@@ -332,6 +332,10 @@ int json_add_response_data(const struct json_object *in,
 			   struct json_object *out)
 {
 	struct json_object *vsid;
+	struct json_object *alg;
+	struct json_object *rev;
+	struct json_object *issam;
+	struct json_object *mode;
 	int ret = json_find_key(in, "vsId", &vsid, json_type_int);
 	if (ret)
 		return ret;
@@ -343,6 +347,51 @@ int json_add_response_data(const struct json_object *in,
 		goto out;
 
 	json_logger(LOGGER_DEBUG, vsid, "Processed vsID");
+	ret = json_find_key(in, "algorithm", &alg, json_type_string);
+	if (ret)
+		return ret;
+
+	json_object_get(alg);
+
+	ret = json_object_object_add(out, "algorithm", alg);
+	if (ret)
+		goto out;
+
+	json_logger(LOGGER_DEBUG, alg, "Processed algorithm");
+
+	/* Mode field is not present for all algorithm, add if found */
+	ret = json_find_key(in, "mode", &mode, json_type_string);
+	if (!ret) {
+		json_object_get(mode);
+		ret = json_object_object_add(out, "mode", mode);
+		if (ret)
+			goto out;
+		json_logger(LOGGER_DEBUG, mode, "Processed Mode");
+	}
+
+	ret = json_find_key(in, "revision", &rev, json_type_string);
+	if (ret)
+		return ret;
+
+	json_object_get(rev);
+
+	ret = json_object_object_add(out, "revision", rev);
+	if (ret)
+		goto out;
+
+	json_logger(LOGGER_DEBUG, rev, "Processed revision");
+
+	ret = json_find_key(in, "isSample", &issam, json_type_boolean);
+	if (ret)
+		return ret;
+
+	json_object_get(issam);
+
+	ret = json_object_object_add(out, "isSample", issam);
+	if (ret)
+		goto out;
+
+	json_logger(LOGGER_DEBUG, issam, "Processed isSample");
 
 out:
 	return ret;
