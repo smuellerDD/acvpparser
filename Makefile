@@ -41,6 +41,15 @@ LIBMAJOR=$(shell cat $(PARSERDIR)/parser.h | grep define | grep MAJVERSION | awk
 LIBMINOR=$(shell cat $(PARSERDIR)/parser.h | grep define | grep MINVERSION | awk '{print $$3}')
 LIBPATCH=$(shell cat $(PARSERDIR)/parser.h | grep define | grep PATCHLEVEL | awk '{print $$3}')
 
+################### Detect Openssl-3 ###############
+STR := $(shell openssl version)
+SUB := $(shell echo "OpenSSL 3")
+ifneq (,$(findstring $(SUB),$(STR)))
+	OSSL_SRC := backends/backend_openssl3.c
+else
+	OSSL_SRC := backends/backend_openssl.c
+endif
+
 ################### Heavy Lifting ###################
 
 LIBVERSION := $(LIBMAJOR).$(LIBMINOR).$(LIBPATCH)
@@ -115,7 +124,8 @@ endif
 ################## CONFIGURE BACKEND OPENSSL ################
 
 ifeq (openssl,$(firstword $(MAKECMDGOALS)))
-	C_SRCS += backends/backend_openssl.c
+	C_SRCS += backends/openssl_common.c
+	C_SRCS += $(OSSL_SRC)
 	LIBRARIES += crypto ssl
 endif
 
