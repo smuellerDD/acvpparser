@@ -105,7 +105,9 @@ struct main_extension {
 	int (*main)(int argc, char *argv[]);
 	void (*usage)(void);
 };
+#if !defined(NO_MAIN)
 void register_main_extension(struct main_extension *extension);
+#endif
 
 void register_tester(struct cavs_tester *curr_tester, const char *log);
 

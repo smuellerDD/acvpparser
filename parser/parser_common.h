@@ -469,6 +469,10 @@ int write_one_entry(const struct json_entry *entry,
 #define DEF_CALLBACK(type, name, flags)					\
 	DEF_CALLBACK_HELPER(type, name, flags, NULL)
 
+int match_expected_vector(const char *actualfile, const char *expectedfile);
+int perform_testing(const char *infile, const char *outfile);
+int perform_testing_regression(const char *infile, const char *expectedfile);
+
 #ifdef __cplusplus
 }
 #endif

@@ -261,4 +261,4 @@ for a particular cipher type will fail.
 # Author
 
 Stephan Mueller  <smueller@chronox.de>
-Copyright (C) 2018 - 2020
+Copyright (C) 2018 - 2021

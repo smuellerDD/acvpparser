@@ -11,7 +11,7 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=gnu99
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
 OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)
@@ -35,11 +35,22 @@ LDFLAGS +=-Wl,-z,relro,-z,now -pie -g
 endif
 
 NAME := acvp-parser
+SHLIB_NAME := libacvpparser
+SHLIB_NAME_STATIC := libacvpparser_static
 
 # Example if version information is kept in a C file
 LIBMAJOR=$(shell cat $(PARSERDIR)/parser.h | grep define | grep MAJVERSION | awk '{print $$3}')
 LIBMINOR=$(shell cat $(PARSERDIR)/parser.h | grep define | grep MINVERSION | awk '{print $$3}')
 LIBPATCH=$(shell cat $(PARSERDIR)/parser.h | grep define | grep PATCHLEVEL | awk '{print $$3}')
+
+################### Detect Openssl-3 ###############
+STR := $(shell openssl version)
+SUB := $(shell echo "OpenSSL 3")
+ifneq (,$(findstring $(SUB),$(STR)))
+	OSSL_SRC := backends/backend_openssl3.c
+else
+	OSSL_SRC := backends/backend_openssl.c
+endif
 
 ################### Heavy Lifting ###################
 
@@ -115,8 +126,22 @@ endif
 ################## CONFIGURE BACKEND OPENSSL ################
 
 ifeq (openssl,$(firstword $(MAKECMDGOALS)))
-	C_SRCS += backends/backend_openssl.c
+	C_SRCS += backends/backend_openssl_common.c
+	C_SRCS += $(OSSL_SRC)
 	LIBRARIES += crypto ssl
+endif
+
+################## CONFIGURE SHARED LIBRARY ################
+
+ifeq (shlib,$(firstword $(MAKECMDGOALS)))
+    CFLAGS += -fPIC -shared
+endif
+
+################## CONFIGURE SHARED STATIC LIBRARY ################
+
+ifeq (shlib_static,$(firstword $(MAKECMDGOALS)))
+    CFLAGS += -static
+    CFLAGS += -DNO_MAIN -DNO_COLORS
 endif
 
 ################## CONFIGURE BACKEND CommonCrypto ################
@@ -293,9 +318,10 @@ endif
 ################## CONFIGURE BACKEND Jitter RNG ##
 
 ifeq (jent,$(firstword $(MAKECMDGOALS)))
-	CFLAGS += -DSHA256 -O0 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
+	JENT_SRC := /home/sm/hacking/sources/jitterentropy/jitterentropy-library
+	CFLAGS += -O0 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
 	C_SRCS += backends/backend_jent.c
-	INCLUDE_DIRS += /home/sm/hacking/sources/jitterentropy/jitterentropy-library
+	INCLUDE_DIRS += $(JENT_SRC) $(JENT_SRC)/src
 	LIBRARIES += pthread
 endif
 
@@ -318,10 +344,10 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica default files
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent shlib shlib_static default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|shlib|shlib_static>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -349,11 +375,21 @@ libica: $(NAME)
 cpacf: $(NAME)
 lrng: $(NAME)
 jent: $(NAME)
+shlib: $(SHLIB_NAME)
+shlib_static: $(SHLIB_NAME_STATIC)
 bouncycastle: $(NAME)
 	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)
+
+$(SHLIB_NAME_STATIC): $(OBJS)
+	ar -crs $(SHLIB_NAME).a $(OBJS)
+	rm $(OBJS)
+
+$(SHLIB_NAME): $(OBJS)
+	$(CC) $(OBJS) -o $(SHLIB_NAME).so $(LDFLAGS)
+	rm $(OBJS)
 
 $(OBJS): | files
 
@@ -368,6 +404,8 @@ asm:
 
 clean:
 	@- $(RM) $(NAME)
+	@- $(RM) $(SHLIB_NAME).so
+	@- $(RM) $(SHLIB_NAME_STATIC).a
 	@- $(RM) $(wildcard $(PARSERDIR)/*.o)
 	@- $(RM) $(wildcard $(PARSERDIR)/json-c/*.o)
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.o)

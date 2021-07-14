@@ -69,6 +69,16 @@ MODULE_DESCRIPTION("Externalization of crypto API to user space");
 #define dbg(fmt, ...)
 #endif
 
+/*
+ * kzfree was renamed to kfree_sensitive in 5.9
+ */
+#undef free_zero
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,9,0)
+# define free_zero(x)	kfree_sensitive(x)
+#else
+# define free_zero(x)	kzfree(x)
+#endif
+
 struct kccavs_data {
 	char *data;
 	u64 len;
@@ -126,7 +136,7 @@ struct kccavs_test *kccavs_test;
  * cryptoapi-test machinery in motion.
  *
  * The following files are defined within the directory of
- * /sys/kernel/debug/cyptoapi-test:
+ * /sys/kernel/debug/kcapi_lrng:
  *
  * type: Cipher type using the u64 integer defines listed above
  * key: If a cipher needs a key (HMAC, sym. ciphers, RNG seed), it must be
@@ -145,7 +155,7 @@ struct kccavs_test *kccavs_test;
  *	    the data length of the string found in data.
  */
 struct kccavs_debugfs {
-	struct dentry *kccavs_debugfs_root; /* /sys/kernel/debug/kcapi-cavs */
+	struct dentry *kccavs_debugfs_root; /* /sys/kernel/debug/kcapi_lrng */
 	struct dentry *kccavs_debugfs_name; /* .../name */
 	struct dentry *kccavs_debugfs_type; /* .../type */
 	struct dentry *kccavs_debugfs_keylen; /* .../keylen */
@@ -501,13 +511,8 @@ static int kccavs_test_hash(size_t nbytes)
 	}
 
 out:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
-	kzfree(sdesc);
-	kzfree(digest);
-#else
-	kfree_sensitive(sdesc);
-	kfree_sensitive(digest);
-#endif
+	free_zero(sdesc);
+	free_zero(digest);
 	crypto_free_shash(tfm);
 	return ret;
 }

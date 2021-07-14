@@ -24,7 +24,7 @@ First, load the module into the kernel by insmod <module.ko>.
 
 Maybe load other crypto modules as needed (e.g. drbg, ...).
 
-A number of files appear in /sys/kernel/debug/kcapi-lrng/ which are used to
+A number of files appear in /sys/kernel/debug/kcapi_lrng/ which are used to
 interact with user space. The documentation of the files is given in the source
 code of the module. An example is given in test.pl.
 

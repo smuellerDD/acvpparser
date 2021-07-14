@@ -36,10 +36,12 @@ int generate_testvector = 0;
 
 static struct main_extension *main_extension = NULL;
 
+#if !defined(NO_MAIN)
 void register_main_extension(struct main_extension* extension)
 {
 	register_backend(main_extension, extension, "main backend");
 }
+#endif
 
 void register_tester(struct cavs_tester *curr_tester, const char *log)
 {
@@ -111,13 +113,22 @@ out:
 	return ret;
 }
 
+#if !defined(NO_MAIN)
 static int versionstring(char *buf, size_t buflen)
 {
 	return snprintf(buf, buflen, "ACVPParser/%d.%d.%d",
 			MAJVERSION, MINVERSION, PATCHLEVEL);
 }
+#else
+static int versionstring(char *buf, size_t buflen)
+{
+	(void)buf;
+	(void)buflen;
+	return 0;
+}
+#endif
 
-static int match_expected(const char *actualfile, const char *expectedfile)
+int match_expected_vector(const char *actualfile, const char *expectedfile)
 {
 	int ret = 0;
 
@@ -141,7 +152,7 @@ static int match_expected(const char *actualfile, const char *expectedfile)
 	return ret;
 }
 
-static int perform_testing(const char *infile, const char *outfile)
+int perform_testing(const char *infile, const char *outfile)
 {
 	struct json_object *inobj = NULL, *outobj = NULL;
 	int ret;
@@ -177,7 +188,7 @@ out:
 	return ret;
 }
 
-static int perform_testing_regression(const char *infile,
+int perform_testing_regression(const char *infile,
 				      const char *expectedfile)
 {
 	struct json_object *inobj = NULL, *outobj = NULL, *expected = NULL;
@@ -373,7 +384,7 @@ int main(int argc, char *argv[])
 	outfile = argv[optind + 1];
 
 	if (expected) {
-		ret = match_expected(infile, outfile);
+		ret = match_expected_vector(infile, outfile);
 	} else if (regression) {
 		ret = perform_testing_regression(infile, outfile);
 	} else {

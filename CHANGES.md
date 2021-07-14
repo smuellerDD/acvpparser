@@ -1,5 +1,7 @@
 v2.1.3
 - fix: LDT
+- enhancement: allow parser to be compiled as a library - patch provided by Daniel Ojalvo
+- enhancement: add OpenSSL 3 support - patch provided by VMWare
 
 v2.1.2
 - fix: strlcpy behaves differently than strncpy leading to an off-by-one

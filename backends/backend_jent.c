@@ -26,7 +26,11 @@
 #undef PATCHLEVEL
 #undef ARRAY_SIZE
 
-#include "jitterentropy-base.c"
+/* This is for Jitter RNG >= 3.1.0 */
+#include "jitterentropy-sha3.c"
+
+/* This is for Jitter RNG < 3.1.0 */
+//#include "jitterentropy-base.c"
 
 /************************************************
  * SHA cipher interface functions

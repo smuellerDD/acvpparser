@@ -196,7 +196,7 @@ static int kcapi_rawciphername(uint64_t cipher, char **cipherstring)
 		break;
 
 	default:
-		logger(LOGGER_WARN, "Unknown cipher %lu\n", cipher);
+		logger(LOGGER_WARN, "Unknown cipher %" PRIu64 "\n", cipher);
 		free(outstr);
 		return -EFAULT;
 	}
