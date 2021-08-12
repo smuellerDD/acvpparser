@@ -539,3 +539,232 @@ static void openssl_ecdh_backend(void)
 {
 	register_ecdh_impl(&openssl_ecdh);
 }
+
+/************************************************
+ * DRBG cipher interface functions
+ ************************************************/
+static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
+		char *drbg_name)
+{
+	logger(LOGGER_DEBUG, "cipher: %" PRIu64 "\n", data->cipher);
+	if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA1) {
+		strcpy(cipher, "SHA1");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA224) {
+		strcpy(cipher,  "SHA224");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA256) {
+		strcpy(cipher, "SHA256");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA384) {
+		strcpy(cipher,  "SHA384");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512224) {
+		strcpy(cipher,  "SHA512-224");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512256) {
+		strcpy(cipher, "SHA512-256");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512) {
+		strcpy(cipher,  "SHA512");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_AESMASK) == ACVP_AES128) {
+		strcpy(cipher, "AES-128-CTR");
+		strcpy(drbg_name, "CTR-DRBG");
+	} else if ((data->cipher & ACVP_AESMASK) == ACVP_AES192) {
+		strcpy(cipher, "AES-192-CTR");
+		strcpy(drbg_name, "CTR-DRBG");
+	} else if ((data->cipher & ACVP_AESMASK) == ACVP_AES256) {
+		strcpy(cipher, "AES-256-CTR");
+		strcpy(drbg_name, "CTR-DRBG");
+	} else {
+		logger(LOGGER_WARN, "DRBG with unhandled cipher detected\n");
+		return -EFAULT;
+	}
+	return 0;
+}
+
+static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
+{
+
+	OSSL_PARAM params[4];
+	char cipher[50];
+	char drbg_name[50];
+	EVP_RAND *rand = NULL;
+	EVP_RAND_CTX *ctx = NULL, *parent = NULL;
+	int df = 0;
+	int ret = 0;
+	unsigned int strength = 256;
+	unsigned char *z;
+	int res = 0;
+	(void)parsed_flags;
+
+	if (openssl_get_drbg_name(data, cipher, drbg_name) < 0)
+		goto out;
+	df = !!data->df;
+
+	/* Create the seed source */
+	rand = EVP_RAND_fetch(NULL, "TEST-RAND", "-fips");
+	CKNULL(rand, -ENOMEM);
+	parent = EVP_RAND_CTX_new(rand, NULL);
+	CKNULL(parent, -ENOMEM);
+	EVP_RAND_free(rand);
+	rand = NULL;
+
+	params[0] = OSSL_PARAM_construct_uint(OSSL_RAND_PARAM_STRENGTH, &strength);
+	params[1] = OSSL_PARAM_construct_end();
+	CKINT(EVP_RAND_CTX_set_params(parent, params));
+	/* Get the DRBG */
+	rand = EVP_RAND_fetch(NULL, drbg_name, NULL);
+	CKNULL(rand, -ENOMEM);
+	ctx = EVP_RAND_CTX_new(rand, parent);
+	CKNULL(ctx, -ENOMEM);
+	/* Set the DRBG up */
+	strength = EVP_RAND_get_strength(ctx);
+	params[0] = OSSL_PARAM_construct_int(OSSL_DRBG_PARAM_USE_DF,
+			(int *)(&df));
+	if(!strcmp(drbg_name,"CTR-DRBG")){
+		params[1] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER,
+				(char *)cipher, 0);
+	}
+	else {
+		params[1] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST,
+				(char *)cipher, strlen(cipher));
+	}
+
+	params[2] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_MAC, "HMAC", 0);
+	params[3] = OSSL_PARAM_construct_end();
+
+	CKINT(EVP_RAND_CTX_set_params(ctx, params));
+	/* Feed in the entropy and nonce */
+	logger_binary(LOGGER_DEBUG, data->entropy.buf, data->entropy.len, "entropy");
+	logger_binary(LOGGER_DEBUG, data->nonce.buf, data->nonce.len, "nonce");
+
+	params[0] = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_ENTROPY,
+			(void *)data->entropy.buf,
+			data->entropy.len);
+	params[1] = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_NONCE,
+			(void *)data->nonce.buf,
+			data->nonce.len);
+	params[2] = OSSL_PARAM_construct_end();
+
+	if (!EVP_RAND_instantiate(parent, strength, 0, NULL, 0, params)) {
+		EVP_RAND_CTX_free(ctx);
+		goto out;
+	}
+	/*
+	 * Run the test
+	 * A NULL personalisation string defaults to the built in so something
+	 * non-NULL is needed if there is no personalisation string
+	 */
+	logger_binary(LOGGER_DEBUG, data->pers.buf, data->pers.len,
+			"personalization string");
+
+	z = data->pers.buf != NULL ? data->pers.buf : (unsigned char *)"";
+	if (!EVP_RAND_instantiate(ctx, strength, data->pr, z, data->pers.len, NULL)) {
+		logger(LOGGER_DEBUG, "DRBG instantiation failed: %s\n",
+				ERR_error_string(ERR_get_error(), NULL));
+		EVP_RAND_CTX_free(ctx);
+		goto out;
+	}
+
+	if (data->entropy_reseed.buffers[0].len) {
+		logger_binary(LOGGER_DEBUG,
+				data->entropy_reseed.buffers[0].buf,
+				data->entropy_reseed.buffers[0].len,
+				"entropy reseed");
+
+		params[0] = OSSL_PARAM_construct_octet_string
+			(OSSL_RAND_PARAM_TEST_ENTROPY, data->entropy_reseed.buffers[0].buf,
+			 data->entropy_reseed.buffers[0].len);
+		params[1] = OSSL_PARAM_construct_end();
+		CKINT(EVP_RAND_CTX_set_params(parent, params));
+		if (data->addtl_reseed.buffers[0].len) {
+			logger_binary(LOGGER_DEBUG,
+					data->addtl_reseed.buffers[0].buf,
+					data->addtl_reseed.buffers[0].len,
+					"addtl reseed");
+		}
+		CKINT_O(EVP_RAND_reseed(ctx,data->pr,
+					NULL, 0,
+					data->addtl_reseed.buffers[0].buf,
+					data->addtl_reseed.buffers[0].len));
+	}
+	if (data->entropy_generate.buffers[0].len) {
+		logger_binary(LOGGER_DEBUG,
+				data->entropy_generate.buffers[0].buf,
+				data->entropy_generate.buffers[0].len,
+				"entropy generate 1");
+		params[0] = OSSL_PARAM_construct_octet_string
+			(OSSL_RAND_PARAM_TEST_ENTROPY,
+			 data->entropy_generate.buffers[0].buf,
+			 data->entropy_generate.buffers[0].len);
+		params[1] = OSSL_PARAM_construct_end();
+		CKINT(EVP_RAND_CTX_set_params(parent, params));
+	}
+
+	logger_binary(LOGGER_DEBUG, data->addtl_generate.buffers[0].buf,
+			data->addtl_generate.buffers[0].len, "addtl generate 1");
+	CKINT(alloc_buf(data->rnd_data_bits_len / 8, &data->random));
+	CKINT_O_LOG(EVP_RAND_generate(ctx, data->random.buf, data->random.len, strength,
+				data->entropy_generate.buffers[0].len?1:0,
+				data->addtl_generate.buffers[0].buf,
+				data->addtl_generate.buffers[0].len),
+			"FIPS_drbg_generate failed\n");
+	logger_binary(LOGGER_DEBUG, data->random.buf, data->random.len,
+			"random tmp");
+	if (data->entropy_generate.buffers[1].len) {
+		logger_binary(LOGGER_DEBUG, data->entropy_generate.buffers[1].buf,
+				data->entropy_generate.buffers[1].len,
+				"entropy generate 1");
+		params[0] = OSSL_PARAM_construct_octet_string
+			(OSSL_RAND_PARAM_TEST_ENTROPY,
+			 data->entropy_generate.buffers[1].buf,
+			 data->entropy_generate.buffers[1].len);
+		params[1] = OSSL_PARAM_construct_end();
+		CKINT(EVP_RAND_CTX_set_params(parent, params));
+	}
+
+	logger_binary(LOGGER_DEBUG, data->addtl_generate.buffers[1].buf,
+			data->addtl_generate.buffers[1].len, "addtl generate 2");
+	CKINT_O_LOG(EVP_RAND_generate(ctx, data->random.buf, data->random.len, strength,
+				data->entropy_generate.buffers[1].len?1:0,
+				data->addtl_generate.buffers[1].buf,
+				data->addtl_generate.buffers[1].len),
+			"FIPS_drbg_generate failed\n");
+	logger_binary(LOGGER_DEBUG, data->random.buf, data->random.len,
+			"random");
+
+	/* Verify the output */
+	res = 0;
+out:
+	if (ctx) {
+		EVP_RAND_uninstantiate(ctx);
+		EVP_RAND_CTX_free(ctx);
+	}
+	if(parent) {
+		EVP_RAND_uninstantiate(parent);
+		EVP_RAND_CTX_free(parent);
+	}
+	if(rand)
+		EVP_RAND_free(rand);
+	return res;
+}
+
+static struct drbg_backend openssl_drbg =
+{
+	openssl_drbg_generate,  /* drbg_generate */
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_drbg_backend)
+static void openssl_drbg_backend(void)
+{
+	register_drbg_impl(&openssl_drbg);
+}
