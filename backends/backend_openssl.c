@@ -2685,6 +2685,11 @@ static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
 	case ACVP_DH_MODP_4096:
 	case ACVP_DH_MODP_6144:
 	case ACVP_DH_MODP_8192:
+	case ACVP_DH_FFDHE_2048:
+	case ACVP_DH_FFDHE_3072:
+	case ACVP_DH_FFDHE_4096:
+	case ACVP_DH_FFDHE_6144:
+	case ACVP_DH_FFDHE_8192:
 		logger(LOGGER_WARN, "Automatically using Safeprime testing with DH operation - safeprime testing with DSA interface not supported (Q not set\n");
 		return _openssl_dh_keygen(P, Q, G, safeprime, X, Y);
 	default:
