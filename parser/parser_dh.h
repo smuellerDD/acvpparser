@@ -87,6 +87,35 @@ struct dh_ss_ver_data {
 };
 
 /**
+ * @brief DH key generation data structure holding the data for the cipher
+ *	  operations specified with dh_keygen.
+ * @var safeprime [in] DH safeprime reference instead of providing PQG
+ * @var X [out] private DH key parameter X
+ * @var Y [out] public DH key parameter Y
+ */
+struct dh_keygen_data {
+	uint64_t safeprime;
+	struct buffer X;
+	struct buffer Y;
+};
+
+/**
+ * @brief DH key verification data structure holding the data for the cipher
+ *	  operations specified with dh_keyver.
+ * @var safeprime [in] DH safeprime reference instead of providing PQG
+ * @var X [in] private DH key parameter X
+ * @var Y [in] public DH key parameter Y
+ * @var keyver_success [out] Is DH key verification with given parameters
+ *			     successful (1) or whether it failed (0).
+ */
+struct dh_keyver_data {
+	uint64_t safeprime;
+	struct buffer X;
+	struct buffer Y;
+	uint32_t keyver_success;
+};
+
+/**
  * @brief Callback data structure that must be implemented by the backend. Some
  *	  callbacks only need to be implemented if the respective cipher support
  *	  shall be tested.
@@ -100,10 +129,14 @@ struct dh_ss_ver_data {
  *
  * @var dh_ss DH shared secret generation
  * @var dh_ss_ver DH shared secret verification
+ * @var dh_keygen DH key generation
+ * @var dh_keyver DH key verification
  */
 struct dh_backend {
 	int (*dh_ss)(struct dh_ss_data *data, flags_t parsed_flags);
 	int (*dh_ss_ver)(struct dh_ss_ver_data *data, flags_t parsed_flags);
+	int (*dh_keygen)(struct dh_keygen_data *data, flags_t parsed_flags);
+	int (*dh_keyver)(struct dh_keyver_data *data, flags_t parsed_flags);
 };
 
 void register_dh_impl(struct dh_backend *implementation);

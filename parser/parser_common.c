@@ -16,7 +16,7 @@
  * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  */
-
+#define _GNU_SOURCE
 #include "bool.h"
 #include "read_json.h"
 #include "stringhelper.h"
@@ -379,6 +379,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(rsa_decryption_primitive)
 			CB_HANDLER(dh_ss)
 			CB_HANDLER(dh_ss_ver)
+			CB_HANDLER(dh_keygen)
+			CB_HANDLER(dh_keyver)
 			CB_HANDLER(drbg)
 			CB_HANDLER(dsa_pqg)
 			CB_HANDLER(dsa_keygen)
@@ -488,8 +490,8 @@ static void parse_flagblock(const struct json_object *obj,
 	while (conv->flag) {
 		switch (type) {
 		case json_type_string:
-			if (!strncasecmp(string, conv->val.string,
-					 strlen(conv->val.string))) {
+			if ((strlen(conv->val.string) == strlen(string)) &&
+			    (strcasestr(conv->val.string, string))) {
 				*parsed_flags |= conv->flag;
 				logger(LOGGER_VERBOSE,
 				       "Found JSON flag: %" PRIu64 " (%s)\n",

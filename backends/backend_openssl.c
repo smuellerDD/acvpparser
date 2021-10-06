@@ -2762,25 +2762,36 @@ out:
 	return ret;
 }
 
-static int openssl_dh_keyver(struct dsa_keyver_data *data,
-			     flags_t parsed_flags)
+static int openssl_dh_keygen(struct dh_keygen_data *data,
+			      flags_t parsed_flags)
+{
+	int ret = 0;
+	(void)parsed_flags;
+
+	CKINT(_openssl_dh_keygen(NULL, NULL, NULL, data->safeprime,
+				 &data->X, &data->Y));
+out:
+	return ret;
+}
+
+static int _openssl_dh_keyver(const uint64_t safeprime,
+			      const struct buffer *X, const struct buffer *Y,
+			      uint32_t *keyver_success)
 {
 	DH *dh = NULL;
 	BIGNUM *y = NULL, *x = NULL;
 	const BIGNUM *nx, *ny;
 	int ret = 0, key_consumed = 0;
 
-	(void)parsed_flags;
-
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
 
-	CKINT(openssl_dh_set_param(NULL, NULL, NULL, data->pqg.safeprime, dh,
+	CKINT(openssl_dh_set_param(NULL, NULL, NULL, safeprime, dh,
 				   NULL));
 
-	y = BN_bin2bn((const unsigned char *) data->Y.buf, (int)data->Y.len, y);
+	y = BN_bin2bn((const unsigned char *) Y->buf, (int)Y->len, y);
 	CKNULL(y, -ENOMEM);
-	x = BN_bin2bn((const unsigned char *) data->X.buf, (int)data->X.len, x);
+	x = BN_bin2bn((const unsigned char *) X->buf, (int)X->len, x);
 	CKNULL(x, -ENOMEM);
 
 	/*
@@ -2799,7 +2810,7 @@ static int openssl_dh_keyver(struct dsa_keyver_data *data,
 	openssl_dh_get0_key(dh, &ny, &nx);
 
 	if (BN_cmp(ny, y) != 0) {
-		data->keyver_success = 0;
+		*keyver_success = 0;
 		logger(LOGGER_DEBUG,
 		       "Key verification failed: provided Y and calculated Y inconsistent\n");
 		ret = 0;
@@ -2821,7 +2832,7 @@ static int openssl_dh_keyver(struct dsa_keyver_data *data,
 	}
 #endif
 
-	data->keyver_success = 1;
+	*keyver_success = 1;
 	logger(LOGGER_DEBUG, "Key verification successful\n");
 
 	ret = 0;
@@ -2836,6 +2847,24 @@ out:
 
 	return ret;
 }
+
+static int openssl_dsa_keyver(struct dsa_keyver_data *data,
+			     flags_t parsed_flags)
+{
+	(void)parsed_flags;
+	return _openssl_dh_keyver(data->pqg.safeprime, &data->X, &data->Y,
+				  &data->keyver_success);
+}
+
+
+static int openssl_dh_keyver(struct dh_keyver_data *data,
+			     flags_t parsed_flags)
+{
+	(void)parsed_flags;
+	return _openssl_dh_keyver(data->safeprime, &data->X, &data->Y,
+				  &data->keyver_success);
+}
+
 
 static int openssl_dsa_sigver(struct dsa_sigver_data *data,
 			      flags_t parsed_flags)
@@ -3113,7 +3142,7 @@ out:
 static struct dsa_backend openssl_dsa =
 {
 	openssl_dsa_keygen,	/* dsa_keygen */
-	openssl_dh_keyver,
+	openssl_dsa_keyver,
 	openssl_dsa_siggen,	/* dsa_siggen */
 	openssl_dsa_sigver,	/* dsa_sigver */
 	openssl_dsa_pqg,	/* dsa_pqg */
@@ -3748,6 +3777,8 @@ static struct dh_backend openssl_dh =
 {
 	openssl_dh_ss,
 	openssl_dh_ss_ver,
+	openssl_dh_keygen,
+	openssl_dh_keyver
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_dh_backend)

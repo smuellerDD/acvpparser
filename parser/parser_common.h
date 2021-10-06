@@ -202,6 +202,8 @@ DEF_CALLBACK_TYPE(rsa_signature_primitive)
 DEF_CALLBACK_TYPE(rsa_decryption_primitive)
 DEF_CALLBACK_TYPE(dh_ss)
 DEF_CALLBACK_TYPE(dh_ss_ver)
+DEF_CALLBACK_TYPE(dh_keygen)
+DEF_CALLBACK_TYPE(dh_keyver)
 DEF_CALLBACK_TYPE(drbg)
 DEF_CALLBACK_TYPE(dsa_pqg)
 DEF_CALLBACK_TYPE(dsa_keygen)
@@ -256,6 +258,8 @@ enum {
 	CB_TYPE_rsa_decryption_primitive,
 	CB_TYPE_dh_ss,
 	CB_TYPE_dh_ss_ver,
+	CB_TYPE_dh_keygen,
+	CB_TYPE_dh_keyver,
 	CB_TYPE_drbg,
 	CB_TYPE_dsa_pqg,
 	CB_TYPE_dsa_keygen,
@@ -303,6 +307,8 @@ struct json_callback {
 		struct rsa_decryption_primitive_callback rsa_decryption_primitive;
 		struct dh_ss_callback dh_ss;
 		struct dh_ss_ver_callback dh_ss_ver;
+		struct dh_keygen_callback dh_keygen;
+		struct dh_keyver_callback dh_keyver;
 		struct drbg_callback drbg;
 		struct dsa_pqg_callback dsa_pqg;
 		struct dsa_keygen_callback dsa_keygen;

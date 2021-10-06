@@ -302,6 +302,60 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 	}
 
 	/**********************************************************************
+	 * DH key generation
+	 **********************************************************************/
+	DH_DEF_CALLBACK(dh_keygen,
+				FLAG_OP_AFT | FLAG_OP_MASK_DH | FLAG_OP_ASYM_TYPE_KEYGEN);
+
+	const struct json_entry dh_keygen_testresult_entries[] = {
+		{"x",		{.data.buf = &dh_keygen_vector.X, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
+		{"y",		{.data.buf = &dh_keygen_vector.Y, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
+	};
+	const struct json_testresult dh_keygen_testresult =
+	SET_ARRAY(dh_keygen_testresult_entries, &dh_keygen_callbacks);
+
+	const struct json_array dh_keygen_test =
+					{ NULL, 0, &dh_keygen_testresult};
+
+	const struct json_entry dh_keygen_testgroup_entries[] = {
+		{"safePrimeGroup",	{.data.largeint = &dh_keygen_vector.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OPTIONAL},
+
+		{"tests",	{.data.array = &dh_keygen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},
+	};
+
+	const struct json_array dh_keygen_testgroup = SET_ARRAY(dh_keygen_testgroup_entries, NULL);
+
+	/**********************************************************************
+	 * DH key verification
+	 **********************************************************************/
+	DH_DEF_CALLBACK(dh_keyver, FLAG_OP_AFT | FLAG_OP_MASK_DH | FLAG_OP_ASYM_TYPE_KEYVER);
+
+	const struct json_entry dh_keyver_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &dh_keyver_vector.keyver_success, WRITER_BOOL},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+	const struct json_testresult dh_keyver_testresult =
+	SET_ARRAY(dh_keyver_testresult_entries, &dh_keyver_callbacks);
+
+	const struct json_entry dh_keyver_test_entries[] = {
+		{"x",		{.data.buf = &dh_keyver_vector.X, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+		{"y",		{.data.buf = &dh_keyver_vector.Y, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+
+	/* search for empty arrays */
+	const struct json_array dh_keyver_test = SET_ARRAY(dh_keyver_test_entries, &dh_keyver_testresult);
+
+	const struct json_entry dh_keyver_testgroup_entries[] = {
+		/* safeprime cipher is provided */
+		{"safePrimeGroup",	{.data.largeint = &dh_keyver_vector.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+
+		{"tests",	{.data.array = &dh_keyver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+	};
+
+	const struct json_array dh_keyver_testgroup = SET_ARRAY(dh_keyver_testgroup_entries, NULL);
+
+
+	/**********************************************************************
 	 * DH shared secret verification
 	 **********************************************************************/
 	DH_DEF_CALLBACK(dh_ss_ver, FLAG_OP_VAL | FLAG_OP_MASK_DH | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER);
@@ -490,7 +544,9 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 	 * input data.
 	 */
 	const struct json_entry dh_testanchor_entries[] = {
-		{"testGroups",	{.data.array = &dh_testgroup, PARSER_ARRAY},	0}
+		{"testGroups",	{.data.array = &dh_testgroup, PARSER_ARRAY},	0},
+		{"testGroups",	{.data.array = &dh_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN},
+		{"testGroups",	{.data.array = &dh_keyver_testgroup, PARSER_ARRAY}, FLAG_OP_ASYM_TYPE_KEYVER}
 	};
 	const struct json_array dh_testanchor = SET_ARRAY(dh_testanchor_entries, NULL);
 
@@ -507,11 +563,20 @@ static struct cavs_tester kas_ffc_r3_ssc =
 	NULL
 };
 
+static struct cavs_tester safeprimes =
+{
+	ACVP_SAFEPRIMES,
+	0,
+	kas_ffc_r3_ssc_tester,	/* process_req */
+	NULL
+};
+
 ACVP_DEFINE_CONSTRUCTOR(register_dh)
 static void register_dh(void)
 {
 	register_tester(&dh, "DH");
 	register_tester(&kas_ffc_r3_ssc, "KAS FFC R3 SSC");
+	register_tester(&safeprimes, "Safe Primes");
 }
 
 void register_dh_impl(struct dh_backend *implementation)
