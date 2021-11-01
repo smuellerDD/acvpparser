@@ -147,7 +147,8 @@ REGRESSION_VECTOR_SKIP="
 	algorithm:KAS-FFC
 	algorithm:KAS-ECC
 	ivGen:internal
-	algorithm:KDF"
+	algorithm:KDF
+	algorithm:KTS-IFC"
 
 #
 # Execute testing
