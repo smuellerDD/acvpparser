@@ -13,6 +13,7 @@
  * (http://www.opensource.org/licenses/mit-license.php)
  */
 
+#define _DEFAULT_SOURCE
 #include "config.h"
 
 #include <math.h>

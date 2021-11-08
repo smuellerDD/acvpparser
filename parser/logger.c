@@ -18,11 +18,12 @@
  * DAMAGE.
  */
 
+#define _DEFAULT_SOURCE
+#include <time.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <time.h>
 
 #include "binhexbin.h"
 #include "logger.h"
@@ -49,6 +50,9 @@ static void logger_severity(enum logger_verbosity severity, char *sev,
 	case LOGGER_ERR:
 		snprintf(sev, sevlen, "Error");
 		break;
+	case LOGGER_NONE:
+		break;
+	case LOGGER_MAX_LEVEL:
 	default:
 		snprintf(sev, sevlen, "Unknown");
 	}
@@ -91,6 +95,9 @@ void logger(enum logger_verbosity severity, const char *fmt, ...)
 	case LOGGER_ERR:
 		fprintf_color = &fprintf_red;
 		break;
+	case LOGGER_NONE:
+		break;
+	case LOGGER_MAX_LEVEL:
 	default:
 		fprintf_color = &fprintf;
 	}

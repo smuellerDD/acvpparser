@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 
 #include "cipher_definitions.h"
 #include "logger.h"
@@ -115,6 +116,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"KAS-KDF", ACVP_HKDF},
 	{"KDF", ACVP_KDF_800_108},
 	{"TLS-v1.3", ACVP_KDF_TLS13},
+	{"TLS-v1.2", ACVP_KDF_TLS12},
 	{"double pipeline iteration", ACVP_KDF_108_DOUBLE_PIPELINE},
 	{"feedback", ACVP_KDF_108_FEEDBACK},
 	{"counter", ACVP_KDF_108_COUNTER},

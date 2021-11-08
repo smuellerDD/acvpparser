@@ -279,8 +279,8 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 
 		/* unverifiable G verification */
 		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
-		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_unver_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
-		{"h",		{.data.buf = &dsa_pqg_vector.g_unver_h, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_unver_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
+		{"h",		{.data.buf = &dsa_pqg_vector.g_unver_h, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
 
 		/* canonical G verification */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_canon_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
@@ -355,6 +355,11 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry dsa_keyver_test_entries[] = {
 		{"x",		{.data.buf = &dsa_keyver_vector.X, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
 		{"y",		{.data.buf = &dsa_keyver_vector.Y, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+
+		/* P, Q, G are provided for SP800-56A rev 1 / FIPS 186-4 */
+		{"p",		{.data.buf = &dsa_keyver_vector.pqg.P, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OPTIONAL},
+		{"q",		{.data.buf = &dsa_keyver_vector.pqg.Q, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OPTIONAL},
+		{"g",		{.data.buf = &dsa_keyver_vector.pqg.G, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OPTIONAL},
 	};
 
 	/* search for empty arrays */
@@ -362,7 +367,7 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 
 	const struct json_entry dsa_keyver_testgroup_entries[] = {
 		/* safeprime cipher is provided for SP800-56A rev 3 keygen */
-		{"safePrimeGroup",	{.data.largeint = &dsa_keyver_vector.pqg.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+		{"safePrimeGroup",	{.data.largeint = &dsa_keyver_vector.pqg.safeprime, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OPTIONAL},
 
 		{"tests",	{.data.array = &dsa_keyver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
 	};

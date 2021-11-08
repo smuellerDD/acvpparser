@@ -114,13 +114,10 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry hkdf_kdf_entries[] = {
 		{"salt",		{.data.buf = &hkdf_vector.salt,			PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL},
 		{"z",			{.data.buf = &hkdf_vector.z,			PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_VAL},
-		{"l",			{.data.integer = &hkdf_vector.dkmlen,		PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_VAL},
-		{"fixedInfoPattern",	{.data.buf = &hkdf_vector.fixed_info_pattern,	PARSER_STRING},	FLAG_OP_AFT | FLAG_OP_VAL},
-		{"hmacAlg",		{.data.largeint = &hkdf_vector.hash,		PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_VAL},
+		//TODO: what to do with l? "secondary shared secret t. For [SP800-56Cr2] only."
 	};
 	const struct json_array hkdf_kdf_test =
 		SET_ARRAY(hkdf_kdf_entries, NULL);
-
 
 	/*
 	 * Define one particular test vector that is expected in the JSON
@@ -135,6 +132,14 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 	const struct json_array hkdf_test =
 		SET_ARRAY(hkdf_test_entries, &hkdf_testresult);
 
+	/* kdfConfiguration */
+	const struct json_entry hkdf_kdf_config_entries[] = {
+		{"l",			{.data.integer = &hkdf_vector.dkmlen,		PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_VAL},
+		{"fixedInfoPattern",	{.data.buf = &hkdf_vector.fixed_info_pattern,	PARSER_STRING},	FLAG_OP_AFT | FLAG_OP_VAL},
+		{"hmacAlg",		{.data.largeint = &hkdf_vector.hash,		PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_VAL},
+	};
+	const struct json_array hkdf_kdf_config_test =
+		SET_ARRAY(hkdf_kdf_config_entries, NULL);
 
 	/*
 	 * Define the test group which contains ancillary data and eventually
@@ -144,6 +149,7 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry hkdf_testgroup_entries[] = {
+		{"kdfConfiguration",	{.data.array = &hkdf_kdf_config_test, PARSER_OBJECT}, FLAG_OP_AFT | FLAG_OP_VAL},
 		{"tests",	{.data.array = &hkdf_test, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_VAL},
 	};
 	const struct json_array hkdf_testgroup = SET_ARRAY(hkdf_testgroup_entries, NULL);

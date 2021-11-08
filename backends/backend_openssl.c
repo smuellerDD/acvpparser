@@ -949,320 +949,6 @@ static int openssl_dh_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key)
 #endif
 
 /************************************************
- * Symmetric cipher interface functions
- ************************************************/
-static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
-{
-	EVP_CIPHER_CTX *ctx = NULL;
-	const EVP_CIPHER *type = NULL;
-	int ret = 0;
-
-	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
-
-	ctx = EVP_CIPHER_CTX_new();
-	CKNULL(ctx, -ENOMEM);
-
-	if (parsed_flags & FLAG_OP_ENC)
-		ret = EVP_EncryptInit_ex(ctx, type, NULL, data->key.buf,
-					 data->iv.buf);
-	else
-		ret = EVP_DecryptInit_ex(ctx, type, NULL, data->key.buf,
-					 data->iv.buf);
-	if (ret != 1) {
-		logger(LOGGER_WARN, "Cipher init failed\n");
-		ret = -EFAULT;
-		goto out;
-	}
-
-	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
-	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
-
-	if (data->cipher == ACVP_TDESCFB1 || data->cipher == ACVP_CFB1)
-		EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPH_FLAG_LENGTH_BITS);
-
-	data->priv = ctx;
-
-	return 0;
-
-out:
-	if (ctx)
-		EVP_CIPHER_CTX_free(ctx);
-	return ret;
-}
-
-#define SEMIBSIZE 8
-static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
-{
-	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
-	size_t origlen = data->data.len;
-
-	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
-		      (parsed_flags & FLAG_OP_ENC) ?
-		      "plaintext" : "ciphertext");
-
-	/* For CFB-1 the data is given in bits */
-	if ((data->cipher == ACVP_TDESCFB1 || data->cipher == ACVP_CFB1) &&
-	    data->data_len_bits) {
-		if (data->data_len_bits > (data->data.len << 3)) {
-			logger(LOGGER_ERR,
-			       "Data length bits (%u bits) is larger than provided data (%zu bytes)\n",
-			       data->data_len_bits, data->data.len);
-			return -EINVAL;
-		}
-		origlen = data->data.len;
-		data->data.len = data->data_len_bits;
-	}
-
-	if (1 != EVP_Cipher(ctx, data->data.buf, data->data.buf,
-			    (unsigned int)data->data.len)) {
-		logger(LOGGER_DEBUG, "Update failed");
-		return -EFAULT;
-	}
-
-	if (data->data.len != origlen)
-		data->data.len = origlen;
-
-	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
-		      (parsed_flags & FLAG_OP_ENC) ?
-		      "ciphertext" : "plaintext");
-
-	return 0;
-}
-
-/*
- * Example for AES MCT inner loop handling in backend
- *
- * This code is meant to be an example - it is meaningless for OpenSSL (but it
- * works!), but when having, say, an HSM where ACVP handling code invoking the
- * HSM crypto code is also found within the HSM, moving this function into that
- * HSM handling code reduces the round trip between the host executing the ACVP
- * parser code and the HSM executing the ACVP handling code a 1000-fold.
- *
- * The MCT inner loop handling logic must return the final cipher text C[j] and
- * the last but one cipher text C[j-1].
- *
- * This code should be invoked when the mct_update function pointer
- * is called by the ACVP parser.
- */
-#if 0
-static int openssl_mct_update_inner_loop(struct sym_data *data,
-					 flags_t parsed_flags)
-{
-	unsigned int i;
-	uint8_t tmp[16];
-	int ret;
-
-	/* This code is only meant for AES */
-	if (data->cipher &~ ACVP_AESMASK)
-		return openssl_mct_update(data, parsed_flags);
-
-	if (data->cipher == ACVP_CFB1 || data->cipher == ACVP_CFB8)
-		return openssl_mct_update(data, parsed_flags);
-
-	if (data->cipher != ACVP_ECB && data->iv.len != sizeof(tmp))
-		return -EINVAL;
-	if (data->data.len != sizeof(tmp))
-		return -EINVAL;
-
-	CKINT(alloc_buf(sizeof(tmp), &data->inner_loop_final_cj1));
-
-	memcpy(data->inner_loop_final_cj1.buf, data->iv.buf, data->iv.len);
-
-	/* 999 rounds where the data shuffling is applied */
-	for (i = 0; i < 999; i++) {
-		CKINT(openssl_mct_update(data, parsed_flags));
-		if (data->cipher != ACVP_ECB) {
-			memcpy(tmp, data->data.buf, data->data.len);
-			memcpy(data->data.buf, data->inner_loop_final_cj1.buf,
-			       data->data.len);
-			memcpy(data->inner_loop_final_cj1.buf, tmp,
-			       data->data.len);
-		}
-	}
-
-	if (data->cipher == ACVP_ECB)
-		memcpy(data->inner_loop_final_cj1.buf, data->data.buf,
-		       data->data.len);
-
-	/* final round of calculation without data shuffle */
-	CKINT(openssl_mct_update(data, parsed_flags));
-
-out:
-	return ret;
-}
-#endif
-
-static int openssl_mct_fini(struct sym_data *data, flags_t parsed_flags)
-{
-	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
-
-	(void)parsed_flags;
-
-	if (ctx)
-		EVP_CIPHER_CTX_free(ctx);
-	data->priv = NULL;
-
-	return 0;
-}
-
-#ifdef OPENSSL_AESKW
-static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	AES_KEY AESkey;
-	BUFFER_INIT(ct);
-	size_t buflen;
-	int ret;
-
-	(void)parsed_flags;
-
-	/*
-	 * Round up to the nearest AES block boundary as input data for KWP
-	 * is not block-aligned.
-	 */
-	buflen = ((data->data.len + 7) / 8) * 8;
-	buflen += SEMIBSIZE;
-
-	CKINT(alloc_buf(buflen, &ct));
-
-	AES_set_encrypt_key(data->key.buf, (int)(data->key.len<<3), &AESkey);
-
-	if (data->cipher == ACVP_KW) {
-		ret = (int)CRYPTO_128_wrap(&AESkey, NULL, ct.buf,
-					   data->data.buf,
-					   data->data.len,
-					   (block128_f)AES_encrypt);
-	} else {
-		ret = (int)CRYPTO_128_wrap_pad(&AESkey, NULL, ct.buf,
-					       data->data.buf,
-					       data->data.len,
-					       (block128_f)AES_encrypt);
-	}
-
-	free_buf(&data->data);
-	copy_ptr_buf(&data->data, &ct);
-
-	if (ret <= 0) {
-		logger(LOGGER_WARN, "AES KW encrypt failed: %d\n", ret);
-		ret = -EFAULT;
-		goto out;
-	}
-
-	ret = 0;
-
-out:
-	return ret;
-}
-
-static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	AES_KEY AESkey;
-	int ret;
-
-	(void)parsed_flags;
-
-	AES_set_decrypt_key(data->key.buf, (int)(data->key.len<<3), &AESkey);
-
-	if (data->cipher == ACVP_KW) {
-		ret = (int)CRYPTO_128_unwrap(&AESkey, NULL, data->data.buf,
-					     data->data.buf,
-					     data->data.len,
-					     (block128_f)AES_decrypt);
-		/* Plaintext data block is smaller by one semiblock */
-		if (data->data.len >= SEMIBSIZE)
-			data->data.len -= SEMIBSIZE;
-	} else {
-		ret = (int)CRYPTO_128_unwrap_pad(&AESkey, NULL, data->data.buf,
-						 data->data.buf,
-						 data->data.len,
-						 (block128_f)AES_decrypt);
-
-		if (ret > 0)
-			data->data.len = (size_t)ret;
-	}
-
-	if (ret <= 0) {
-		if (data->data.len >= CIPHER_DECRYPTION_FAILED_LEN) {
-			memcpy(data->data.buf, CIPHER_DECRYPTION_FAILED,
-			       CIPHER_DECRYPTION_FAILED_LEN);
-			data->data.len = CIPHER_DECRYPTION_FAILED_LEN;
-		} else {
-			logger(LOGGER_WARN, "AES KW decrypt failed\n");
-			ret = -EFAULT;
-			goto out;
-		}
-	}
-
-	ret = 0;
-
-out:
-	return ret;
-}
-#else
-static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	(void)data;
-	(void)parsed_flags;
-	return -EOPNOTSUPP;
-}
-
-static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	(void)data;
-	(void)parsed_flags;
-	return -EOPNOTSUPP;
-}
-#endif
-
-static int openssl_encrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	int ret;
-
-	if (data->cipher == ACVP_KW || data->cipher == ACVP_KWP)
-		return openssl_kw_encrypt(data, parsed_flags);
-
-	CKINT(openssl_mct_init(data, parsed_flags));
-
-	ret = openssl_mct_update(data, parsed_flags);
-
-	openssl_mct_fini(data, parsed_flags);
-
-out:
-	return ret;
-}
-
-static int openssl_decrypt(struct sym_data *data, flags_t parsed_flags)
-{
-	int ret;
-
-	if (data->cipher == ACVP_KW || data->cipher == ACVP_KWP)
-		return openssl_kw_decrypt(data, parsed_flags);
-
-	CKINT(openssl_mct_init(data, parsed_flags));
-
-	ret = openssl_mct_update(data, parsed_flags);
-
-	openssl_mct_fini(data, parsed_flags);
-
-out:
-	return ret;
-}
-
-static struct sym_backend openssl_sym =
-{
-	openssl_encrypt,
-	openssl_decrypt,
-	openssl_mct_init,
-	openssl_mct_update, /* or openssl_mct_update_inner_loop */
-	openssl_mct_fini,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(openssl_sym_backend)
-static void openssl_sym_backend(void)
-{
-	register_sym_impl(&openssl_sym);
-}
-
-/************************************************
  * CMAC/HMAC cipher interface functions
  ************************************************/
 static int openssl_cmac_generate(struct hmac_data *data)
@@ -1633,6 +1319,96 @@ static void openssl_kdf_tls_backend(void)
 	register_kdf_tls_impl(&openssl_kdf_tls);
 }
 
+
+static int openssl_tls12_op(struct tls12_data *data, flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *pctx = NULL;
+	const EVP_MD *md;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_md_convert(data->hashalg, &md));
+
+	/* Special case */
+	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1)
+		md = EVP_get_digestbynid(NID_md5_sha1);
+
+	CKNULL_LOG(md, -EFAULT, "Cipher implementation not found\n");
+
+	CKINT(alloc_buf(data->pre_master_secret.len, &data->master_secret));
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
+	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
+
+	CKINT_O(EVP_PKEY_derive_init(pctx));
+	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
+	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
+						  data->pre_master_secret.buf,
+						  data->pre_master_secret.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+				TLS_MD_EXTENDED_MASTER_SECRET_CONST,
+				TLS_MD_EXTENDED_MASTER_SECRET_CONST_SIZE));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->session_hash.buf,
+						data->session_hash.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_derive(pctx, data->master_secret.buf,
+				&data->master_secret.len));
+
+	logger_binary(LOGGER_DEBUG, data->master_secret.buf,
+		      data->master_secret.len, "master_secret");
+
+	EVP_PKEY_CTX_free(pctx);
+	pctx = NULL;
+
+	CKINT(alloc_buf(data->key_block_length / 8, &data->key_block));
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
+	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
+
+	CKINT_O(EVP_PKEY_derive_init(pctx));
+	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
+	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
+						  data->master_secret.buf,
+						  data->master_secret.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+					TLS_MD_KEY_EXPANSION_CONST,
+					TLS_MD_KEY_EXPANSION_CONST_SIZE));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->server_random.buf,
+						data->server_random.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->client_random.buf,
+						data->client_random.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_derive(pctx, data->key_block.buf,
+				&data->key_block.len));
+
+	logger_binary(LOGGER_DEBUG, data->key_block.buf, data->key_block.len,
+		      "keyblock");
+
+	ret = 0;
+
+out:
+	EVP_PKEY_CTX_free(pctx);
+	return (ret);
+}
+
+static struct tls12_backend openssl_tls12 =
+{
+	openssl_tls12_op,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_tls12_backend)
+static void openssl_tls12_backend(void)
+{
+	register_tls12_impl(&openssl_tls12);
+}
+
 /************************************************
  * SSHv2 KDF
  ************************************************/
@@ -1845,24 +1621,6 @@ static void openssl_kdf_tls_backend(void)
 /************************************************
  * SP 800-108 KBKDF interface functions
  ************************************************/
-/* Stolen from crypto/kdf/kbkdf.c */
-static uint32_t be32(uint32_t host)
-{
-	uint32_t big = 0;
-	const union {
-		long one;
-		char little;
-	} is_endian = { 1 };
-
-	if (!is_endian.little)
-		return host;
-
-	big |= (host & 0xff000000) >> 24;
-	big |= (host & 0x00ff0000) >> 8;
-	big |= (host & 0x0000ff00) << 8;
-	big |= (host & 0x000000ff) << 24;
-	return big;
-}
 
 static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 {
@@ -1873,7 +1631,7 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 	uint32_t l = be32(data->derived_key_length);
 	BUFFER_INIT(label);
 	BUFFER_INIT(context);
-	int ret = 0;
+	int ret = 0, alloced = 0;
 	(void)parsed_flags;
 
 	logger(LOGGER_VERBOSE, "data->kdfmode = %" PRIu64 "\n", data->kdfmode);
@@ -1931,37 +1689,56 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 	logger(LOGGER_VERBOSE, "L = %u\n", derived_key_bytes);
 	logger_binary(LOGGER_VERBOSE, (unsigned char *)&l, sizeof(l), "[L]_2");
 
-	CKINT(alloc_buf(data->key.len, &label));
-	CKINT(alloc_buf(data->key.len, &context));
-	/* Allocate the fixed_data to hold Label || 0x00 || Context || [L]_2 */
-	CKINT(alloc_buf(label.len + 1 + context.len + sizeof(l),
-			&data->fixed_data));
+	if (data->fixed_data.len) {
+		if (data->fixed_data.len != (data->key.len * 2 + 1 + sizeof(l))) {
+			logger(LOGGER_ERR, "KBKDF fixed data unexpected length for regression testing\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		label.buf = data->fixed_data.buf;
+		label.len = data->key.len;
+		context.buf = data->fixed_data.buf + 1 + label.len;
+		context.len = data->key.len;
+	} else {
+		alloced = 1;
+		CKINT(alloc_buf(data->key.len, &label));
+		CKINT(alloc_buf(data->key.len, &context));
 
-	/* Randomly choose the label and context */
-	RAND_bytes(label.buf, (int)label.len);
-	RAND_bytes(context.buf, (int)context.len);
+		/*
+		 * Allocate the fixed_data to hold
+		 * Label || 0x00 || Context || [L]_2
+		 */
+		CKINT(alloc_buf(label.len + 1 + context.len + sizeof(l),
+				&data->fixed_data));
+
+		/* Randomly choose the label and context */
+		RAND_bytes(label.buf, (int)label.len);
+		RAND_bytes(context.buf, (int)context.len);
+
+		/*
+		 * Fixed data = Label || 0x00 || Context || [L]_2
+		 * The counter i is not part of it
+		 */
+		memcpy(data->fixed_data.buf, label.buf, label.len);
+		       data->fixed_data.buf[label.len] = 0x00;
+		memcpy(data->fixed_data.buf + label.len + 1, context.buf,
+		       context.len);
+		memcpy(data->fixed_data.buf + label.len + 1 + context.len,
+		       (unsigned char *)&l, sizeof(l));
+
+		logger_binary(LOGGER_VERBOSE, data->fixed_data.buf,
+			      data->fixed_data.len, "data->fixed_data");
+	}
 
 	logger_binary(LOGGER_VERBOSE, label.buf, label.len, "label");
 	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_SALT, label.buf,
-				 label.len),
+				label.len),
 		    "EVP_KDF_ctrl failed to set the SALT (label)");
 
 	logger_binary(LOGGER_VERBOSE, context.buf, context.len, "context");
 	CKINT_O_LOG(EVP_KDF_ctrl(ctx, EVP_KDF_CTRL_SET_KB_INFO, context.buf,
-				 context.len),
+				context.len),
 		    "EVP_KDF_ctrl fail to set KB_INFO (context)");
-
-	/* Fixed data = Label || 0x00 || Context || [L]_2
-	 * The counter i is not part of it
-	 */
-	memcpy(data->fixed_data.buf, label.buf, label.len);
-	data->fixed_data.buf[label.len] = 0x00;
-	memcpy(data->fixed_data.buf + label.len + 1, context.buf, context.len);
-	memcpy(data->fixed_data.buf + label.len + 1 + context.len,
-	       (unsigned char *)&l, sizeof(l));
-
-	logger_binary(LOGGER_VERBOSE, data->fixed_data.buf,
-		      data->fixed_data.len, "data->fixed_data");
 
 	if (data->iv.len) {
 		logger_binary(LOGGER_VERBOSE, data->iv.buf, data->iv.len,
@@ -1977,10 +1754,13 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 		    "EVP_KDF_DERIVE failed\n");
 	logger_binary(LOGGER_VERBOSE, data->derived_key.buf,
                       derived_key_bytes, "data->derived_key");
+
 out:
 	EVP_KDF_CTX_free(ctx);
-	free_buf(&label);
-	free_buf(&context);
+	if (alloced) {
+		free_buf(&label);
+		free_buf(&context);
+	}
 	return ret;
 }
 
@@ -2573,9 +2353,9 @@ out:
 }
 #endif
 
-static int openssl_dh_set_param(struct buffer *P /* [in] */,
-			        struct buffer *Q /* [in] */,
-			        struct buffer *G /* [in] */,
+static int openssl_dh_set_param(const struct buffer *P /* [in] */,
+			        const struct buffer *Q /* [in] */,
+			        const struct buffer *G /* [in] */,
 			        uint64_t safeprime /* [in] */,
 				DH *dh /* [out] */,
 				size_t *keylen /* [out] */)
@@ -2648,7 +2428,7 @@ static int _openssl_dh_keygen(struct buffer *P /* [in] */,
 
 	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh, NULL));
 
-	CKINT_O_LOG(DH_generate_key(dh), "DSA_generate_key() failed\n");
+	CKINT_O_LOG(DH_generate_key(dh), "DH_generate_key() failed\n");
 
 	openssl_dh_get0_key(dh, &y, &x);
 
@@ -2685,11 +2465,6 @@ static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
 	case ACVP_DH_MODP_4096:
 	case ACVP_DH_MODP_6144:
 	case ACVP_DH_MODP_8192:
-	case ACVP_DH_FFDHE_2048:
-	case ACVP_DH_FFDHE_3072:
-	case ACVP_DH_FFDHE_4096:
-	case ACVP_DH_FFDHE_6144:
-	case ACVP_DH_FFDHE_8192:
 		logger(LOGGER_WARN, "Automatically using Safeprime testing with DH operation - safeprime testing with DSA interface not supported (Q not set\n");
 		return _openssl_dh_keygen(P, Q, G, safeprime, X, Y);
 	default:
@@ -2774,7 +2549,9 @@ out:
 	return ret;
 }
 
-static int _openssl_dh_keyver(const uint64_t safeprime,
+static int _openssl_dh_keyver(const struct buffer *P, const struct buffer *Q,
+			      const struct buffer *G,
+			      const uint64_t safeprime,
 			      const struct buffer *X, const struct buffer *Y,
 			      uint32_t *keyver_success)
 {
@@ -2786,7 +2563,7 @@ static int _openssl_dh_keyver(const uint64_t safeprime,
 	dh = DH_new();
 	CKNULL_LOG(dh, -ENOMEM, "DH_new() failed\n");
 
-	CKINT(openssl_dh_set_param(NULL, NULL, NULL, safeprime, dh,
+	CKINT(openssl_dh_set_param(P, Q, G, safeprime, dh,
 				   NULL));
 
 	y = BN_bin2bn((const unsigned char *) Y->buf, (int)Y->len, y);
@@ -2851,9 +2628,23 @@ out:
 static int openssl_dsa_keyver(struct dsa_keyver_data *data,
 			     flags_t parsed_flags)
 {
+	int reset = 0, ret;
+
 	(void)parsed_flags;
-	return _openssl_dh_keyver(data->pqg.safeprime, &data->X, &data->Y,
-				  &data->keyver_success);
+
+	if (data->pqg.P.len && data->pqg.Q.len && data->pqg.G.len) {
+		FIPS_mode_set(0);
+		reset = 1;
+	}
+
+	ret = _openssl_dh_keyver(&data->pqg.P, &data->pqg.Q, &data->pqg.G,
+				 data->pqg.safeprime, &data->X, &data->Y,
+				 &data->keyver_success);
+
+	if (reset)
+		FIPS_mode_set(1);
+
+	return ret;
 }
 
 
@@ -2861,7 +2652,8 @@ static int openssl_dh_keyver(struct dh_keyver_data *data,
 			     flags_t parsed_flags)
 {
 	(void)parsed_flags;
-	return _openssl_dh_keyver(data->safeprime, &data->X, &data->Y,
+	return _openssl_dh_keyver(NULL, NULL, NULL,
+				  data->safeprime, &data->X, &data->Y,
 				  &data->keyver_success);
 }
 
@@ -4097,8 +3889,10 @@ static int openssl_rsa_oaep_encrypt(struct kts_ifc_data *data)
 		return -EINVAL;
 
 	CKINT(left_pad_buf(&init->n, data->modulus >> 3));
-	CKINT(alloc_buf(data->keylen >> 3, &init->dkm));
-	RAND_bytes(init->dkm.buf, (int)init->dkm.len);
+	if (!init->dkm.len) {
+		CKINT(alloc_buf(data->keylen >> 3, &init->dkm));
+		RAND_bytes(init->dkm.buf, (int)init->dkm.len);
+	}
 
 	CKINT(openssl_md_convert(data->kts_hash, &md));
 

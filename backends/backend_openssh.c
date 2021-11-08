@@ -18,6 +18,7 @@
  * DAMAGE.
  */
 
+#define _DEFAULT_SOURCE
 #include <ctype.h>
 #include <string.h>
 #include <sys/wait.h>

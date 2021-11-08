@@ -325,6 +325,8 @@ out:
 			CKINT(cb->fn(cb->vector, parsed_flags));	       \
 		} else {						       \
 			logger(LOGGER_VERBOSE, "No callback defined\n");       \
+			ret = -EOPNOTSUPP;				       \
+			goto out;					       \
 		}							       \
 		break;							       \
 	}
@@ -409,8 +411,10 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(pbkdf)
 			CB_HANDLER(hkdf)
 			CB_HANDLER(kts_ifc)
+			CB_HANDLER(tls12)
 			CB_HANDLER(tls13)
 			CB_HANDLER(kmac)
+			CB_HANDLER(ansi_x963)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",

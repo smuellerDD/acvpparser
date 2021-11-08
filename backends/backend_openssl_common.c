@@ -45,6 +45,25 @@ int openssl_bn2buffer(const BIGNUM *number, struct buffer *buf)
 	return openssl_bn2buf(number, buf, (uint32_t)BN_num_bytes(number));
 }
 
+/* Stolen from crypto/kdf/kbkdf.c */
+uint32_t be32(uint32_t host)
+{
+	uint32_t big = 0;
+	const union {
+		long one;
+		char little;
+	} is_endian = { 1 };
+
+	if (!is_endian.little)
+		return host;
+
+	big |= (host & 0xff000000) >> 24;
+	big |= (host & 0x00ff0000) >> 8;
+	big |= (host & 0x0000ff00) << 8;
+	big |= (host & 0x000000ff) << 24;
+	return big;
+}
+
 int openssl_cipher(uint64_t cipher, size_t keylen, const EVP_CIPHER **type)
 {
 	uint64_t mask;
@@ -283,6 +302,44 @@ int openssl_cipher(uint64_t cipher, size_t keylen, const EVP_CIPHER **type)
 		mask = ACVP_CIPHERTYPE_CMAC;
 		l_type = EVP_des_ede3_cbc();
 		break;
+#ifdef OPENSSL_AESKW
+	case ACVP_KW:
+		mask = ACVP_CIPHERTYPE_AES;
+		switch (keylen) {
+		case 16:
+			l_type = EVP_aes_128_wrap();
+			break;
+		case 24:
+			l_type = EVP_aes_192_wrap();
+			break;
+		case 32:
+			l_type = EVP_aes_256_wrap();
+			break;
+		default:
+			logger(LOGGER_WARN, "Unknown key size\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		break;
+	case ACVP_KWP:
+		mask = ACVP_CIPHERTYPE_AES;
+		switch (keylen) {
+		case 16:
+			l_type = EVP_aes_128_wrap_pad();
+			break;
+		case 24:
+			l_type = EVP_aes_192_wrap_pad();
+			break;
+		case 32:
+			l_type = EVP_aes_256_wrap_pad();
+			break;
+		default:
+			logger(LOGGER_WARN, "Unknown key size\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		break;
+#endif
 #ifdef OPENSSL_30X
 	case ACVP_CBC_CS1:
 	case ACVP_CBC_CS2:
@@ -577,6 +634,346 @@ static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
 	return -EOPNOTSUPP;
 }
 #endif
+
+/************************************************
+ * Symmetric cipher interface functions
+ ************************************************/
+static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
+{
+	EVP_CIPHER_CTX *ctx = NULL;
+	const EVP_CIPHER *type = NULL;
+	int ret = 0;
+
+	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
+
+	ctx = EVP_CIPHER_CTX_new();
+	CKNULL(ctx, -ENOMEM);
+
+	if (parsed_flags & FLAG_OP_ENC)
+		ret = EVP_EncryptInit_ex(ctx, type, NULL, data->key.buf,
+					 data->iv.buf);
+	else
+		ret = EVP_DecryptInit_ex(ctx, type, NULL, data->key.buf,
+					 data->iv.buf);
+	CKINT_O_LOG(ret, "Cipher init failed\n");
+
+	EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
+	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
+
+	if (data->cipher == ACVP_TDESCFB1 || data->cipher == ACVP_CFB1)
+		EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPH_FLAG_LENGTH_BITS);
+
+	data->priv = ctx;
+
+	return 0;
+
+out:
+	if (ctx)
+		EVP_CIPHER_CTX_free(ctx);
+	return ret;
+}
+
+#define SEMIBSIZE 8
+static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
+{
+	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
+	size_t origlen = data->data.len;
+	int outl;
+
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      (parsed_flags & FLAG_OP_ENC) ?
+		      "plaintext" : "ciphertext");
+
+	/* For CFB-1 the data is given in bits */
+	if ((data->cipher == ACVP_TDESCFB1 || data->cipher == ACVP_CFB1) &&
+	    data->data_len_bits) {
+		if (data->data_len_bits > (data->data.len << 3)) {
+			logger(LOGGER_ERR,
+			       "Data length bits (%u bits) is larger than provided data (%zu bytes)\n",
+			       data->data_len_bits, data->data.len);
+			return -EINVAL;
+		}
+		origlen = data->data.len;
+		data->data.len = data->data_len_bits;
+	}
+
+	if (!EVP_CipherUpdate(ctx, data->data.buf, &outl, data->data.buf,
+			    data->data.len)) {
+		logger(LOGGER_WARN, "Update failed\n");
+		return -EFAULT;
+	}
+
+	if (!EVP_CipherFinal_ex(ctx, data->data.buf, &outl)) {
+		logger(LOGGER_WARN, "Final failed: %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
+		return -EFAULT;
+	}
+
+	if (data->data.len != origlen)
+		data->data.len = origlen;
+
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      (parsed_flags & FLAG_OP_ENC) ?
+		      "ciphertext" : "plaintext");
+
+	return 0;
+}
+
+/*
+ * Example for AES MCT inner loop handling in backend
+ *
+ * This code is meant to be an example - it is meaningless for OpenSSL (but it
+ * works!), but when having, say, an HSM where ACVP handling code invoking the
+ * HSM crypto code is also found within the HSM, moving this function into that
+ * HSM handling code reduces the round trip between the host executing the ACVP
+ * parser code and the HSM executing the ACVP handling code a 1000-fold.
+ *
+ * The MCT inner loop handling logic must return the final cipher text C[j] and
+ * the last but one cipher text C[j-1].
+ *
+ * This code should be invoked when the mct_update function pointer
+ * is called by the ACVP parser.
+ */
+#if 0
+static int openssl_mct_update_inner_loop(struct sym_data *data,
+					 flags_t parsed_flags)
+{
+	unsigned int i;
+	uint8_t tmp[16];
+	int ret;
+
+	/* This code is only meant for AES */
+	if (data->cipher &~ ACVP_AESMASK)
+		return openssl_mct_update(data, parsed_flags);
+
+	if (data->cipher == ACVP_CFB1 || data->cipher == ACVP_CFB8)
+		return openssl_mct_update(data, parsed_flags);
+
+	if (data->cipher != ACVP_ECB && data->iv.len != sizeof(tmp))
+		return -EINVAL;
+	if (data->data.len != sizeof(tmp))
+		return -EINVAL;
+
+	CKINT(alloc_buf(sizeof(tmp), &data->inner_loop_final_cj1));
+
+	memcpy(data->inner_loop_final_cj1.buf, data->iv.buf, data->iv.len);
+
+	/* 999 rounds where the data shuffling is applied */
+	for (i = 0; i < 999; i++) {
+		CKINT(openssl_mct_update(data, parsed_flags));
+		if (data->cipher != ACVP_ECB) {
+			memcpy(tmp, data->data.buf, data->data.len);
+			memcpy(data->data.buf, data->inner_loop_final_cj1.buf,
+			       data->data.len);
+			memcpy(data->inner_loop_final_cj1.buf, tmp,
+			       data->data.len);
+		}
+	}
+
+	if (data->cipher == ACVP_ECB)
+		memcpy(data->inner_loop_final_cj1.buf, data->data.buf,
+		       data->data.len);
+
+	/* final round of calculation without data shuffle */
+	CKINT(openssl_mct_update(data, parsed_flags));
+
+out:
+	return ret;
+}
+#endif
+
+static int openssl_mct_fini(struct sym_data *data, flags_t parsed_flags)
+{
+	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
+
+	(void)parsed_flags;
+
+	if (ctx)
+		EVP_CIPHER_CTX_free(ctx);
+	data->priv = NULL;
+
+	return 0;
+}
+
+static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	EVP_CIPHER_CTX *ctx = NULL;
+	const EVP_CIPHER *type = NULL;
+	BUFFER_INIT(ct);
+	size_t ctlen;
+	int outl;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
+
+	ctx = EVP_CIPHER_CTX_new();
+	CKNULL(ctx, -ENOMEM);
+
+	EVP_CIPHER_CTX_set_padding(ctx, 0);
+	EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW);
+
+	CKINT_O_LOG(EVP_EncryptInit_ex(ctx, type, NULL, data->key.buf,
+			       	       data->iv.buf),
+		    "AES KW init failed\n");
+
+	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
+	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      "plaintext");
+
+	/*
+	 * Round up to the nearest AES block boundary as input data for KWP
+	 * is not block-aligned.
+	 */
+	// TODO: should this be ((data->data.len + 15) / 16) * 16; ?
+	ctlen = ((data->data.len + 7) / 8) * 8;
+	ctlen += SEMIBSIZE;
+
+	CKINT(alloc_buf(ctlen, &ct));
+
+	if (!EVP_CipherUpdate(ctx, ct.buf, &outl, data->data.buf,
+			    data->data.len)) {
+		logger(LOGGER_WARN, "AES KW encrypt update failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ct.len = (size_t)outl;
+
+	if (!EVP_CipherFinal_ex(ctx, ct.buf, &outl)) {
+		logger(LOGGER_WARN, "AES KW encrypt final failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	free_buf(&data->data);
+	copy_ptr_buf(&data->data, &ct);
+
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      "ciphertext");
+
+	ret = 0;
+
+out:
+	if (ctx)
+		EVP_CIPHER_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	EVP_CIPHER_CTX *ctx = NULL;
+	const EVP_CIPHER *type = NULL;
+	int outl;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
+
+	ctx = EVP_CIPHER_CTX_new();
+	CKNULL(ctx, -ENOMEM);
+
+	EVP_CIPHER_CTX_set_padding(ctx, 0);
+	EVP_CIPHER_CTX_set_flags(ctx, EVP_CIPHER_CTX_FLAG_WRAP_ALLOW);
+
+	CKINT_O_LOG(EVP_DecryptInit_ex(ctx, type, NULL, data->key.buf,
+			       	       data->iv.buf),
+		    "AES KW init failed\n");
+
+	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
+	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      "ciphertext");
+
+
+	if (!EVP_CipherUpdate(ctx, data->data.buf, &outl, data->data.buf,
+			    data->data.len)) {
+		if (data->data.len >= CIPHER_DECRYPTION_FAILED_LEN) {
+			memcpy(data->data.buf, CIPHER_DECRYPTION_FAILED,
+			       CIPHER_DECRYPTION_FAILED_LEN);
+			data->data.len = CIPHER_DECRYPTION_FAILED_LEN;
+			ret = 0;
+			goto out;
+		} else {
+			logger(LOGGER_WARN, "AES KW encrypt update failed\n");
+			ret = -EFAULT;
+			goto out;
+		}
+	}
+
+	/* Plaintext data block is smaller by one semiblock */
+	data->data.len = (size_t)outl;
+
+	if (!EVP_CipherFinal_ex(ctx, data->data.buf, &outl)) {
+		logger(LOGGER_WARN, "AES KW encrypt final failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
+		      "plaintext");
+
+	ret = 0;
+
+out:
+	if (ctx)
+		EVP_CIPHER_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_encrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	int ret;
+
+	if (data->cipher == ACVP_KW || data->cipher == ACVP_KWP)
+		return openssl_kw_encrypt(data, parsed_flags);
+
+	CKINT(openssl_mct_init(data, parsed_flags));
+
+	ret = openssl_mct_update(data, parsed_flags);
+
+	openssl_mct_fini(data, parsed_flags);
+
+out:
+	return ret;
+}
+
+static int openssl_decrypt(struct sym_data *data, flags_t parsed_flags)
+{
+	int ret;
+
+	if (data->cipher == ACVP_KW || data->cipher == ACVP_KWP)
+		return openssl_kw_decrypt(data, parsed_flags);
+
+	CKINT(openssl_mct_init(data, parsed_flags));
+
+	ret = openssl_mct_update(data, parsed_flags);
+
+	openssl_mct_fini(data, parsed_flags);
+
+out:
+	return ret;
+}
+
+static struct sym_backend openssl_sym =
+{
+	openssl_encrypt,
+	openssl_decrypt,
+	openssl_mct_init,
+	openssl_mct_update, /* or openssl_mct_update_inner_loop */
+	openssl_mct_fini,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_sym_backend)
+static void openssl_sym_backend(void)
+{
+	register_sym_impl(&openssl_sym);
+}
 
 /************************************************
  * AEAD cipher interface functions

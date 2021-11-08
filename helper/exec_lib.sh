@@ -139,15 +139,23 @@ get_proc_family() {
 
 # List of JSON keyword:value pairs to search for JSON test vectors known
 # to be no known answer test and thus are unfit for regression testing
-# TODO: ECDSA siggen: use -t
 REGRESSION_VECTOR_SKIP="
-	mode:keyGen
-	mode:sigGen
-	mode:pqgGen
-	algorithm:KAS-FFC
-	algorithm:KAS-ECC
-	ivGen:internal
-	algorithm:KDF"
+	algorithm:KTS-IFC"
+
+# List of JSON search_keyword:search_value:replace_keyword:replace_value set to
+# search for JSON vectors know to be no known answer tests but can be turned
+# into known answer tests for regression testing
+REGRESSION_VECTOR_REPLACE="
+	mode:keyGen:mode:keyVer
+	mode:sigGen:mode:sigVer
+	mode:pqgGen:mode:pqgVer
+	ivGen:internal:ivGen:external
+	algorithm:KAS-FFC:testType:VAL
+	algorithm:KAS-ECC:testType:VAL
+	kdfMode:counter:algorithm:KDF
+	kdfMode:feedback:algorithm:KDF
+	kdfMode:double:algorithm:KDF
+"
 
 #
 # Execute testing
@@ -175,7 +183,7 @@ exec_module()
 	# If the script name contains "_regression" we switch into regression
 	# mode transparently
 	if $(echo $0 | grep -q "_regression")
-       	then
+	then
 	       regression="regression"
 	       pass_name="VALIDATED"
 	fi
@@ -365,12 +373,46 @@ exec_module()
 					fi
 				done
 
+				# Invoke replace operation for the following
+				# vectors
+				local replaceop=""
+				for j in $REGRESSION_VECTOR_REPLACE
+				do
+					local OLDIFS=$IFS
+					IFS=":"
+
+					local tokens=( $j )
+					keyword=${tokens[0]}
+					value=${tokens[1]}
+					r_keyword=${tokens[2]}
+					replace=${tokens[3]}
+
+					IFS=$OLDIFS
+
+					if [ -z "$keyword" -o -z "$value" -o -z "$r_keyword" -o -z "$replace" ]
+					then
+						echo "Empty keyword ($keyword) or value ($value) or replace keyword ($r_keyword) or replace ($replace)"
+						continue
+					fi
+
+					if (grep -i \"$keyword\" $dir/$_LIB_REQ | grep -iq \"$value\" > /dev/null)
+					then
+						replaceop="--replace $r_keyword:$replace"
+						break
+					fi
+				done
+
 				if [ $skip -ne 0 ]
 				then
 					continue
 				fi
 
-				if [ -x"$testvalidation" != x ]
+				if [ -n "$replaceop" ]
+				then
+					# Perform regression testing
+					testname="Regression testing of no-known-answer test"
+					$_LIB_EXEC $replaceop $dir/$_LIB_REQ $dir/$respfile
+				elif [ -x"$testvalidation" != x ]
 				then
 					# Perform regression testing
 					testname="Regression testing"

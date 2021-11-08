@@ -175,6 +175,8 @@ int openssl_bn2buf(const BIGNUM *number, struct buffer *buf,
 
 int openssl_bn2buffer(const BIGNUM *number, struct buffer *buf);
 
+uint32_t be32(uint32_t host);
+
 int openssl_cipher(uint64_t cipher, size_t keylen,
 			  const EVP_CIPHER **type);
 

@@ -47,6 +47,7 @@
 #include "parser_sha.h"
 #include "parser_sym.h"
 #include "parser_ifc.h"
+#include "parser_tls12.h"
 #include "parser_tls13.h"
 #include "parser_kmac.h"
 

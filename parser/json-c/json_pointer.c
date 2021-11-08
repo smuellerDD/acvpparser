@@ -6,6 +6,7 @@
  *
  */
 
+#define _DEFAULT_SOURCE
 #include "config.h"
 
 #include "strerror_override.h"

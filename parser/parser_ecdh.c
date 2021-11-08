@@ -156,6 +156,7 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ecdh_eu_testresult_entries[] = {
 		{"ephemeralPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"ephemeralPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"hashZIut",		{.data.buf = &ecdh_ss_vector.hashzz, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_eu_testresult =
@@ -175,6 +176,7 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ecdh_opdh_i_testresult_entries[] = {
 		{"ephemeralPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
 		{"ephemeralPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"ephemeralPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
 		{"hashZIut",		{.data.buf = &ecdh_ss_vector.hashzz, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
 	};
 	const struct json_testresult ecdh_opdh_i_testresult =
@@ -190,6 +192,7 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ecdh_opdh_r_testresult_entries[] = {
 		{"staticPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"staticPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"hashZIut",		{.data.buf = &ecdh_ss_vector.hashzz, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_opdh_r_testresult =
@@ -209,6 +212,7 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ecdh_su_testresult_entries[] = {
 		{"staticPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"staticPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"hashZIut",		{.data.buf = &ecdh_ss_vector.hashzz, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_su_testresult =
@@ -435,6 +439,7 @@ static int kas_ecc_r3_ssc_tester(struct json_object *in,
 	const struct json_entry ecdh_eu_testresult_entries[] = {
 		{"ephemeralPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"ephemeralPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_EPHEMERAL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_eu_testresult =
 			SET_ARRAY(ecdh_eu_testresult_entries, &ecdh_ss_callbacks);
@@ -452,6 +457,7 @@ static int kas_ecc_r3_ssc_tester(struct json_object *in,
 	const struct json_entry ecdh_opdh_i_testresult_entries[] = {
 		{"ephemeralPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
 		{"ephemeralPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"ephemeralPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_INITIATOR},
 	};
 	const struct json_testresult ecdh_opdh_i_testresult =
 			SET_ARRAY(ecdh_opdh_i_testresult_entries, &ecdh_ss_callbacks);
@@ -466,6 +472,7 @@ static int kas_ecc_r3_ssc_tester(struct json_object *in,
 	const struct json_entry ecdh_opdh_r_testresult_entries[] = {
 		{"staticPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"staticPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ONE_PASS_DH | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_opdh_r_testresult =
 			SET_ARRAY(ecdh_opdh_r_testresult_entries, &ecdh_ss_callbacks);
@@ -483,6 +490,7 @@ static int kas_ecc_r3_ssc_tester(struct json_object *in,
 	const struct json_entry ecdh_su_testresult_entries[] = {
 		{"staticPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"staticPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
 	const struct json_testresult ecdh_su_testresult =
 			SET_ARRAY(ecdh_su_testresult_entries, &ecdh_ss_callbacks);

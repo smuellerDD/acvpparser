@@ -26,6 +26,55 @@
 #include "parser_common.h"
 
 /******************************************************************************
+ * ANSI X9.63 callback definitions
+ ******************************************************************************/
+static struct ansi_x963_backend *ansi_x963_backend = NULL;
+
+static int kdf_tester_ansi_x963(struct json_object *in, struct json_object *out,
+				uint64_t cipher)
+{
+	(void)cipher;
+
+	/**********************************************************************
+	 * ANSI X9.63 operation
+	 **********************************************************************/
+	DEF_CALLBACK(ansi_x963, ansi_x963, FLAG_OP_AFT);
+
+	const struct json_entry ansi_x963_testresult_entries[] = {
+		{"keyData",		{.data.buf = &ansi_x963_vector.key_data, WRITER_BIN},	FLAG_OP_AFT},
+	};
+	const struct json_testresult ansi_x963_testresult =
+		SET_ARRAY(ansi_x963_testresult_entries, &ansi_x963_callbacks);
+
+	const struct json_entry ansi_x963_test_entries[] = {
+		{"z",			{.data.buf = &ansi_x963_vector.z, PARSER_BIN},	FLAG_OP_AFT},
+		{"sharedInfo",		{.data.buf = &ansi_x963_vector.shared_info, PARSER_BIN},	FLAG_OP_AFT},
+	};
+
+	/* search for empty arrays */
+	const struct json_array ansi_x963_test = SET_ARRAY(ansi_x963_test_entries, &ansi_x963_testresult);
+
+	const struct json_entry ansi_x963_testgroup_entries[] = {
+		{"hashAlg",			{.data.largeint = &ansi_x963_vector.hashalg, PARSER_CIPHER},	FLAG_OP_AFT },
+		{"keyDataLength",	{.data.integer = &ansi_x963_vector.key_data_len, PARSER_UINT},	FLAG_OP_AFT },
+		{"fieldSize",		{.data.integer = &ansi_x963_vector.field_size, PARSER_UINT}, FLAG_OP_AFT },
+		{"tests",			{.data.array = &ansi_x963_test, PARSER_ARRAY},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_TLS },
+	};
+	const struct json_array ansi_x963_testgroup = SET_ARRAY(ansi_x963_testgroup_entries, NULL);
+
+	/**********************************************************************
+	 * KDF common test group
+	 **********************************************************************/
+	const struct json_entry ansi_x963_testanchor_entries[] = {
+		{"testGroups",			{.data.array = &ansi_x963_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_TLS},
+	};
+	const struct json_array ansi_x963_testanchor = SET_ARRAY(ansi_x963_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&ansi_x963_testanchor, "1.0", in, out);
+}
+
+/******************************************************************************
  * KDF TLS callback definitions
  ******************************************************************************/
 static struct kdf_tls_backend *kdf_tls_backend = NULL;
@@ -273,6 +322,10 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		CKINT(kdf_tester_ikev2(in, out, cipher));
 		executed = true;
 	}
+	if (kdf_ikev2_backend && !strncmp(mode, "ansix9.63", 9)) {
+		CKINT(kdf_tester_ansi_x963(in, out, cipher));
+		executed = true;
+	}
 
 	/*
 	 * If !executed -> None of the backends were registered -> -EOPNOTSUPP.
@@ -321,4 +374,9 @@ void register_kdf_ikev1_impl(struct kdf_ikev1_backend *implementation)
 void register_kdf_ikev2_impl(struct kdf_ikev2_backend *implementation)
 {
 	register_backend(kdf_ikev2_backend, implementation, "KDF_IKEv2");
+}
+
+void register_ansi_x963_impl(struct ansi_x963_backend *implementation)
+{
+	register_backend(ansi_x963_backend, implementation, "ANSI_X9.63");
 }

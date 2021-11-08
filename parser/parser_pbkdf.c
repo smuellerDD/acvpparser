@@ -35,6 +35,11 @@ static int kdf_tester_pbkdf(struct json_object *in, struct json_object *out,
 {
 	(void)cipher;
 
+	if (!pbkdf_backend) {
+		logger(LOGGER_WARN, "No PBKDF backend set\n");
+		return -EOPNOTSUPP;
+	}
+
 	/**********************************************************************
 	 * PBKDF operation
 	 **********************************************************************/

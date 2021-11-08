@@ -51,9 +51,11 @@ extern "C"
  *				the counter is placed. This is only needed for
  *				ACVP_KDF_108_MIDDLE_FIXED test vectors.
  * @var fixed_data [out] Fixed input data string - this can be an arbitrary
- *			   string that is used as label/counter input. The
- *			   backend / IUT must generate that string and return
- *			   it.
+ *			 string that is used as label/counter input. The
+ *			 backend / IUT must generate that string and return
+ *			 it.
+ *			 NOTE: It may be provided as input for regression
+ *			 testing.
  * @var derived_key [out] The derived keying material output.
  */
 struct kdf_108_data {

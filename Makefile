@@ -11,7 +11,7 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=gnu99
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
 OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)

@@ -88,7 +88,7 @@ struct tls13_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @var tls13 Perform a PBKDF key derivation
+ * @var tls13 Perform a TLS 1.3 PRF operation
  */
 struct tls13_backend {
 	int (*tls13)(struct tls13_data *data, flags_t parsed_flags);

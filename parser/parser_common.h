@@ -45,8 +45,10 @@
 #include "parser_pbkdf.h"
 #include "parser_hkdf.h"
 #include "parser_ifc.h"
+#include "parser_tls12.h"
 #include "parser_tls13.h"
 #include "parser_kmac.h"
+#include "parser_ansi_x963.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -232,8 +234,10 @@ DEF_CALLBACK_TYPE(kdf_108)
 DEF_CALLBACK_TYPE(pbkdf)
 DEF_CALLBACK_TYPE(hkdf)
 DEF_CALLBACK_TYPE(kts_ifc)
+DEF_CALLBACK_TYPE(tls12)
 DEF_CALLBACK_TYPE(tls13)
 DEF_CALLBACK_TYPE(kmac)
+DEF_CALLBACK_TYPE(ansi_x963)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -290,8 +294,10 @@ enum {
 	CB_TYPE_pbkdf,
 	CB_TYPE_hkdf,
 	CB_TYPE_kts_ifc,
+	CB_TYPE_tls12,
 	CB_TYPE_tls13,
 	CB_TYPE_kmac,
+	CB_TYPE_ansi_x963,
 };
 struct json_callback {
 	union {
@@ -337,8 +343,10 @@ struct json_callback {
 		struct pbkdf_callback pbkdf;
 		struct hkdf_callback hkdf;
 		struct kts_ifc_callback kts_ifc;
+		struct tls12_callback tls12;
 		struct tls13_callback tls13;
 		struct kmac_callback kmac;
+		struct ansi_x963_callback ansi_x963;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

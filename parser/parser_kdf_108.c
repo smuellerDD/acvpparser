@@ -54,6 +54,9 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry kdf_108_test_entries[] = {
 		{"keyIn",	{.data.buf = &kdf_108_vector.key, PARSER_BIN}, FLAG_OP_AFT},
 		{"iv",		{.data.buf = &kdf_108_vector.iv, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
+
+		/* Support for regression test */
+		{"fixedData",	{.data.buf = &kdf_108_vector.fixed_data, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
 	};
 	const struct json_array kdf_108_test =
 		SET_ARRAY(kdf_108_test_entries, &kdf_108_testresult);

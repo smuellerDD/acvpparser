@@ -17,6 +17,7 @@
  * DAMAGE.
  */
 
+#define _DEFAULT_SOURCE
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>

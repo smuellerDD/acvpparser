@@ -18,6 +18,7 @@
  * DAMAGE.
  */
 
+#define _DEFAULT_SOURCE
 #include <stdlib.h>
 #include "backend_common.h"
 
@@ -47,9 +48,9 @@ static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 
 	CKINT(alloc_buf(SHA3_256_SIZE_DIGEST, &data->mac));
 
-	sha3_256_init(ctx);
-	sha3_update(ctx, data->msg.buf, data->msg.len);
-	sha3_final(ctx, data->mac.buf);
+	sha3_256_init(&ctx);
+	sha3_update(&ctx, data->msg.buf, data->msg.len);
+	sha3_final(&ctx, data->mac.buf);
 
 out:
 	return ret;

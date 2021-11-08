@@ -37,19 +37,70 @@ MODULE_POSTFIX="_"
 EXEC_TYPES_DRBG10X__64_bit___="CFLAGS=-DOPENSSL_DRBG_10X"
 EXEC_TYPES_DRBG10X__32_bit___="CFLAGS=\"-m32 -DOPENSSL_DRBG_10X\" LDFLAGS=-m32"
 
-EXEC="TDES_C FFC_DH KBKDF TLS_v1.3"
+#	Algorithm Implementations for supported platforms
 
 # Environment variable evaluated by ACVP Parser
 CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
+#	Common implementations
+
+EXEC_COMMON="TDES_C FFC_DH KBKDF TLS_v1.3"
+
+#	Implementations for S390
+
 if [ $(uname -m) = "s390x" ]; then
-	EXEC="$EXEC
-	      SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM"
+	EXEC="$EXEC_COMMON 
+		AES_CPACF AESASM AESGCM_CPACF AESGCM_ASM_CPACF AESGCM_ASM_ASM 
+		SHA_CPACF SHA_ASM SHA3_CPACF SHA3_ASM 
+		SSH_CPACF SSH_ASM
+		ALL_NOPAI"
+
+	CM_s390x_KIMD_GHASH="kimd:~0:~0x4000000000000000"
+	CM_s390x_KIMD_SHA="kimd:~0x70000000FC000000:~0"
+	CM_s390x_KIMD="kimd:~0x70000000FC000000:~0x4000000000000000"
+	CM_s390x_KLMD="klmd:~0x00000000FC000000:~0"
+	CM_s390x_KM="km:~0x380000002800:~0"
+	CM_s390x_KMC="kmc:~0x380000000000:~0"
+	CM_s390x_KMAC="kmac:~0x380000000000:~0"
+	CM_s390x_KMO="kmo:~0x380000000000:~0"
+	CM_s390x_KMF="kmf:~0x380000000000:~0"
+	CM_s390x_KMA="kma:~0x380000000000:~0"
+	CM_s390x_PCC="pcc:~0xE000000000000000:~0"
+	CM_s390x_KDSA="kdsa:~0x7070000000000000:~0"
+	
+CM_s390x_NOPAI="$CM_s390x_KIMD;$CM_s390x_KLMD;$CM_s390x_KM;$CM_s390x_KMC;$CM_s390x_KMAC;$CM_s390x_KMO;$CM_s390x_KMF;$CM_s390x_KMA;$CM_s390x_PCC;$CM_s390x_KDSA"
+	
+	#	Default configuration (CPACF enabled)
+	CIPHER_CALL_TDES_C=""
+	CIPHER_CALL_KBKDF="" 
+	# This assignment does not work, the name should be changed
+	#	CIPHER_CALL_TLS_v1.3=""
+	CIPHER_CALL_AES_CPACF="" 
+	CIPHER_CALL_SHA_CPACF="" 
+	CIPHER_CALL_SSH_CPACF="" 
+	CIPHER_CALL_SHA3_CPACF=""
+
+	CIPHER_CALL_AESGCM_CPACF=""
+	#	Turns off KMA capabilities (builtin AES GCM) and leave  KIMD (GHASH) enabled
+	CIPHER_CALL_AESGCM_ASM_CPACF="OPENSSL_s390xcap=\"$CM_s390x_KMA\"" 
+	
+	#	Turns off all CPACF capabilities
+	CIPHER_CALL_AESGCM_ASM_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+
+	CIPHER_CALL_AESASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	CIPHER_CALL_SHA_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	CIPHER_CALL_SSH_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	CIPHER_CALL_SHA3_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	CIPHER_CALL_ALL_NOPAI="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	
 elif [ $(uname -m) = "aarch64" ]; then
-	EXEC="$EXEC
-	      SHA_ASM SHA3_ASM SSH_ASM
-	      AES_C AES_C_GCM
-	      NEON VPAES VPAES_GCM CE CE_GCM SHA_CE SHA3_CE"
+
+	#	Implementations for ARM64
+
+	EXEC="$EXEC_COMMON 
+		SHA_ASM SHA3_ASM SSH_ASM 
+		AES_C AES_C_GCM 
+		NEON VPAES VPAES_GCM CE CE_GCM SHA_CE SHA3_CE"
 
 	# Unlike for x86, OPENSSL_armcap_P is taken at face value
 	# define ARMV7_NEON      (1<<0)
@@ -75,11 +126,13 @@ elif [ $(uname -m) = "aarch64" ]; then
 	CIPHER_CALL_SHA_CE="OPENSSL_armcap_P=7D"
 	CIPHER_CALL_SHA3_CE="OPENSSL_armcap_P=7D"
 
+#	Implementations for PPC
+
 elif [ $(uname -m) = "ppc" -o $(uname -m) = "ppc64" -o $(uname -m) = "ppcle" -o $(uname -m) = "ppc64le" ]; then
-	EXEC="$EXEC
-	      SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM
-	      SHA_VMX SSH_VMX AES_VMX AES_VMX_ASM
-	      AES_Altivec AES_Altivec_ASM"
+	EXEC="$EXEC_COMMON 
+		SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM 
+		SHA_VMX SSH_VMX AES_VMX AES_VMX_ASM 
+		AES_Altivec AES_Altivec_ASM"
 
 	CIPHER_CALL_SHA_ASM="OPENSSL_ppccap=0"
 	CIPHER_CALL_SHA3_ASM="OPENSSL_ppccap=0"
@@ -96,16 +149,17 @@ elif [ $(uname -m) = "ppc" -o $(uname -m) = "ppc64" -o $(uname -m) = "ppcle" -o 
 	CIPHER_CALL_AES_Altivec_ASM="OPENSSL_ppccap=2"
 
 else
-	EXEC="$EXEC
-	      AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM
-	      AESASM AESASM_AVX AESASM_CLMULNI AESASM_ASM
-              BAES_CTASM BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM
-              SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM SHA3_AVX2 SHA3_ASM SHA3_AVX512
-              SSH_AVX2 SSH_AVX SSH_SSSE3 SSH_ASM"
+	#	Implementations for X64
 
+	EXEC="$EXEC_COMMON  
+		AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM 
+		AESASM AESASM_AVX AESASM_CLMULNI AESASM_ASM 
+		BAES_CTASM BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM 
+		SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM SHA3_AVX2 SHA3_ASM SHA3_AVX512 
+		SSH_AVX2 SSH_AVX SSH_SSSE3 SSH_ASM"
+	     
 	OPENSSL_REMOVE_AVX_SHA=":~0xe0200020"						# remove bits #64+21/29/30/31 (SHA512), #64+5 (AVX2)
 	OPENSSL_REMOVE_AVX=":~0x20"							# remove bit #64+5 (AVX2)
-
 
 	# Assembler cipher and C block chaining modes
 	CIPHER_CALL_TDES_C=""
@@ -155,6 +209,7 @@ do_test() {
 		eval "$BUILD_FLAGS build_tool ${TARGET}"
 
 		for exec in $EXEC; do
+			echo "Processing [$exec]"
 			eval CIPHER_CALL=\${CIPHER_CALL_${exec}} 2> /dev/null
 
 			local modulename="${MODULE_PREFIX}${type}${exec}${MODULE_POSTFIX}"

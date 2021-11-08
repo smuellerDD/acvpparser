@@ -1,3 +1,12 @@
+v2.1.4
+- enhancement: add OpenSSL DH keygen
+- enhancement: add regression test support for GCM internal IV, keyGen, sigGen, pqgGen, KAS-ECC, KAS-FFC, SP800-108 KDF
+- enhancement: add TLS 1.2 RFC7627 support to OpenSSL
+- enhancement: use C11
+- enhancement: add regression tests for non-KAT tests (see REGRESSION_VECTOR_REPLACE in helper/exec_lib.sh for list of supported algorithms)
+- enhancement: add ANSI X9.63 parser
+- fix: update HKDF parser to match current specification
+
 v2.1.3
 - fix: LDT
 - enhancement: allow parser to be compiled as a library - patch provided by Daniel Ojalvo
