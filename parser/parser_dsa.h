@@ -160,6 +160,7 @@ struct dsa_pqg_data {
 	struct buffer pq_prov_qseed;
 
 	uint32_t pqgver_success;
+	struct buffer domainseed;
 };
 
 /**
