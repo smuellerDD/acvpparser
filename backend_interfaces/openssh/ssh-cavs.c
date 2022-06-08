@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

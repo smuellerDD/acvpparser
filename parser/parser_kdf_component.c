@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -38,27 +38,27 @@ static int kdf_tester_ansi_x963(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * ANSI X9.63 operation
 	 **********************************************************************/
-	DEF_CALLBACK(ansi_x963, ansi_x963, FLAG_OP_AFT);
+	DEF_CALLBACK(ansi_x963, ansi_x963, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963);
 
 	const struct json_entry ansi_x963_testresult_entries[] = {
-		{"keyData",		{.data.buf = &ansi_x963_vector.key_data, WRITER_BIN},	FLAG_OP_AFT},
+		{"keyData",		{.data.buf = &ansi_x963_vector.key_data, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
 	};
 	const struct json_testresult ansi_x963_testresult =
 		SET_ARRAY(ansi_x963_testresult_entries, &ansi_x963_callbacks);
 
 	const struct json_entry ansi_x963_test_entries[] = {
-		{"z",			{.data.buf = &ansi_x963_vector.z, PARSER_BIN},	FLAG_OP_AFT},
-		{"sharedInfo",		{.data.buf = &ansi_x963_vector.shared_info, PARSER_BIN},	FLAG_OP_AFT},
+		{"z",			{.data.buf = &ansi_x963_vector.z, PARSER_BIN},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
+		{"sharedInfo",		{.data.buf = &ansi_x963_vector.shared_info, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
 	};
 
 	/* search for empty arrays */
 	const struct json_array ansi_x963_test = SET_ARRAY(ansi_x963_test_entries, &ansi_x963_testresult);
 
 	const struct json_entry ansi_x963_testgroup_entries[] = {
-		{"hashAlg",			{.data.largeint = &ansi_x963_vector.hashalg, PARSER_CIPHER},	FLAG_OP_AFT },
-		{"keyDataLength",	{.data.integer = &ansi_x963_vector.key_data_len, PARSER_UINT},	FLAG_OP_AFT },
-		{"fieldSize",		{.data.integer = &ansi_x963_vector.field_size, PARSER_UINT}, FLAG_OP_AFT },
-		{"tests",			{.data.array = &ansi_x963_test, PARSER_ARRAY},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_TLS },
+		{"hashAlg",		{.data.largeint = &ansi_x963_vector.hashalg, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
+		{"keyDataLength",	{.data.integer = &ansi_x963_vector.key_data_len, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
+		{"fieldSize",		{.data.integer = &ansi_x963_vector.field_size, PARSER_UINT}, 	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
+		{"tests",		{.data.array = &ansi_x963_test, PARSER_ARRAY},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X963 },
 	};
 	const struct json_array ansi_x963_testgroup = SET_ARRAY(ansi_x963_testgroup_entries, NULL);
 
@@ -66,7 +66,7 @@ static int kdf_tester_ansi_x963(struct json_object *in, struct json_object *out,
 	 * KDF common test group
 	 **********************************************************************/
 	const struct json_entry ansi_x963_testanchor_entries[] = {
-		{"testGroups",			{.data.array = &ansi_x963_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_TLS},
+		{"testGroups",			{.data.array = &ansi_x963_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_ANSI_X963 },
 	};
 	const struct json_array ansi_x963_testanchor = SET_ARRAY(ansi_x963_testanchor_entries, NULL);
 
@@ -292,6 +292,61 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 }
 
 /******************************************************************************
+ * KDF SRTP callback definitions
+ ******************************************************************************/
+static struct kdf_srtp_backend *kdf_srtp_backend = NULL;
+
+static int kdf_tester_kdf_srtp(struct json_object *in, struct json_object *out,
+			       uint64_t cipher)
+{
+	(void)cipher;
+
+	/**********************************************************************
+	 * KDF SRTP operation
+	 **********************************************************************/
+	DEF_CALLBACK(kdf_srtp, kdf_srtp, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP);
+
+	const struct json_entry kdf_srtp_testresult_entries[] = {
+		{"srtpKe",		{.data.buf = &kdf_srtp_vector.srtp_ke, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtpKa",		{.data.buf = &kdf_srtp_vector.srtp_ka, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtpKs",		{.data.buf = &kdf_srtp_vector.srtp_ks, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtcpKe",		{.data.buf = &kdf_srtp_vector.srtcp_ke, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtcpKa",		{.data.buf = &kdf_srtp_vector.srtcp_ka, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtcpKs",		{.data.buf = &kdf_srtp_vector.srtcp_ks, WRITER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+	};
+	const struct json_testresult kdf_srtp_testresult =
+		SET_ARRAY(kdf_srtp_testresult_entries, &kdf_srtp_callbacks);
+
+	const struct json_entry kdf_srtp_test_entries[] = {
+		{"masterKey",		{.data.buf = &kdf_srtp_vector.master_key, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"masterSalt",		{.data.buf = &kdf_srtp_vector.master_salt, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"index",		{.data.buf = &kdf_srtp_vector.index, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"srtcpIndex",		{.data.buf = &kdf_srtp_vector.srtcp_index, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+	};
+
+	/* search for empty arrays */
+	const struct json_array kdf_srtp_test = SET_ARRAY(kdf_srtp_test_entries, &kdf_srtp_testresult);
+
+	const struct json_entry kdf_srtp_testgroup_entries[] = {
+		{"aesKeyLength",	{.data.integer = &kdf_srtp_vector.aes_key_length, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"kdr",			{.data.buf = &kdf_srtp_vector.kdr, PARSER_BIN}, 		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+		{"tests",		{.data.array = &kdf_srtp_test, PARSER_ARRAY},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_SRTP },
+	};
+	const struct json_array kdf_srtp_testgroup = SET_ARRAY(kdf_srtp_testgroup_entries, NULL);
+
+	/**********************************************************************
+	 * KDF common test group
+	 **********************************************************************/
+	const struct json_entry kdf_srtp_testanchor_entries[] = {
+		{"testGroups",			{.data.array = &kdf_srtp_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_SRTP },
+	};
+	const struct json_array kdf_srtp_testanchor = SET_ARRAY(kdf_srtp_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&kdf_srtp_testanchor, "1.0", in, out);
+}
+
+/******************************************************************************
  * KDF generic parser definitions
  ******************************************************************************/
 static int kdf_tester(struct json_object *in, struct json_object *out,
@@ -322,8 +377,12 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 		CKINT(kdf_tester_ikev2(in, out, cipher));
 		executed = true;
 	}
-	if (kdf_ikev2_backend && !strncmp(mode, "ansix9.63", 9)) {
+	if (ansi_x963_backend && !strncmp(mode, "ansix9.63", 9)) {
 		CKINT(kdf_tester_ansi_x963(in, out, cipher));
+		executed = true;
+	}
+	if (kdf_srtp_backend && !strncmp(mode, "srtp", 4)) {
+		CKINT(kdf_tester_kdf_srtp(in, out, cipher));
 		executed = true;
 	}
 
@@ -379,4 +438,9 @@ void register_kdf_ikev2_impl(struct kdf_ikev2_backend *implementation)
 void register_ansi_x963_impl(struct ansi_x963_backend *implementation)
 {
 	register_backend(ansi_x963_backend, implementation, "ANSI_X9.63");
+}
+
+void register_kdf_srtp_impl(struct kdf_srtp_backend *implementation)
+{
+	register_backend(kdf_srtp_backend, implementation, "KDF_SRTP");
 }

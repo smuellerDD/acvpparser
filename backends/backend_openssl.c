@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -373,7 +373,7 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 
 	CKINT(left_pad_buf(&data->P, data->L / 8));
 	CKINT(left_pad_buf(&data->Q, data->N / 8));
-	CKINT(left_pad_buf(&data->pq_prob_domain_param_seed, data->N / 8));
+	CKINT(left_pad_buf(&data->domainseed, data->N / 8));
 
 	ctx = BN_CTX_new();
 	CKNULL_LOG(ctx, 1, "BN_CTX_new()");
@@ -387,8 +387,8 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
 	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
 	logger_binary(LOGGER_DEBUG, data->G.buf, data->G.len, "G");
-	logger_binary(LOGGER_DEBUG, data->pq_prob_domain_param_seed.buf,
-		      data->pq_prob_domain_param_seed.len,
+	logger_binary(LOGGER_DEBUG, data->domainseed.buf,
+		      data->domainseed.len,
 		      "Domain parameter seed");
 	logger(LOGGER_DEBUG, "Counter = %u\n", data->pq_prob_counter);
 
@@ -418,8 +418,8 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	}
 
 	CKINT_O_LOG(FIPS_dsa_builtin_paramgen(dsa, data->L, data->N, NULL,
-					   data->pq_prob_domain_param_seed.buf,
-					   data->pq_prob_domain_param_seed.len,
+					   data->domainseed.buf,
+					   data->domainseed.len,
 					   &counter2,
 					   h2, NULL),
 		    "FIPS_dsa_builtin_paramgen() failed\n");
@@ -801,15 +801,15 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 
 	CKINT(left_pad_buf(&data->P, data->L / 8));
 	CKINT(left_pad_buf(&data->Q, data->N / 8));
-	CKINT(left_pad_buf(&data->pq_prob_domain_param_seed, data->N / 8));
+	CKINT(left_pad_buf(&data->domainseed, data->N / 8));
 
 	logger(LOGGER_DEBUG, "L = %u\n", data->L);
 	logger(LOGGER_DEBUG, "N = %u\n", data->N);
 
 	logger_binary(LOGGER_DEBUG, data->P.buf, data->P.len, "P");
 	logger_binary(LOGGER_DEBUG, data->Q.buf, data->Q.len, "Q");
-	logger_binary(LOGGER_DEBUG, data->pq_prob_domain_param_seed.buf,
-		      data->pq_prob_domain_param_seed.len,
+	logger_binary(LOGGER_DEBUG, data->domainseed.buf,
+		      data->domainseed.len,
 		      "Domain parameter seed");
 	logger(LOGGER_DEBUG, "Counter = %u\n", data->pq_prob_counter);
 
@@ -831,8 +831,8 @@ static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 
 	ret = FIPS_dsa_builtin_paramgen2(dsa, data->L, data->N, md,
-					 data->pq_prob_domain_param_seed.buf,
-					 data->pq_prob_domain_param_seed.len,
+					 data->domainseed.buf,
+					 data->domainseed.len,
 					 (int)data->pq_prob_counter,
 				 	 seed, &counter, &h, NULL);
 	if (ret < 0) {
@@ -2224,7 +2224,7 @@ static int openssl_dsa_pq_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
 {
 	(void)parsed_flags;
 	return _openssl_dsa_pqg_gen(&data->P, &data->Q, &data->G,
-				    &data->pq_prob_domain_param_seed,
+				    &data->domainseed,
 				    &data->pq_prob_counter,
 				    data->L, data->N, data->cipher);
 }
@@ -3827,82 +3827,84 @@ static void openssl_ecdh_backend(void)
 }
 
 /************************************************
- * SP800-132 PBKDF cipher interface functions
- ************************************************/
-static int openssl_pbkdf_generate(struct pbkdf_data *data,
-				  flags_t parsed_flags)
-{
-	const EVP_MD *md = NULL;
-	uint32_t derived_key_bytes = data->derived_key_length / 8;
-	int ret;
-
-	(void)parsed_flags;
-
-	if (data->derived_key_length % 8) {
-		logger(LOGGER_WARN, "Derived key must be byte-aligned\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	CKINT(openssl_md_convert(data->hash & ACVP_HASHMASK, &md));
-
-	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
-
-	CKINT_O_LOG(PKCS5_PBKDF2_HMAC((const char *)data->password.buf,
-				      (int)data->password.len,
-				      data->salt.buf, (int)data->salt.len,
-				      (int)data->iteration_count,
-				      md, (int)data->derived_key.len,
-				      data->derived_key.buf), "PBKDF failed\n");
-
-out:
-	return ret;
-}
-
-static struct pbkdf_backend openssl_pbkdf =
-{
-	openssl_pbkdf_generate,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(openssl_pbkdf_backend)
-static void openssl_pbkdf_backend(void)
-{
-	register_pbkdf_impl(&openssl_pbkdf);
-}
-
-/************************************************
  * SP800-56B rev 2 KTS IFC cipher interface functions
  ************************************************/
 
-static int openssl_rsa_oaep_encrypt(struct kts_ifc_data *data)
+/*
+ * return: 0 on success, < 0 on true error, > 0 when validation fails
+ */
+static int openssl_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data,
+					      int validation)
 {
-	struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
-	const EVP_MD *md = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
 	EVP_PKEY *pk = NULL;
 	RSA *rsa = NULL;
 	BIGNUM *n = NULL, *e = NULL;
-	size_t outlen;
+	BUFFER_INIT(label);
+	BUFFER_INIT(new_c);
+	struct buffer *dkm_p, *c_p;
+	size_t outlen, keylen = (data->keylen) ? data->keylen : data->modulus;
 	int ret;
 
-	if (data->keylen > data->modulus)
+	if (keylen > data->modulus)
 		return -EINVAL;
-
-	CKINT(left_pad_buf(&init->n, data->modulus >> 3));
-	if (!init->dkm.len) {
-		CKINT(alloc_buf(data->keylen >> 3, &init->dkm));
-		RAND_bytes(init->dkm.buf, (int)init->dkm.len);
-	}
-
-	CKINT(openssl_md_convert(data->kts_hash, &md));
-
-	n = BN_bin2bn((const unsigned char *)init->n.buf, (int)init->n.len, n);
-	CKNULL(n, -ENOMEM);
-	e = BN_bin2bn((const unsigned char *)init->e.buf, (int)init->e.len, e);
-	CKNULL(e, -ENOMEM);
 
 	rsa = RSA_new();
 	CKNULL(rsa, -ENOMEM);
+
+	if (validation) {
+		struct kts_ifc_init_validation_data *init_val =
+					&data->u.kts_ifc_init_validation;
+
+		CKINT(left_pad_buf(&init_val->n, data->modulus >> 3));
+
+		dkm_p = &init_val->dkm;
+		c_p = &new_c;
+
+		if (init_val->p.buf && init_val->q.buf) {
+			BIGNUM *p = NULL, *q = NULL;
+			p = BN_bin2bn((const unsigned char *)init_val->p.buf,
+				      (int)init_val->p.len, p);
+			CKNULL(p, -ENOMEM);
+			q = BN_bin2bn((const unsigned char *)init_val->q.buf,
+				      (int)init_val->q.len, e);
+			CKNULL(q, -ENOMEM);
+
+			CKINT_O_LOG(openssl_rsa_set0_factors(rsa, p, q),
+				    "Assembly of RSA factors failed\n");
+		}
+
+		n = BN_bin2bn((const unsigned char *)init_val->n.buf,
+			      (int)init_val->n.len, n);
+		CKNULL(n, -ENOMEM);
+		e = BN_bin2bn((const unsigned char *)init_val->e.buf,
+			      (int)init_val->e.len, e);
+		CKNULL(e, -ENOMEM);
+	} else {
+		struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
+
+		CKINT(left_pad_buf(&init->n, data->modulus >> 3));
+		if (!init->dkm.len) {
+			CKINT(alloc_buf(keylen >> 3, &init->dkm));
+			RAND_bytes(init->dkm.buf, (int)init->dkm.len);
+
+			/*
+			 * Ensure that in case of raw encryption, the value is
+			 * not too large.
+			 */
+			init->dkm.buf[0] &= ~0x80;
+		}
+
+		dkm_p = &init->dkm;
+		c_p = &init->iut_c;
+
+		n = BN_bin2bn((const unsigned char *)init->n.buf,
+			      (int)init->n.len, n);
+		CKNULL(n, -ENOMEM);
+		e = BN_bin2bn((const unsigned char *)init->e.buf,
+			      (int)init->e.len, e);
+		CKNULL(e, -ENOMEM);
+	}
 
 	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, NULL),
 		    "Assembly of RSA key failed\n");
@@ -3917,23 +3919,84 @@ static int openssl_rsa_oaep_encrypt(struct kts_ifc_data *data)
 
 	CKINT_O_LOG(EVP_PKEY_encrypt_init(ctx), "PKEY encrypt init failed\n");
 
-	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING),
-		    "Setting OAEP padding failed\n");
-	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
-		    "Setting of OAEP MD failed\n");
+	if (data->kts_hash) {
+		/* OAEP Padding */
+		const EVP_MD *md = NULL;
+
+		CKINT(openssl_md_convert(data->kts_hash, &md));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx,
+						RSA_PKCS1_OAEP_PADDING),
+			    "Setting OAEP padding failed\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
+			   "Setting of OAEP MD failed\n");
+
+		/* Evaluate encoding and concatenate Server and IUT Ids */
+
+		if (convert_cipher_match(data->kts_encoding,
+					 ACVP_KAS_ENCODING_CONCATENATION,
+					 ACVP_CIPHERTYPE_KAS)) {
+			CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
+				    "Setting MFGL MD failed\n");
+			CKINT(alloc_buf(data->server_id.len + data->iut_id.len,
+					&label));
+			memcpy(label.buf, data->iut_id.buf, data->iut_id.len);
+			memcpy(label.buf + data->iut_id.len, data->server_id.buf,
+			data->server_id.len);
+
+
+			CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx,
+								     label.buf,
+								     label.len),
+				    "Setting OAEP label failed\n");
+		}
+	} else {
+		/* Raw encryption */
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
+			    "Setting no padding failed\n");
+	}
 
 	/* Determine buffer length */
-	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &outlen, init->dkm.buf,
-				     init->dkm.len),
+	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &outlen, dkm_p->buf,
+				     dkm_p->len),
 		    "Getting ciphertext length failed %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
 
-	CKINT(alloc_buf(outlen, &init->iut_c));
+	CKINT(alloc_buf(outlen, c_p));
 
-	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, init->iut_c.buf, &outlen,
-				     init->dkm.buf, init->dkm.len),
-		    "RSA OAEP encryption failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
+	ret = EVP_PKEY_encrypt(ctx, c_p->buf, &outlen, dkm_p->buf, dkm_p->len);
+
+
+	if (validation) {
+		struct kts_ifc_init_validation_data *init_val =
+					&data->u.kts_ifc_init_validation;
+
+		/* OpenSSL returns 0 on failure */
+		if (ret != 1) {
+			logger(LOGGER_DEBUG,
+			       "Validation: RSA encryption failed %s\n",
+			       ERR_error_string(ERR_get_error(), NULL));
+			ret = EFAULT;
+		} else if (outlen != init_val->c.len ||
+			   memcmp(init_val->c.buf, c_p->buf, outlen)) {
+			logger(LOGGER_DEBUG, "lens %zu %zu\n", outlen,
+			       init_val->c.len);
+			logger_binary(LOGGER_DEBUG, init_val->c.buf,
+				      init_val->c.len,
+				      "expected encrypted secret");
+			logger_binary(LOGGER_DEBUG, c_p->buf, c_p->len,
+				      "calculated encrypted secret");
+
+			ret = EFAULT;
+		} else {
+			ret = 0;
+		}
+	} else if (ret != 1) {
+		logger(LOGGER_ERR, "RSA encryption failed %s\n",
+		       ERR_error_string(ERR_get_error(), NULL));
+		ret = -EFAULT;
+	} else {
+		ret = 0;
+	}
 
 out:
 	if (pk)
@@ -3942,46 +4005,92 @@ out:
 		RSA_free(rsa);
 	if (ctx)
 		EVP_PKEY_CTX_free(ctx);
+	free_buf(&new_c);
+
+	/*
+	 * The man page for EVP_PKEY_CTX_set0_rsa_oaep_label reads:
+	 *
+	 * "The library takes ownership of the label so the caller should
+	 * not free the original memory pointed to by label."
+	 *
+	 * So, this call is not needed.
+	 * free_buf(&label);
+	 */
+
 	return ret;
 }
 
-static int openssl_rsa_oaep_decrypt(struct kts_ifc_data *data)
+static int openssl_rsa_kas_ifc_set_key(RSA *rsa,
+				       struct buffer *n_buf,
+				       struct buffer *e_buf,
+				       struct buffer *d_buf,
+				       struct buffer *p_buf,
+				       struct buffer *q_buf)
 {
-	struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
-	const EVP_MD *md = NULL;
-	BUFFER_INIT(tmp);
-	EVP_PKEY_CTX *ctx = NULL;
-	EVP_PKEY *pk = NULL;
-	RSA *rsa = NULL;
 	BIGNUM *n = NULL, *e = NULL, *d = NULL, *p = NULL, *q = NULL;
-	size_t outlen;
 	int ret;
 
-	if (data->keylen > data->modulus)
-		return -EINVAL;
-
-	CKINT(left_pad_buf(&resp->n, data->modulus >> 3));
-
-	CKINT(openssl_md_convert(data->kts_hash, &md));
-
-	n = BN_bin2bn((const unsigned char *)resp->n.buf, (int)resp->n.len, n);
+	n = BN_bin2bn((const unsigned char *)n_buf->buf, (int)n_buf->len, n);
 	CKNULL(n, -ENOMEM);
-	e = BN_bin2bn((const unsigned char *)resp->e.buf, (int)resp->e.len, e);
+	e = BN_bin2bn((const unsigned char *)e_buf->buf, (int)e_buf->len, e);
 	CKNULL(e, -ENOMEM);
-	d = BN_bin2bn((const unsigned char *)resp->d.buf, (int)resp->d.len, d);
+	d = BN_bin2bn((const unsigned char *)d_buf->buf, (int)d_buf->len, d);
 	CKNULL(d, -ENOMEM);
-	p = BN_bin2bn((const unsigned char *)resp->p.buf, (int)resp->p.len, p);
+	p = BN_bin2bn((const unsigned char *)p_buf->buf, (int)p_buf->len, p);
 	CKNULL(p, -ENOMEM);
-	q = BN_bin2bn((const unsigned char *)resp->q.buf, (int)resp->q.len, q);
+	q = BN_bin2bn((const unsigned char *)q_buf->buf, (int)q_buf->len, q);
 	CKNULL(q, -ENOMEM);
-
-	rsa = RSA_new();
-	CKNULL(rsa, -ENOMEM);
 
 	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, d),
 		    "Assembly of RSA key failed\n");
 	CKINT_O_LOG(openssl_rsa_set0_factors(rsa, p, q),
 		    "Assembly of RSA factors failed\n");
+
+out:
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
+					      int validation)
+{
+	BUFFER_INIT(tmp);
+	BUFFER_INIT(label);
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pk = NULL;
+	RSA *rsa = NULL;
+
+	struct buffer *c_p;
+	size_t outlen, keylen = (data->keylen) ? data->keylen : data->modulus;
+	int ret;
+
+	if (keylen > data->modulus)
+		return -EINVAL;
+
+	rsa = RSA_new();
+	CKNULL(rsa, -ENOMEM);
+
+	if (validation) {
+		struct kts_ifc_resp_validation_data *resp_val =
+					&data->u.kts_ifc_resp_validation;
+
+		CKINT(left_pad_buf(&resp_val->n, data->modulus >> 3));
+
+		CKINT(openssl_rsa_kas_ifc_set_key(rsa, &resp_val->n,
+						  &resp_val->e, &resp_val->d,
+						  &resp_val->p, &resp_val->q));
+
+		c_p = &resp_val->c;
+	} else {
+		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
+
+		CKINT(left_pad_buf(&resp->n, data->modulus >> 3));
+
+		CKINT(openssl_rsa_kas_ifc_set_key(rsa, &resp->n,
+						  &resp->e, &resp->d,
+						  &resp->p, &resp->q));
+
+		c_p = &resp->c;
+	}
 
 	pk = EVP_PKEY_new();
 	CKNULL(pk, -ENOMEM);
@@ -3993,33 +4102,95 @@ static int openssl_rsa_oaep_decrypt(struct kts_ifc_data *data)
 
 	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx), "PKEY decrypt init failed\n");
 
-	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING),
-		    "Setting OAEP padding failed\n");
-	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
-		    "Setting of OAEP MD failed\n");
+	if (data->kts_hash) {
+		/* OAEP Padding */
+		const EVP_MD *md = NULL;
+
+		CKINT(openssl_md_convert(data->kts_hash, &md));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx,
+						RSA_PKCS1_OAEP_PADDING),
+			    "Setting OAEP padding failed\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
+			    "Setting of OAEP MD failed\n");
+
+		/* Evaluate encoding and concatenate IUT and Server Ids */
+
+		if (convert_cipher_match(data->kts_encoding,
+					 ACVP_KAS_ENCODING_CONCATENATION,
+					 ACVP_CIPHERTYPE_KAS)) {
+			CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
+				    "Setting MFGL MD failed\n");
+			CKINT(alloc_buf(data->server_id.len + data->iut_id.len,
+					&label));
+			memcpy(label.buf, data->server_id.buf, data->server_id.len);
+			memcpy(label.buf + data->server_id.len, data->iut_id.buf,
+			data->iut_id.len);
+
+			CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx,
+								     label.buf,
+								     label.len),
+				    "Setting OAEP label failed\n");
+		}
+	} else {
+		/* Raw encryption */
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
+			    "Setting padding failed\n");
+	}
 
 	/* Determine buffer length */
-	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, resp->c.buf,
-				     resp->c.len),
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, c_p->buf, c_p->len),
 		    "Getting plaintext length failed %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
 
 	CKINT(alloc_buf(outlen, &tmp));
 
-	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, tmp.buf, &tmp.len,
-				     resp->c.buf, resp->c.len),
-		    "RSA OAEP decryption failed %s\n",
+	/* End of change */
+
+	ret = EVP_PKEY_decrypt(ctx, tmp.buf, &tmp.len, c_p->buf, c_p->len);
+
+	if (validation) {
+		struct kts_ifc_resp_validation_data *resp_val =
+					&data->u.kts_ifc_resp_validation;
+
+		/* OpenSSL returns 0 on failure */
+		if (ret != 1) {
+			logger(LOGGER_DEBUG,
+			       "Validation: RSA encryption failed %s\n",
+			       ERR_error_string(ERR_get_error(), NULL));
+			ret = EFAULT;
+		} else if (outlen != resp_val->dkm.len ||
+			   memcmp(resp_val->dkm.buf, tmp.buf, outlen)) {
+			logger(LOGGER_DEBUG, "lens %zu %zu\n", outlen,
+			       resp_val->dkm.len);
+			logger_binary(LOGGER_DEBUG, resp_val->dkm.buf,
+				      resp_val->dkm.len,
+				      "expected decrypted secret");
+			logger_binary(LOGGER_DEBUG, tmp.buf, tmp.len,
+				      "calculated decrypted secret");
+
+			ret = EFAULT;
+		} else {
+			ret = 0;
+		}
+
+	} else if (ret != 1) {
+		logger(LOGGER_ERR, "RSA decryption failed %s\n",
 		    ERR_error_string(ERR_get_error(), NULL));
-
-	if (tmp.len < (data->keylen >> 3)) {
-		logger(LOGGER_ERR,
-		       "RSA OAEP decrypted data has insufficient size\n");
 		ret = -EFAULT;
-		goto out;
-	}
 
-	CKINT(alloc_buf(data->keylen >> 3, &resp->dkm));
-	memcpy(resp->dkm.buf, tmp.buf, resp->dkm.len);
+	} else {
+		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
+
+		if (tmp.len < (keylen >> 3)) {
+			logger(LOGGER_ERR,
+			       "RSA decrypted data has insufficient size\n");
+			ret = -EFAULT;
+			goto out;
+		}
+
+		CKINT(alloc_buf(keylen >> 3, &resp->dkm));
+		memcpy(resp->dkm.buf, tmp.buf, resp->dkm.len);
+	}
 
 out:
 	if (pk)
@@ -4028,6 +4199,17 @@ out:
 		RSA_free(rsa);
 	if (ctx)
 		EVP_PKEY_CTX_free(ctx);
+
+	/*
+	 * The man page for EVP_PKEY_CTX_set0_rsa_oaep_label reads:
+	 *
+	 * "The library takes ownership of the label so the caller should
+	 * not free the original memory pointed to by label."
+	 *
+	 * So, this call is not needed.
+	 * free_buf(&label);
+	 */
+
 	free_buf(&tmp);
 	return ret;
 }
@@ -4041,24 +4223,36 @@ static int openssl_kts_ifc_generate(struct kts_ifc_data *data,
 
 	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
 	    (parsed_flags & FLAG_OP_AFT)) {
-		CKINT(openssl_rsa_oaep_encrypt(data));
+		CKINT(openssl_rsa_kas_ifc_encrypt_common(data, 0));
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
 		   (parsed_flags & FLAG_OP_AFT)) {
-		CKINT(openssl_rsa_oaep_decrypt(data));
+		CKINT(openssl_rsa_kas_ifc_decrypt_common(data, 0));
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
 		   (parsed_flags & FLAG_OP_VAL)) {
 		struct kts_ifc_init_validation_data *init_val =
 					&data->u.kts_ifc_init_validation;
 
-		init_val->validation_success = 0;
-		ret = -EOPNOTSUPP;
+		CKINT(openssl_rsa_kas_ifc_encrypt_common(data, 1));
+
+		if (ret > 0) {
+			init_val->validation_success = 0;
+			ret = 0;
+		} else {
+			init_val->validation_success = 1;
+		}
 	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
 		   (parsed_flags & FLAG_OP_VAL)) {
 		struct kts_ifc_resp_validation_data *resp_val =
 					&data->u.kts_ifc_resp_validation;
 
-		resp_val->validation_success = 1;
-		ret = -EOPNOTSUPP;
+		CKINT(openssl_rsa_kas_ifc_decrypt_common(data, 1));
+
+		if (ret > 0) {
+			resp_val->validation_success = 0;
+			ret = 0;
+		} else {
+			resp_val->validation_success = 1;
+		}
 	} else {
 		logger(LOGGER_ERR, "Unknown test\n");
 		ret = -EINVAL;
@@ -4078,399 +4272,6 @@ static void openssl_kts_ifc_backend(void)
 {
 	register_kts_ifc_impl(&openssl_kts_ifc);
 }
-
-#ifdef OPENSSL_ENABLE_TLS13
-/************************************************
- * RFC8446 TLS v1.3 KDF
- ************************************************/
-static int openssl_hkdf_extract(const EVP_MD *md,
-				const uint8_t *key, size_t keylen,
-				const uint8_t *salt, size_t saltlen,
-				uint8_t *secret, size_t *secretlen)
-{
-	EVP_PKEY_CTX *pctx = NULL;
-	int ret;
-
-	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
-	CKNULL(pctx, -EFAULT);
-
-	/* Extract phase */
-	CKINT_O_LOG(EVP_PKEY_derive_init(pctx),
-		    "Initialiation of HKDF failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_hkdf_mode(pctx,
-					   EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY),
-		    "Setting HKDF Extract operation failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_set_hkdf_md(pctx, md), "Setting MD failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, key, keylen),
-		    "Setting HKDF key failed\n");
-
-
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen),
-		    "Setting salt failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_derive(pctx, secret, secretlen),
-		    "Deriving expand key failed\n");
-
-out:
-	if (pctx)
-		EVP_PKEY_CTX_free(pctx);
-	return ret;
-}
-
-static int openssl_hkdf_expand(const EVP_MD *md,
-			       const uint8_t *fi, size_t filen,
-			       const uint8_t *secret, size_t secretlen,
-			       uint8_t *dkm, size_t *dkmlen)
-{
-	EVP_PKEY_CTX *pctx = NULL;
-	int ret;
-
-	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
-	CKNULL(pctx, -EFAULT);
-
-	CKINT_O_LOG(EVP_PKEY_derive_init(pctx),
-		    "Initialiation of HKDF failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_hkdf_mode(pctx,
-					   EVP_PKEY_HKDEF_MODE_EXPAND_ONLY),
-		    "Setting HKDF Expand operation failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_set_hkdf_md(pctx, md), "Setting MD failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secretlen),
-		    "Setting HKDF key failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_CTX_add1_hkdf_info(pctx, fi, filen),
-		    "Setting fixed info string failed\n");
-
-	CKINT_O_LOG(EVP_PKEY_derive(pctx, dkm, dkmlen),
-		    "Deriving key material failed\n");
-
-out:
-	if (pctx)
-		EVP_PKEY_CTX_free(pctx);
-	return ret;
-}
-
-#define TLS13_MAX_DIGEST_SIZE	64
-#define TLS13_MAX_LABEL_LEN     249
-
-static inline void be16_to_ptr(uint8_t *p, const uint16_t value)
-{
-	p[0] = (uint8_t)(value >> 8);
-	p[1] = (uint8_t)(value);
-}
-
-/*
- * @param secret: secret from the HKDF extract phase
- * @param label: TLS 1.3 label
- * @param data: hashed input data
- * @param out: derived key material
- */
-static int tls13_hkdf_expand(const EVP_MD *md, const uint8_t *secret,
-			     const uint8_t *label, size_t labellen,
-			     const uint8_t *data, size_t datalen,
-			     uint8_t *out, size_t outlen)
-{
-	static const unsigned char label_prefix[] = "tls13 ";
-	int ret;
-	size_t hkdflabellen;
-	size_t hashlen;
-	/*
-	 * 2 bytes for length of derived secret + 1 byte for length of combined
-	 * prefix and label + bytes for the label itself + 1 byte length of hash
-	 * + bytes for the hash itself
-	 */
-	unsigned char hkdflabel[sizeof(uint16_t) +
-				sizeof(uint8_t) +
-				(sizeof(label_prefix) - 1) +
-				TLS13_MAX_LABEL_LEN + 1 +
-				TLS13_MAX_DIGEST_SIZE];
-
-	if (labellen > TLS13_MAX_LABEL_LEN)
-		return -EINVAL;
-
-	hashlen = (size_t)EVP_MD_size(md);
-
-	be16_to_ptr(hkdflabel, (uint16_t)outlen);
-	hkdflabellen = sizeof(uint16_t);
-
-	hkdflabel[hkdflabellen] = (uint8_t)labellen + 6;
-	hkdflabellen++;
-	memcpy(hkdflabel + hkdflabellen, label_prefix, sizeof(label_prefix) - 1);
-	hkdflabellen += sizeof(label_prefix) - 1;
-	memcpy(hkdflabel + hkdflabellen, label, labellen);
-	hkdflabellen += labellen;
-
-	if (data) {
-		hkdflabel[hkdflabellen] = (uint8_t)datalen;
-		hkdflabellen++;
-		memcpy(hkdflabel + hkdflabellen, data, datalen);
-		hkdflabellen += datalen;
-	}
-
-	CKINT(openssl_hkdf_expand(md, hkdflabel, hkdflabellen,
-				  secret, hashlen, out, &outlen));
-
-out:
-	return ret;
-}
-
-/* Always filled with zeros */
-static const unsigned char default_zeros[TLS13_MAX_DIGEST_SIZE];
-
-/*
- * @param prevsecret: Result of previous tls13_generate_secret operations
- * 		      (during first invocation, this is NULL)
- * @param insecret: Secret (either PSK or DHE shared secret or NULL)
- * @param outsecret: secret of message digest size
- */
-/* This function is copied from OpenSSL */
-static int tls13_generate_secret(const EVP_MD *md,
-				 const uint8_t *prevsecret,
-				 const uint8_t *insecret,
-				 size_t insecretlen,
-				 uint8_t *outsecret)
-{
-	size_t mdlen, prevsecretlen;
-	int mdleni;
-	int ret;
-	static const char derived_secret_label[] = "derived";
-	unsigned char preextractsec[TLS13_MAX_DIGEST_SIZE];
-
-	mdleni = EVP_MD_size(md);
-	/* Ensure cast to size_t is safe */
-	if (mdleni < 0)
-		return -EFAULT;
-	mdlen = (size_t)mdleni;
-
-	if (insecret == NULL) {
-		insecret = default_zeros;
-		insecretlen = mdlen;
-	}
-
-	if (prevsecret == NULL) {
-		prevsecret = default_zeros;
-		prevsecretlen = 0;
-	} else {
-		EVP_MD_CTX *mctx = EVP_MD_CTX_new();
-		unsigned char hash[EVP_MAX_MD_SIZE];
-
-		/* The pre-extract derive step uses a hash of no messages */
-		if (mctx == NULL
-		    || EVP_DigestInit_ex(mctx, md, NULL) <= 0
-		    || EVP_DigestFinal_ex(mctx, hash, NULL) <= 0) {
-			logger(LOGGER_ERR, "hash generation failed\n");
-			EVP_MD_CTX_free(mctx);
-			return -EFAULT;
-		}
-		EVP_MD_CTX_free(mctx);
-
-		/* Generate the pre-extract secret */
-		if (!tls13_hkdf_expand(md, prevsecret,
-				       (unsigned char *)derived_secret_label,
-				       sizeof(derived_secret_label) - 1,
-				       hash, mdlen, preextractsec, mdlen))
-			return -EFAULT;
-
-		prevsecret = preextractsec;
-		prevsecretlen = mdlen;
-	}
-
-	CKINT(openssl_hkdf_extract(md, insecret, insecretlen,
-				   prevsecret, prevsecretlen,
-				   outsecret, &mdlen));
-
-out:
-	return ret;
-}
-
-static int openssl_hash(const EVP_MD *md,
-			uint8_t *in, size_t inlen,
-			uint8_t *in2, size_t in2len,
-			uint8_t *out, unsigned int *outlen)
-{
-	EVP_MD_CTX *ctx = EVP_MD_CTX_create();
-	int ret;
-
-	CKNULL_LOG(ctx, -ENOMEM, "MD context not created\n");
-
-	CKINT_O_LOG(EVP_DigestInit(ctx, md), "EVP_DigestInit() failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
-
-	CKINT_O_LOG(EVP_DigestUpdate(ctx, in, inlen),
-		    "EVP_DigestUpdate() failed\n");
-
-	if (in2 && in2len)
-		CKINT_O_LOG(EVP_DigestUpdate(ctx, in2, in2len),
-			    "EVP_DigestUpdate() failed\n");
-
-	CKINT_O_LOG(EVP_DigestFinal(ctx, out, outlen),
-		    "EVP_DigestFinal() failed\n");
-
-out:
-	return ret;
-}
-
-static int openssl_tls13_generate(struct tls13_data *data,
-				  flags_t parsed_flags)
-{
-	static const unsigned char client_early_traffic[] = "c e traffic";
-	static const unsigned char early_exporter_master_secret[] = "e exp master";
-	static const unsigned char client_handshake_traffic[] = "c hs traffic";
-	static const unsigned char client_application_traffic[] = "c ap traffic";
-	static const unsigned char server_handshake_traffic[] = "s hs traffic";
-	static const unsigned char server_application_traffic[] = "s ap traffic";
-	static const unsigned char exporter_master_secret[] = "exp master";
-	static const unsigned char resumption_master_secret[] = "res master";
-
-	const EVP_MD *md = NULL;
-	uint8_t mdbuf[EVP_MAX_MD_SIZE];
-	uint8_t secret[EVP_MAX_MD_SIZE];
-	unsigned int mdbuflen;
-	int mdlen;
-
-	int ret;
-
-	if (!(parsed_flags & FLAG_OP_TLS13_RUNNING_MODE_DHE)) {
-		logger(LOGGER_ERR, "Only DHE supported\n");
-		return -EOPNOTSUPP;
-	}
-
-	CKINT(openssl_md_convert(data->hash, &md));
-	mdlen = EVP_MD_size(md);
-
-	CKINT(alloc_buf((size_t)mdlen, &data->client_early_traffic_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->early_exporter_master_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->client_application_traffic_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->server_application_traffic_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->client_handshake_traffic_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->server_handshake_traffic_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->exporter_master_secret));
-	CKINT(alloc_buf((size_t)mdlen, &data->resumption_master_secret));
-
-	/* Generate Early Secret without PSK */
-	CKINT_LOG(tls13_generate_secret(md, NULL, NULL, 0, secret),
-		  "Generation of Early Secret failed\n");
-
-	/* Generate secrets */
-	CKINT(openssl_hash(md, data->client_hello_random.buf,
-			   data->client_hello_random.len, NULL, 0,
-			   mdbuf, &mdbuflen));
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      client_early_traffic,
-				      sizeof(client_early_traffic) - 1,
-				      mdbuf, mdbuflen,
-				      data->client_early_traffic_secret.buf,
-				      data->client_early_traffic_secret.len),
-		   "Generation of client early traffic secret failed\n");
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      early_exporter_master_secret,
-				      sizeof(early_exporter_master_secret) - 1,
-				      mdbuf, mdbuflen,
-				      data->early_exporter_master_secret.buf,
-				      data->early_exporter_master_secret.len),
-		   "Generation of early exporter master secret failed\n");
-
-
-	/* Generate Handshake Secret  */
-	CKINT_LOG(tls13_generate_secret(md, secret,
-					data->dhe.buf, data->dhe.len,
-					secret),
-		  "Generation of Handshake Secret failed\n");
-
-	/* generate the concatenated message as input */
-	CKINT(openssl_hash(md, data->client_hello_random.buf,
-			   data->client_hello_random.len,
-			   data->server_hello_random.buf,
-			   data->server_hello_random.len,
-			   mdbuf, &mdbuflen));
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      client_handshake_traffic,
-				      sizeof(client_handshake_traffic) - 1,
-				      mdbuf, mdbuflen,
-				      data->client_handshake_traffic_secret.buf,
-				      data->client_handshake_traffic_secret.len),
-		   "Generation of client handshake traffic secret failed\n");
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      server_handshake_traffic,
-				      sizeof(server_handshake_traffic) - 1,
-				      mdbuf, mdbuflen,
-				      data->server_handshake_traffic_secret.buf,
-				      data->server_handshake_traffic_secret.len),
-		   "Generation of server handshake traffic secret failed\n");
-
-	/* Generate Master Secret  */
-	CKINT_LOG(tls13_generate_secret(md, secret, NULL, 0, secret),
-		  "Generation of Master Secret failed\n");
-
-	/* Generate the concatenated message */
-	CKINT(openssl_hash(md, data->client_hello_random.buf,
-			   data->client_hello_random.len,
-			   data->server_finished_random.buf,
-			   data->server_finished_random.len,
-			   mdbuf, &mdbuflen));
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      client_application_traffic,
-				      sizeof(client_application_traffic) - 1,
-				      mdbuf, mdbuflen,
-				      data->client_application_traffic_secret.buf,
-				      data->client_application_traffic_secret.len),
-		   "Generation of client application traffic secret failed\n");
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      server_application_traffic,
-				      sizeof(server_application_traffic) - 1,
-				      mdbuf, mdbuflen,
-				      data->server_application_traffic_secret.buf,
-				      data->server_application_traffic_secret.len),
-		   "Generation of server application traffic secret failed\n");
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      exporter_master_secret,
-				      sizeof(exporter_master_secret) - 1,
-				      mdbuf, mdbuflen,
-				      data->exporter_master_secret.buf,
-				      data->exporter_master_secret.len),
-		   "Generation of exporter master secret failed\n");
-
-	CKINT(openssl_hash(md, data->client_hello_random.buf,
-			   data->client_hello_random.len,
-			   data->client_finished_random.buf,
-			   data->client_finished_random.len,
-			   mdbuf, &mdbuflen));
-
-	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
-				      resumption_master_secret,
-				      sizeof(resumption_master_secret) - 1,
-				      mdbuf, mdbuflen,
-				      data->resumption_master_secret.buf,
-				      data->resumption_master_secret.len),
-		   "Generation of resumption master secret failed\n");
-
-out:
-	return ret;
-}
-
-static struct tls13_backend openssl_tls13 =
-{
-	openssl_tls13_generate,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(openssl_tls13_backend)
-static void openssl_tls13_backend(void)
-{
-	register_tls13_impl(&openssl_tls13);
-}
-
-#endif /* OPENSSL_ENABLE_TLS13 */
 
 #ifdef OPENSSL_ENABLE_HKDF
 /************************************************

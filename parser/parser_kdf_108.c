@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -56,6 +56,7 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 		{"iv",		{.data.buf = &kdf_108_vector.iv, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
 
 		/* Support for regression test */
+		{"breakLocation",{.data.integer = &kdf_108_vector.break_location, PARSER_UINT}, FLAG_OP_AFT | FLAG_OPTIONAL},
 		{"fixedData",	{.data.buf = &kdf_108_vector.fixed_data, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
 	};
 	const struct json_array kdf_108_test =

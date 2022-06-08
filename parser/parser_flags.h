@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -173,6 +173,8 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_KDF_TYPE_IKEV1_PKE			(0x0400000000000000ULL)
 #define FLAG_OP_KDF_TYPE_800_108			(0x0800000000000000ULL)
 #define FLAG_OP_KDF_TYPE_HKDF				(0x1000000000000000ULL)
+#define FLAG_OP_KDF_TYPE_ANSI_X963			(0x2000000000000000ULL)
+#define FLAG_OP_KDF_TYPE_SRTP				(0x4000000000000000ULL)
 
 /* DRBG other input flag */
 #define FLAG_OP_DRBG_RESEED				(0x2000000000000000ULL)

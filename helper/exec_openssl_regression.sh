@@ -44,7 +44,7 @@ CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
 #	Common implementations
 
-EXEC_COMMON="TDES_C FFC_DH KBKDF TLS_v1.3"
+EXEC_COMMON="TDES_C FFC_DH KBKDF TLS_v1_3"
 
 #	Implementations for S390
 
@@ -73,8 +73,7 @@ CM_s390x_NOPAI="$CM_s390x_KIMD;$CM_s390x_KLMD;$CM_s390x_KM;$CM_s390x_KMC;$CM_s39
 	#	Default configuration (CPACF enabled)
 	CIPHER_CALL_TDES_C=""
 	CIPHER_CALL_KBKDF="" 
-	# This assignment does not work, the name should be changed
-	#	CIPHER_CALL_TLS_v1.3=""
+	CIPHER_CALL_TLS_v1_3=""
 	CIPHER_CALL_AES_CPACF="" 
 	CIPHER_CALL_SHA_CPACF="" 
 	CIPHER_CALL_SSH_CPACF="" 

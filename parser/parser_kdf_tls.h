@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -31,10 +31,9 @@ extern "C"
 /**
  * @brief TLS PRF testing context
  *
- * @var hashalg [in] Hash algorithm to be used for PRF. ACVP_SHA1
- *		       implies TLS v1.0 / v1.1 testing with SHA-1 / MD5 based
- *		       PRF. References to SHA-2 implies TLS v1.2 with the given
- *		       hash to be used for the PRF.
+ * @var hashalg [in] Hash algorithm to be used for PRF. Previously used to
+ * 		       distinguish between TLS v1.0 / v1.1 and TLS v1.2 testing.
+ * 		       Now unused, will always be set to ACVP_SHA1.
  * @var pre_master_secret_length [in] Length of pre-master secret in bits
  *					(information only as the
  *					@var pre_master_secret contains the

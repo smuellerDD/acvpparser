@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -51,6 +51,9 @@ extern "C"
  *				implementation can handle large data during
  *				its processing. Note, this variable is only
  *				set if an LDT test vector was requested.
+ *				Commonly this can be achieved by simply calling
+ *				the hash update function with the following loop
+ *				`for (i = 0; i < data->ldt_expansion_size; i += data->msg.len)`
  * @var outlen [in] Size of the output message digest to be created in bits.
  *		      This field is required for variable-sized output message
  *		      digests, such as SHAKE.

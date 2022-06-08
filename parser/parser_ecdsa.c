@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -252,27 +252,27 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * ECDSA PKV verification
 	 **********************************************************************/
-	ECDSA_DEF_CALLBACK(ecdsa_pkvver, FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER);
+	ECDSA_DEF_CALLBACK(ecdsa_pkvver, FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS);
 
 	const struct json_entry ecdsa_pkvver_testresult_entries[] = {
 		{"testPassed",	{.data.integer = &ecdsa_pkvver_vector.keyver_success, WRITER_BOOL},
-			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS},
 	};
 	const struct json_testresult ecdsa_pkvver_testresult = SET_ARRAY(ecdsa_pkvver_testresult_entries, &ecdsa_pkvver_callbacks);
 
 	const struct json_entry ecdsa_pkvver_test_entries[] = {
 		{"qx",		{.data.buf = &ecdsa_pkvver_vector.Qx, PARSER_BIN},
-			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS},
 		{"qy",		{.data.buf = &ecdsa_pkvver_vector.Qy, PARSER_BIN},
-			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER},
+			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS},
 	};
 
 	/* search for empty arrays */
 	const struct json_array ecdsa_pkvver_test = SET_ARRAY(ecdsa_pkvver_test_entries, &ecdsa_pkvver_testresult);
 
 	const struct json_entry ecdsa_pkvver_testgroup_entries[] = {
-		{"curve",	{.data.largeint = &ecdsa_pkvver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
-		{"tests",	{.data.array = &ecdsa_pkvver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER },
+		{"curve",	{.data.largeint = &ecdsa_pkvver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS },
+		{"tests",	{.data.array = &ecdsa_pkvver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYVER | FLAG_OP_ECDSA_SECRETGENTYPE_TESTING | FLAG_OP_ECDSA_SECRETGENTYPE_EXTRABITS },
 	};
 	const struct json_array ecdsa_pkvver_testgroup = SET_ARRAY(ecdsa_pkvver_testgroup_entries, NULL);
 

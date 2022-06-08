@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2021 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -56,7 +56,7 @@ struct ansi_x963_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @var ansi_x963 Perform a PBKDF key derivation
+ * @var ansi_x963 Perform a ANSI X9.63 key derivation
  */
 struct ansi_x963_backend {
 	int (*ansi_x963)(struct ansi_x963_data *data, flags_t parsed_flags);

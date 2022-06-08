@@ -41,11 +41,21 @@ extern "C"
  * @var mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
- * @val customization [in] optional customization bit string of any length in binary form.
+ * @val customization [in] optional customization bit string of any length.
+ *			   Note, the parser already converts the test data
+ *			   into the right format. I.e. if the test vector
+ *			   defines a hexadecimal buffer, the parser converts
+ *			   it automatically into binary. If it is a string
+ *			   the customization string is found in the buffer.
+ *			   The IUT simply has to consume the provided buffer
+ *			   without performing any conversion operation.
  * @var verify_result [out] This variable is to be filled by the backend
- *			      during a Verification test whether verification was successful or not.
+ *			    during a Verification test whether verification was
+ *			    successful or not.
  * @val xof_enabled [in] eXtendable-Output filled to enable XOF mode or not
- * @var cipher [in] Cipher specification as defined in cipher_definitions.h
+ * @var cipher [in] Cipher specification as defined in cipher_definitions.
+ *
+ * @var hex_customization [internal] Ignore
  */
 struct kmac_data {
 	struct buffer key;
@@ -57,6 +67,8 @@ struct kmac_data {
 	uint32_t verify_result;
 	uint32_t xof_enabled;
 	uint64_t cipher;
+
+	uint32_t hex_customization;
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -87,6 +87,8 @@ extern "C"
  *				 * SHA512
  *				 * SHA512224
  *				 * SHA512256
+ *				 * ACVP_CIPHERTYPE_TDES (the mode is irrelevant
+ *							 when specifying TDES)
  * @var rnd_data_bits_len [in] Length of random data to produce in bits.
  * @var pr [in] Prediction resistance enabled (1 == true, 0 == false)
  * @var df [in] Derivation function requested (1 == true, 0 == false)

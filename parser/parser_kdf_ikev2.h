@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -33,17 +33,23 @@ extern "C"
  *
  * @var hashalg [in] Hash algorithm to be used for PRF.
  * @var dkmlen [in] Length of derived key material to be produced
- * @var n_init [in] Value of initiator nonce
- * @var n_resp [in] Value of responder nonce
+ * @var n_init [in] Value of initiator nonce (Ni in RFC 5996)
+ * @var n_resp [in] Value of responder nonce (Nr in RFC 5996)
  * @var spi_init [in] Security parameter indice of the initiator
+ * 			(SPIi in RFC 5996)
  * @var spi_resp [in] Security parameter indice of the responder
- * @var gir [in] Diffie-Hellman shared secret
- * @var gir_new [in] New Diffie-Hellman shared secret
- * @var s_key_seed [out] Results of the extraction step
- * @var s_key_seed_rekey [out] Results of the newly created skeyid
- * @var dkm [out] Derived key material from expansion step
- * @var dkm_child [out] Expansion step results for child SA
- * @var dkm_child_dh [out] Expansion step results for child SA DH
+ * 			(SPIr in RFC 5996)
+ * @var gir [in] Diffie-Hellman shared secret (g^ir in RFC 5996)
+ * @var gir_new [in] New Diffie-Hellman shared secret (g^ir (new) in RFC 5996)
+ * @var s_key_seed [out] Results of the extraction step (SKEYSEED in RFC 5996)
+ * @var s_key_seed_rekey [out] Results of the reseed extraction step
+ * 				 (SKEYSEED in RFC 5996, Section 2.18)
+ * @var dkm [out] Derived key material from expansion step (the output of
+ * 		    prf+(SKEYSEED, Ni | Nr | SPIi | SPIr) in RFC 5996)
+ * @var dkm_child [out] Expansion step results for child SA (the first
+ * 			  definition of KEYMAT in RFC 5996, Section 2.17)
+ * @var dkm_child_dh [out] Expansion step results for child SA DH (the second
+ * 			     definition of KEYMAT in RFC 5996, Section 2.17)
  */
 struct kdf_ikev2_data {
 	uint64_t hashalg;

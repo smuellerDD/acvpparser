@@ -23,6 +23,7 @@ _LIB_EXPECTED="testvector-expected.json"
 failures=0
 local_failures=0
 
+# EBITS can be set as an environment variable to remove 32 bits
 EBITS=${EBITS:-"64 32"}
 ABITS=()
 for B in ${EBITS}; do
@@ -75,6 +76,11 @@ echo_fail()
 echo_deact()
 {
 	echo $(color "yellow")[DEACTIVATED]$(color off) $@
+}
+
+echo_warn()
+{
+	echo $(color "blue")[WARNING]$(color off) $@
 }
 
 clean_tool()
@@ -140,7 +146,8 @@ get_proc_family() {
 # List of JSON keyword:value pairs to search for JSON test vectors known
 # to be no known answer test and thus are unfit for regression testing
 REGRESSION_VECTOR_SKIP="
-	algorithm:KTS-IFC"
+	algorithm:KTS-IFC
+"
 
 # List of JSON search_keyword:search_value:replace_keyword:replace_value set to
 # search for JSON vectors know to be no known answer tests but can be turned
@@ -152,6 +159,7 @@ REGRESSION_VECTOR_REPLACE="
 	ivGen:internal:ivGen:external
 	algorithm:KAS-FFC:testType:VAL
 	algorithm:KAS-ECC:testType:VAL
+	algorithm:KAS-ECC-SSC:testType:VAL
 	kdfMode:counter:algorithm:KDF
 	kdfMode:feedback:algorithm:KDF
 	kdfMode:double:algorithm:KDF
@@ -395,7 +403,7 @@ exec_module()
 						continue
 					fi
 
-					if (grep -i \"$keyword\" $dir/$_LIB_REQ | grep -iq \"$value\" > /dev/null)
+					if (grep -i \"$keyword\" $dir/$_LIB_REQ | grep -iq $value > /dev/null)
 					then
 						replaceop="--replace $r_keyword:$replace"
 						break

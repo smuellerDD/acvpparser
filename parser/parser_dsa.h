@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -85,25 +85,31 @@ extern "C"
  *	    parameter Q
  * @var G [out: G generation, in: PQG verification] domain parameter G
  *
- * @var g_canon_index [out: G generation, in: G verification] The index
- *			value provided to the generator in canonical method.
- *			Only to be used for canonical G generation /
- *			verification.
- * @var g_canon_domain_param_seed [out: G generation, in: G verification] The
+ * @var domainseed [out: PQ generation, in: all other use cases] This
+ *		   buffer holds the domain seed. It is filled in parallel with
+ *		   with all seed variables below. As the seed variables below
+ *		   are only used for separate, tests, they can all be collapsed
+ *		   into one.
+ *
+ * @var g_canon_index [in: G generation, in: G verification] The index value
+ * 			provided to the generator in canonical method. Only to
+ * 			be used for canonical G generation / verification.
+ * @var g_canon_domain_param_seed [in: G generation, in: G verification] The
  *				    seed used for the P and Q generation in
  *				    the probable method. Only to be used for
  *				    unverifiable G generation / verification.
+ *				    DEPRECATED - use @var domainseed
  *
- * @var g_unver_domain_param_seed [out: G generation, in: G verification] The
- *				    seed used for the P and Q generation in
- *				    the probable method. Only to be used for
- *				    unverifiable G generation / verification.
- * @var g_unver_h [out: G generation, in: G verification] The index
- *		    value provided to the generator in unverifiable method.
- *		    Only to be used for unverifiable G generation /
- *		    verification.
+ * @var g_unver_domain_param_seed [in: G verification] The seed used for the P
+ * 				    and Q generation in the unverifiable method.
+ * 				    Only to be used for unverifiable G
+ * 				    verification.
+ *				    DEPRECATED - use @var domainseed
+ * @var g_unver_h [in: G verification] The index value provided to the generator
+ * 		    in unverifiable method. Only to be used for unverifiable G
+ * 		    verification.
  *
- * @var pg_prob_counter [out: PQ generation, in: PQ verification] The counter
+ * @var pq_prob_counter [out: PQ generation, in: PQ verification] The counter
  *			  to be used for the probable P and Q generation. Only
  *			  to be used for PQ generation / verification with
  *			  probable primes.
@@ -111,10 +117,12 @@ extern "C"
  *				    The seed used for the P and Q generation in
  *				    the probable method. Only to be used for
  *				    probable P/Q generation / verification.
+ *				    DEPRECATED - use @var domainseed
  *
  * @var pq_prov_firstseed [out: PQ generation, in: PQ: verification]
  *			    Firstseed for PQ generation. Only to be used for PQ
  *			    generation / verification with provable primes.
+ *			    DEPRECATED - use @var domainseed
  * @var pq_prov_pcounter [out: PQ generation, in: PQ verification] The counter
  *			   to be used for the provable P generation. Only to be
  *			   used for PQ generation / verification with provable
@@ -144,6 +152,8 @@ struct dsa_pqg_data {
 	struct buffer Q;
 	struct buffer G;
 
+	struct buffer domainseed;
+
 	struct buffer g_canon_index;
 	struct buffer g_canon_domain_param_seed;
 
@@ -171,7 +181,7 @@ struct dsa_pqg_data {
  * allocated by the backend. The parser takes care of deallocating them.
  *
  * @var cipher [in] Hash type to use for signature operation
- * @var pqg.safeprime [in] Safe prime definition (only set for SP800-56A rev 3)
+ * @var safeprime [in] Safe prime definition (only set for SP800-56A rev 3)
  * @var L [in] L size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
  * @var N [in] N size in bits (only set for FIPS 186-4 / SP800-56A rev 1)
  * @var P [out] domain parameter P (only set for FIPS 186-4 / SP800-56A rev 1)

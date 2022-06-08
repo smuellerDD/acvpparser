@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Müller <smueller@chronox.de>
- * Copyright 2021 VMware, Inc.
+ * Copyright (C) 2018 - 2022, Stephan Müller <smueller@chronox.de>
+ * Copyright 2022 VMware, Inc.
  *
  * License: see LICENSE file
  *
@@ -42,6 +42,7 @@ extern "C"
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/hmac.h>
+#include <openssl/kdf.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
@@ -51,10 +52,10 @@ extern "C"
 
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
 #include <openssl/ssl.h>
-#include <openssl/kdf.h>
 #include <openssl/core_names.h>
 #include <openssl/param_build.h>
 #include <openssl/bn.h>
+#include <openssl/provider.h>
 #endif
 
 #if OPENSSL_VERSION_NUMBER < 0x30000000L
@@ -185,6 +186,17 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type);
 int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		struct buffer *hashzz);
 int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char *dgst);
+
+#ifdef OPENSSL_ENABLE_TLS13
+int openssl_hkdf_extract(const EVP_MD *md,
+			 const uint8_t *key, size_t keylen,
+			 const uint8_t *salt, size_t saltlen,
+			 uint8_t *secret, size_t *secretlen);
+int openssl_hkdf_expand(const EVP_MD *md,
+			const uint8_t *fi, size_t filen,
+			const uint8_t *secret, size_t secretlen,
+			uint8_t *dkm, size_t *dkmlen);
+#endif
 
 #ifdef __cplusplus
 }

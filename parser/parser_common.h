@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -49,6 +49,8 @@
 #include "parser_tls13.h"
 #include "parser_kmac.h"
 #include "parser_ansi_x963.h"
+#include "parser_kdf_srtp.h"
+#include "parser_cshake.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -238,6 +240,8 @@ DEF_CALLBACK_TYPE(tls12)
 DEF_CALLBACK_TYPE(tls13)
 DEF_CALLBACK_TYPE(kmac)
 DEF_CALLBACK_TYPE(ansi_x963)
+DEF_CALLBACK_TYPE(kdf_srtp)
+DEF_CALLBACK_TYPE(cshake)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -298,6 +302,8 @@ enum {
 	CB_TYPE_tls13,
 	CB_TYPE_kmac,
 	CB_TYPE_ansi_x963,
+	CB_TYPE_kdf_srtp,
+	CB_TYPE_cshake,
 };
 struct json_callback {
 	union {
@@ -347,6 +353,8 @@ struct json_callback {
 		struct tls13_callback tls13;
 		struct kmac_callback kmac;
 		struct ansi_x963_callback ansi_x963;
+		struct kdf_srtp_callback kdf_srtp;
+		struct cshake_callback cshake;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

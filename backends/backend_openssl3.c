@@ -19,7 +19,10 @@
  * The code uses the interface offered by OpenSSL-3
  */
 
+#include <openssl/provider.h>
+
 #include "backend_openssl_common.h"
+#include <openssl/provider.h>
 
 OSSL_PROVIDER *fips;
 OSSL_PROVIDER *base;
@@ -44,8 +47,9 @@ static void openssl_backend_init(void)
 ACVP_DEFINE_DESTRUCTOR(openssl_backend_fini)
 static void openssl_backend_fini(void)
 {
-	OSSL_PROVIDER_unload(base);
-	OSSL_PROVIDER_unload(fips);
+	#pragma message "Deliberate memleak required for OpenSSL 3 - OpenSSL cleans itself using atexit"
+	//OSSL_PROVIDER_unload(base);
+	//OSSL_PROVIDER_unload(fips);
 }
 
 /************************************************
@@ -56,6 +60,24 @@ static void openssl_dh_get0_key(const EVP_PKEY *r, BIGNUM **pub_key,
 {
 	EVP_PKEY_get_bn_param(r,OSSL_PKEY_PARAM_PRIV_KEY, priv_key);
 	EVP_PKEY_get_bn_param(r,OSSL_PKEY_PARAM_PUB_KEY, pub_key);
+}
+
+static int openssl_pkey_get_bn_bytes(EVP_PKEY *pkey, const char *name,
+				     struct buffer *out)
+{
+	BIGNUM *bn = NULL;
+	int sz;
+	int ret = 0;
+
+	CKNULL(EVP_PKEY_get_bn_param(pkey, name, &bn), -EINVAL);
+	sz = BN_num_bytes(bn);
+	CKINT(alloc_buf(sz, out));
+	CKNULL(BN_bn2binpad(bn, out->buf, sz), EINVAL);
+
+out:
+	if (bn)
+		BN_free(bn);
+	return ret;
 }
 
 /************************************************
@@ -345,14 +367,15 @@ static int openssl_dh_ss_common(uint64_t cipher,
 				struct buffer *hashzz)
 {
 	EVP_PKEY_CTX *pctx = NULL;
-	EVP_PKEY_CTX *dctx = NULL;		/* Create a EVP_PKEY_CTX to perform key derivation */
+	/* Create a EVP_PKEY_CTX to perform key derivation */
+	EVP_PKEY_CTX *dctx = NULL;
 	EVP_PKEY *pkey = NULL;
 	EVP_PKEY *peerkey = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
 	OSSL_PARAM *params_peer = NULL;
 	EVP_PKEY *genkey = NULL;
-    EVP_PKEY_CTX *gctx = NULL;
+	EVP_PKEY_CTX *gctx = NULL;
 	BIGNUM *p_bn = NULL, *q_bn = NULL,*g_bn = NULL;
 	BIGNUM *bn_Yrem = NULL, *bn_Xloc = NULL, *bn_Yloc = NULL;
 	BIGNUM *cbn_Xloc = NULL, *cbn_Yloc = NULL;
@@ -374,17 +397,18 @@ static int openssl_dh_ss_common(uint64_t cipher,
 		pctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
 		CKNULL(pctx, -EFAULT);
 		CKINT_O_LOG(EVP_PKEY_fromdata_init(pctx),
-					"EVP_PKEY_fromdata_init failed\n");
+			    "EVP_PKEY_fromdata_init failed\n");
 
 		params = OSSL_PARAM_BLD_to_param(bld);
-		CKINT_O_LOG(EVP_PKEY_fromdata(pctx, &genkey, EVP_PKEY_KEYPAIR, params),
-					"EVP_PKEY_keygen failed\n");
+		CKINT_O_LOG(EVP_PKEY_fromdata(pctx, &genkey,
+					      EVP_PKEY_KEYPAIR, params),
+			    "EVP_PKEY_keygen failed\n");
 		gctx = EVP_PKEY_CTX_new_from_pkey(NULL, genkey, NULL);
 		CKNULL(gctx, -EFAULT);
 		CKINT_O_LOG(EVP_PKEY_keygen_init(gctx),
-					"EVP_PKEY_keygen_init failed\n");
+			    "EVP_PKEY_keygen_init failed\n");
 		CKINT_O_LOG(EVP_PKEY_generate(gctx, &pkey),
-					"EVP_PKEY_generate failed\n");
+			    "EVP_PKEY_generate failed\n");
 
 		openssl_dh_get0_key(pkey, &cbn_Yloc, &cbn_Xloc);
 		CKINT(openssl_bn2buffer(cbn_Yloc, Yloc));
@@ -402,7 +426,7 @@ static int openssl_dh_ss_common(uint64_t cipher,
 		pctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
 		CKNULL(pctx, -EFAULT);
 		CKINT_O_LOG(EVP_PKEY_fromdata_init(pctx),
-					"EVP_PKEY_fromdata_init failed\n");
+			    "EVP_PKEY_fromdata_init failed\n");
 		EVP_PKEY_fromdata(pctx, &pkey, EVP_PKEY_KEYPAIR, params);
 	}
 
@@ -410,29 +434,31 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, q_bn);
 	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G, g_bn);
 	logger_binary(LOGGER_DEBUG, Yrem->buf, Yrem->len, "Yremote");
-	bn_Yrem = BN_bin2bn((const unsigned char *)Yrem->buf, (int)Yrem->len, NULL);
+	bn_Yrem = BN_bin2bn((const unsigned char *)Yrem->buf, (int)Yrem->len,
+			    NULL);
 	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, bn_Yrem);
 	params_peer = OSSL_PARAM_BLD_to_param(bld);
 
 	pctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
 	CKNULL(pctx, -EFAULT);
 	CKINT_O_LOG(EVP_PKEY_fromdata_init(pctx),
-			"EVP_PKEY_fromdata_init failed\n");
-	CKINT_O_LOG(EVP_PKEY_fromdata(pctx, &peerkey, EVP_PKEY_PUBLIC_KEY, params_peer),
-			"EVP_PKEY_fromdata failed\n");
+		    "EVP_PKEY_fromdata_init failed\n");
+	CKINT_O_LOG(EVP_PKEY_fromdata(pctx, &peerkey, EVP_PKEY_PUBLIC_KEY,
+				      params_peer),
+		    "EVP_PKEY_fromdata failed\n");
 	CKINT_LOG(alloc_buf(keylen, &ss), "Cannot allocate ss\n");
 
 	/* Compute the shared secret */
 	dctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, NULL);
 	CKNULL(dctx, -EFAULT);
 	CKINT_O_LOG(EVP_PKEY_derive_init(dctx),
-			"EVP_PKEY_derive_init failed\n");
+		    "EVP_PKEY_derive_init failed\n");
 	if(EVP_PKEY_derive_set_peer(dctx, peerkey)<0){
 		ERR_print_errors_fp(stderr);
 		goto out;
 	}
 	CKINT_O_LOG(EVP_PKEY_derive(dctx, NULL, &ss.len),
-			"EVP_PKEY_derive failed\n");
+		    "EVP_PKEY_derive failed\n");
 	CKINT(alloc_buf(ss.len, &ss));
 	if(EVP_PKEY_derive(dctx, ss.buf, &ss.len)<=0){
 		ERR_print_errors_fp(stderr);
@@ -508,6 +534,9 @@ static struct dh_backend openssl_dh =
 {
 	openssl_dh_ss,
 	openssl_dh_ss_ver,
+	// TODO: implement DH keygen and keyver for OpenSSL 3.
+	NULL,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_dh_backend)
@@ -520,11 +549,12 @@ static void openssl_dh_backend(void)
  * ECDH cipher interface functions
  ************************************************/
 
-static int openssl_ecdh_ss_common(uint64_t cipher,
-		struct buffer *Qxrem, struct buffer *Qyrem,
-		struct buffer *privloc,
-		struct buffer *Qxloc, struct buffer *Qyloc,
-		struct buffer *hashzz)
+static int
+openssl_ecdh_ss_common(uint64_t cipher,
+		       struct buffer *Qxrem, struct buffer *Qyrem,
+		       struct buffer *privloc,
+		       struct buffer *Qxloc, struct buffer *Qyloc,
+		       struct buffer *hashzz)
 {
 	int nid = 0, ret = 0;
 	EVP_PKEY_CTX *kactx = NULL, *dctx = NULL;
@@ -543,7 +573,8 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 	CKINT_LOG(_openssl_ecdsa_curves(cipher, &nid , dgst),
 			"Conversion of curve failed\n");
 	const char *digest = dgst;
-	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, digest, 0);
+	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, digest,
+					0);
 	OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 1);
 	if(Qxloc->len){
 		CKINT(alloc_buf(Qxloc->len + Qyloc->len + 1, &publoc));
@@ -551,10 +582,12 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 		memcpy(publoc.buf + 1, Qxloc->buf, Qxloc->len);
 		memcpy(publoc.buf + 1 + Qxloc->len, Qyloc->buf, Qyloc->len);
 		logger_binary(LOGGER_DEBUG, publoc.buf, publoc.len, "publoc");
-		OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, publoc.buf,publoc.len);
+		OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY,
+						 publoc.buf,publoc.len);
 	}
 	if(privloc->len){
-		privloc_bn = BN_bin2bn((const unsigned char *)privloc->buf, (int)privloc->len, NULL);
+		privloc_bn = BN_bin2bn((const unsigned char *)privloc->buf,
+				       (int)privloc->len, NULL);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, privloc_bn);
 	}
 	params = OSSL_PARAM_BLD_to_param(bld);
@@ -562,19 +595,19 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 	kactx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
 	CKNULL_LOG(kactx, -ENOMEM, "EVP_PKEY_CTX_new_from_name failed\n");
 	CKINT_O_LOG(EVP_PKEY_fromdata_init(kactx),
-				"EVP_PKEY_fromdata_init failed with status=%d\n", ret);
+		    "EVP_PKEY_fromdata_init failed with status=%d\n", ret);
 
 	if(!(Qxloc->len) && !(privloc->len)) {
 		pkey = EVP_PKEY_Q_keygen(NULL, NULL, "EC", digest);
 		CKNULL_LOG(pkey, -EFAULT, "EVP_PKEY_Q_keygen failed\n");
-	}
-	else {
-		CKINT_O_LOG(EVP_PKEY_fromdata(kactx, &pkey, EVP_PKEY_KEYPAIR, params),
-					"EVP_PKEY_fromdata failed\n");
+	} else {
+		CKINT_O_LOG(EVP_PKEY_fromdata(kactx, &pkey, EVP_PKEY_KEYPAIR,
+					      params),
+					      "EVP_PKEY_fromdata failed\n");
 	}
 
 	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME,
-			digest, strlen(digest)+1);
+					digest, strlen(digest)+1);
 
 	CKINT(alloc_buf(Qxrem->len + Qyrem->len + 1, &pubrem));
 	pubrem.buf[0]= POINT_CONVERSION_UNCOMPRESSED;
@@ -625,6 +658,7 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 
 	/* We do not use CKINT here, because -ENOENT is no real error */
 	ret = openssl_hash_ss(cipher, &ss, hashzz);
+
 out:
 	if(pkey)
 		EVP_PKEY_free(pkey);
@@ -938,8 +972,11 @@ static int openssl_kdf_tls_op(struct kdf_tls_data *data, flags_t parsed_flags)
 	CKINT(openssl_md_convert(data->hashalg, &md));
 
 	/* Special case */
-	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1)
-		md = EVP_get_digestbynid(NID_md5_sha1);
+	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1) {
+		logger(LOGGER_ERR, "TLS 1.0/1.1 is not supported\n");
+		ret = -EINVAL;
+		goto out;
+	}
 
 	CKNULL_LOG(md, -EFAULT, "Cipher implementation not found\n");
 
@@ -1309,3 +1346,1129 @@ static void openssl_kdf_108_backend(void)
 	register_kdf_108_impl(&openssl_kdf108_backend);
 }
 #endif
+
+/************************************************
+ * DSA interface functions
+ ************************************************/
+static int openssl_get_safeprime_group(uint64_t safeprime, const char **group)
+{
+	int ret = 0;
+
+	switch (safeprime)
+	{
+	case ACVP_DH_FFDHE_2048:
+		*group = "ffdhe2048";
+		break;
+	case ACVP_DH_FFDHE_3072:
+		*group = "ffdhe3072";
+		break;
+	case ACVP_DH_FFDHE_4096:
+		*group = "ffdhe4096";
+		break;
+	case ACVP_DH_FFDHE_6144:
+		*group = "ffdhe6144";
+		break;
+	case ACVP_DH_FFDHE_8192:
+		*group = "ffdhe8192";
+		break;
+	default:
+		logger(LOGGER_ERR,
+		       "Safeprime testing with DSA not supported (Q not set)\n");
+		ret = -EFAULT;
+		goto out;
+	}
+out:
+	return ret;
+}
+
+static int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md, struct buffer *msg,
+			   struct buffer *sig)
+{
+	int ret = 0;
+	EVP_MD_CTX *md_ctx = NULL;
+	size_t sz = EVP_PKEY_size(pkey);
+
+	CKINT(alloc_buf(sz, sig));
+	md_ctx = EVP_MD_CTX_new();
+	CKNULL(md_ctx, -EFAULT);
+
+	CKINT_O(EVP_DigestSignInit(md_ctx, NULL, md, NULL, pkey));
+	CKINT_O(EVP_DigestSign(md_ctx, sig->buf, &sig->len, msg->buf,
+			       msg->len));
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	return ret;
+}
+
+static int openssl_pkey_get_octet_bytes(EVP_PKEY *pkey, const char *name,
+					struct buffer *out)
+{
+	int ret = 0;
+	size_t len = 0;
+
+	CKNULL(EVP_PKEY_get_octet_string_param(pkey, name, NULL, 0, &len),
+	       -EFAULT);
+	CKINT(alloc_buf(len, out));
+	CKNULL(EVP_PKEY_get_octet_string_param(pkey, name, out->buf, len,
+					       &out->len), -EFAULT);
+
+out:
+	return ret;
+}
+
+static int _openssl_dsa_pqg_gen(struct buffer *P,
+				struct buffer *Q,
+				struct buffer *G,
+				struct buffer *firstseed,
+				uint32_t *counter,
+				uint32_t L, uint32_t N, uint64_t cipher)
+{
+	int ret = 0;
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	const EVP_MD *md = NULL;
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+	CKNULL(ctx, -EFAULT);
+	CKINT_O(EVP_PKEY_paramgen_init(ctx));
+	CKINT(openssl_md_convert(cipher & ACVP_HASHMASK, &md));
+
+	CKINT_O(EVP_PKEY_CTX_set_dsa_paramgen_md(ctx, md));
+	CKINT_O(EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, L));
+	CKINT_O(EVP_PKEY_CTX_set_dsa_paramgen_q_bits(ctx, N));
+
+	CKINT_O(EVP_PKEY_paramgen(ctx, &key));
+
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_FFC_P, P));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_FFC_Q, Q));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_FFC_G, G));
+	CKINT_O(EVP_PKEY_get_int_param(key, OSSL_PKEY_PARAM_FFC_PCOUNTER,
+				       (int *)counter));
+	if (firstseed) {
+		CKINT(openssl_pkey_get_octet_bytes(key,
+						   OSSL_PKEY_PARAM_FFC_SEED,
+						   firstseed));
+	}
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_dsa_pq_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	(void)parsed_flags;
+	return _openssl_dsa_pqg_gen(&data->P, &data->Q, &data->G,
+				    &data->domainseed, &data->pq_prob_counter,
+				    data->L, data->N, data->cipher);
+}
+
+static int openssl_dsa_create_pkey(EVP_PKEY **pkey, struct buffer *p,
+				   struct buffer *q, struct buffer *g,
+				   struct buffer *seed, int counter,
+				   struct buffer *h, struct buffer *index,
+				   int validate_pq, int validate_g,
+				   struct buffer *pub, BN_CTX *bn_ctx,
+				   const EVP_MD *md)
+{
+	int ret = 0;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	BIGNUM *p_bn = NULL, *q_bn = NULL, *g_bn = NULL, *pub_bn = NULL;
+	char* hex_index = NULL;
+	size_t hex_index_size = 0;
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_FFC_VALIDATE_PQ,
+					validate_pq));
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_FFC_VALIDATE_G,
+					validate_g));
+	p_bn = BN_CTX_get(bn_ctx);
+	BN_bin2bn(p->buf, p->len, p_bn);
+	CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_P, p_bn));
+	q_bn = BN_CTX_get(bn_ctx);
+	BN_bin2bn(q->buf, q->len, q_bn);
+	CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_Q, q_bn));
+
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_FFC_PCOUNTER,
+					counter));
+
+	if (g && g->len) {
+		g_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(g->buf, g->len, g_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_FFC_G,
+					       g_bn));
+	}
+
+	if (h && h->len) {
+		int number = (int)strtol((const char *)h->buf, NULL, 10);
+		CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_FFC_H,
+						number));
+	}
+
+	if (index && index->len) {
+		bin2hex_alloc(index->buf, index->len, &hex_index,
+			      &hex_index_size);
+		int number = (int)strtol((const char *)hex_index, NULL, 16);
+		CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_FFC_GINDEX,
+						number));
+	}
+
+	if (seed && seed->len) {
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_PKEY_PARAM_FFC_SEED,
+							 seed->buf, seed->len));
+	}
+	
+	if (md) {
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_PKEY_PARAM_FFC_DIGEST,
+							EVP_MD_name(md), 0));
+	}
+	
+	if (pub && pub->len) {
+		pub_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(pub->buf, pub->len, pub_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY,
+						pub_bn));
+	}
+
+	params = OSSL_PARAM_BLD_to_param(bld);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+	CKNULL(ctx, -EFAULT);
+	CKINT_O(EVP_PKEY_fromdata_init(ctx));
+	CKINT_O(EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_PUBLIC_KEY, params));
+
+out:
+	return ret;
+}
+
+static int openssl_dsa_g_gen(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	BN_CTX *bn_ctx = NULL;
+	int ret = 0;
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	bn_ctx = BN_CTX_new_ex(NULL);
+	CKINT(openssl_dsa_create_pkey(&key, &data->P, &data->Q, NULL,
+				      &data->domainseed, 0, NULL, NULL, 0, 1,
+				      NULL, bn_ctx, md));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_FFC_G, &data->G));
+	logger_binary(LOGGER_DEBUG, data->G.buf, data->G.len, "G");
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_dsa_pq_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	int ret = 0;
+	BN_CTX *bn_ctx = NULL;
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	bn_ctx = BN_CTX_new_ex(NULL);
+	CKINT(openssl_dsa_create_pkey(&key, &data->P, &data->Q, NULL,
+				      &data->domainseed, data->pq_prob_counter,
+				      NULL, NULL, 1, 0, NULL, bn_ctx, md));
+
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
+	ret = EVP_PKEY_param_check(ctx);
+
+	if (1 == ret) {
+		data->pqgver_success = 1;
+		logger(LOGGER_DEBUG, "PQG verification successful\n");
+	} else {
+		data->pqgver_success = 0;
+		logger(LOGGER_DEBUG, "PQG verification failed\n");
+	}
+
+	ret = 0;
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+
+	return ret;
+}
+
+static int openssl_dsa_pqg_ver(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	BN_CTX *bn_ctx = NULL;
+	int ret = 0;
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+	CKINT(left_pad_buf(&data->P, data->L / 8));
+	CKINT(left_pad_buf(&data->Q, data->N / 8));
+	CKINT(left_pad_buf(&data->G, data->L / 8));
+
+	bn_ctx = BN_CTX_new_ex(NULL);
+	CKINT(openssl_dsa_create_pkey(&key, &data->P, &data->Q, &data->G,
+				      &data->domainseed, data->pq_prob_counter,
+				      &data->g_unver_h, &data->g_canon_index, 0,
+				      1, NULL, bn_ctx, md));
+
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
+	ret = EVP_PKEY_param_check(ctx);
+	if (1 == ret) {
+		data->pqgver_success = 1;
+		logger(LOGGER_DEBUG, "PQG verification successful\n");
+	} else {
+		data->pqgver_success = 0;
+		logger(LOGGER_DEBUG, "PQG verification failed\n");
+	}
+	ret = 0;
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+
+	return ret;
+}
+
+static int openssl_dsa_pqggen(struct dsa_pqggen_data *data,
+			      flags_t parsed_flags)
+{
+	EVP_PKEY *dsa = NULL;
+	uint32_t counter;
+	int ret;
+
+	(void)parsed_flags;
+	ret = _openssl_dsa_pqg_gen(&data->P, &data->Q, &data->G, NULL,
+				   &counter, data->L, data->N, data->cipher);
+
+	if (dsa)
+		EVP_PKEY_free(dsa);
+
+	return ret;
+}
+
+static int openssl_dsa_pqg(struct dsa_pqg_data *data, flags_t parsed_flags)
+{
+	parsed_flags &= ~FLAG_OP_GDT;
+	if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROBABLE_PQ_GEN))
+		return openssl_dsa_pq_gen(data, parsed_flags);
+	else if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROBABLE_PQ_GEN))
+		return openssl_dsa_pq_ver(data, parsed_flags);
+	else if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_UNVERIFIABLE_G_GEN))
+		return openssl_dsa_g_gen(data, parsed_flags);
+	else if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN))
+		return openssl_dsa_pqg_ver(data, parsed_flags);
+	else if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_CANONICAL_G_GEN))
+		return openssl_dsa_g_gen(data, parsed_flags);
+	else if (parsed_flags ==
+		(FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN))
+		return openssl_dsa_pqg_ver(data, parsed_flags);
+	else {
+		logger(LOGGER_WARN,
+			"Unknown DSA PQG generation / verification definition (parsed flags: %" PRIu64 ")\n",
+			parsed_flags);
+		return -EINVAL;
+	}
+}
+
+static int _openssl_dsa_keygen(struct buffer *P /* [in] */,
+			       struct buffer *Q /* [in] */,
+			       struct buffer *G /* [in] */,
+			       uint64_t safeprime /* [in] */,
+			       struct buffer *X /* [out] */,
+			       struct buffer *Y /* [out] */,
+			       EVP_PKEY **key)
+{
+	int ret = 0;
+	BN_CTX *bn_ctx = NULL;
+	EVP_PKEY_CTX *key_ctx = NULL;
+	OSSL_PARAM params[2];
+	const char *group;
+
+	switch (safeprime) {
+		case ACVP_DH_MODP_2048:
+		case ACVP_DH_MODP_3072:
+		case ACVP_DH_MODP_4096:
+		case ACVP_DH_MODP_6144:
+		case ACVP_DH_MODP_8192:
+			logger(LOGGER_ERR,
+			       "Safeprime testing with DSA not supported (Q not set)\n");
+			ret = -EFAULT;
+			break;
+		case ACVP_DH_FFDHE_2048:
+		case ACVP_DH_FFDHE_3072:
+		case ACVP_DH_FFDHE_4096:
+		case ACVP_DH_FFDHE_6144:
+		case ACVP_DH_FFDHE_8192:
+			CKINT(openssl_get_safeprime_group(safeprime, &group));
+			params[0] = OSSL_PARAM_construct_utf8_string(
+					OSSL_PKEY_PARAM_GROUP_NAME, (char *)group, 0);
+			params[1] = OSSL_PARAM_construct_end();
+
+			key_ctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+			CKNULL(key_ctx, -EFAULT);
+			CKINT_O(EVP_PKEY_keygen_init(key_ctx));
+			CKINT_O(EVP_PKEY_CTX_set_params(key_ctx, params));
+			CKINT_O(EVP_PKEY_keygen(key_ctx, key));
+			CKINT(openssl_pkey_get_bn_bytes(*key,
+							OSSL_PKEY_PARAM_PRIV_KEY,
+							X));
+			CKINT(openssl_pkey_get_bn_bytes(*key,
+							OSSL_PKEY_PARAM_PUB_KEY,
+							Y));
+
+			logger_binary(LOGGER_DEBUG, X->buf, X->len, "X");
+			logger_binary(LOGGER_DEBUG, Y->buf, Y->len, "Y");
+			if (key_ctx)
+				EVP_PKEY_CTX_free(key_ctx);
+			break;
+
+		default:
+			bn_ctx = BN_CTX_new_ex(NULL);
+			CKINT(openssl_dsa_create_pkey(key, P, Q, G, NULL, 0,
+						      NULL, NULL, 1, 0, NULL,
+						      bn_ctx, NULL));
+			key_ctx = EVP_PKEY_CTX_new_from_pkey(NULL, *key, NULL);
+			CKNULL(key_ctx, -EFAULT);
+			CKINT_O(EVP_PKEY_keygen_init(key_ctx));
+			CKINT(EVP_PKEY_param_check(key_ctx));
+			CKINT_O(EVP_PKEY_keygen(key_ctx, key));
+			CKINT(openssl_pkey_get_bn_bytes(*key,
+							OSSL_PKEY_PARAM_PUB_KEY,
+							X));
+			CKINT(openssl_pkey_get_bn_bytes(*key,
+							OSSL_PKEY_PARAM_PRIV_KEY,
+							Y));
+			logger_binary(LOGGER_DEBUG, X->buf, X->len, "X");
+			logger_binary(LOGGER_DEBUG, Y->buf, Y->len, "Y");
+	}
+
+out:
+	return ret;
+}
+
+static int openssl_dsa_keygen(struct dsa_keygen_data *data,
+				flags_t parsed_flags)
+{
+	struct dsa_pqggen_data *pqg = &data->pqg;
+	EVP_PKEY *key = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G, pqg->safeprime,
+				  &data->X, &data->Y, &key));
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	return ret;
+}
+
+static int openssl_dh_create_pkey(EVP_PKEY **pkey, const char *group_name,
+				  struct buffer *pub, struct buffer *priv,
+				  BN_CTX *bn_ctx)
+{
+	int ret = 0;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	BIGNUM *pub_bn = NULL, *priv_bn = NULL;
+
+	bld = OSSL_PARAM_BLD_new();
+	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME,
+					group_name, 0);
+
+	if (pub->len) {
+		pub_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(pub->buf, pub->len, pub_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PUB_KEY, pub_bn);
+	}
+	if (priv->len) {
+		priv_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(priv->buf, priv->len, priv_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY, priv_bn);
+	}
+
+	params = OSSL_PARAM_BLD_to_param(bld);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
+	CKNULL(ctx, -EFAULT);
+	CKINT_O(EVP_PKEY_fromdata_init(ctx));
+	CKINT_O(EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_KEYPAIR, params));
+
+out:
+	OSSL_PARAM_free(params);
+	OSSL_PARAM_BLD_free(bld);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+
+	return ret;
+}
+
+static int openssl_dsa_keyver(struct dsa_keyver_data *data,
+				flags_t parsed_flags){
+	int ret = 0;
+	BN_CTX *bn_ctx = NULL;
+	EVP_PKEY_CTX *key_ctx = NULL;
+	EVP_PKEY *pkey = NULL;
+	const char *group;
+
+	(void) parsed_flags;
+
+	bn_ctx = BN_CTX_new_ex(NULL);
+	CKINT(openssl_get_safeprime_group(data->pqg.safeprime, &group));
+	if (openssl_dh_create_pkey(&pkey, group, &data->Y, &data->X,
+				   bn_ctx) <= 0) {
+		data->keyver_success = 0;
+	}
+
+	key_ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, "fips=yes");
+	CKNULL(key_ctx, -EFAULT);
+
+	if (EVP_PKEY_check(key_ctx) > 0) {
+		data->keyver_success = 1;
+	} else {
+		data->keyver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (pkey)
+		EVP_PKEY_free(pkey);
+	if (key_ctx)
+		EVP_PKEY_CTX_free(key_ctx);
+	BN_CTX_free(bn_ctx);
+	return ret;
+}
+
+static int openssl_dsa_keygen_en(struct dsa_pqggen_data *pqg, struct buffer *Y,
+				 void **privkey)
+{
+	EVP_PKEY *key = NULL;
+	BUFFER_INIT(X);
+	int ret;
+
+	CKINT(_openssl_dsa_keygen(&pqg->P, &pqg->Q, &pqg->G, pqg->safeprime,
+				  &X, Y, &key));
+	*privkey = key;
+
+out:
+	if (ret && key)
+		EVP_PKEY_free(key);
+	free_buf(&X);
+	return ret;
+}
+
+static int openssl_get_dsa_sig_rs_bytes(struct buffer *sig, struct buffer *r,
+					struct buffer *s)
+{
+	int ret = 0;
+	size_t r1_len, s1_len;
+	const BIGNUM *r1, *s1;
+	// We need a copy of the pointer here because d2i_DSA_SIG modifies it.
+	const unsigned char *sig_buf = sig->buf;
+	DSA_SIG *sign = d2i_DSA_SIG(NULL, &sig_buf, sig->len);
+
+	CKNULL_LOG(sign, -EINVAL, "sign not generated\n");
+	DSA_SIG_get0(sign, &r1, &s1);
+	CKNULL_LOG(r1, -EINVAL, "r not generated\n");
+	CKNULL_LOG(s1, -EINVAL, "s not generated\n");
+	r1_len = BN_num_bytes(r1);
+	s1_len = BN_num_bytes(s1);
+	CKINT(alloc_buf(r1_len, r));
+	CKINT(alloc_buf(s1_len, s));
+	CKINT(BN_bn2binpad(r1, r->buf, r1_len));
+	CKINT(BN_bn2binpad(s1, s->buf, s1_len));
+
+out:
+	if (sign)
+		DSA_SIG_free(sign);
+	return ret;
+}
+
+static int openssl_dsa_siggen(struct dsa_siggen_data *data,
+			      flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	int ret = 0;
+	BUFFER_INIT(sig_buf);
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+
+	if (!data->privkey) {
+		logger(LOGGER_ERR, "Private key missing\n");
+		return -EINVAL;
+	}
+	key = data->privkey;
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	CKINT(openssl_sig_gen(key, md, &data->msg, &sig_buf));
+	CKINT(openssl_get_dsa_sig_rs_bytes(&sig_buf, &data->R, &data->S));
+
+	logger_binary(LOGGER_DEBUG, data->R.buf, data->R.len, "R");
+	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
+
+	ret = 0;
+out:
+	free_buf(&sig_buf);
+	return ret;
+}
+
+static int openssl_dsa_SIG_set0(DSA_SIG *sig, BIGNUM *r, BIGNUM *s)
+{
+	return DSA_SIG_set0(sig, r, s);
+}
+
+static int openssl_dsa_sigver(struct dsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	struct dsa_pqggen_data *pqg = &data->pqg;
+	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	DSA_SIG *sig = NULL;
+	BIGNUM *r = NULL, *s = NULL;
+	size_t sig_len;
+	int ret = 0, sig_consumed = 0;
+	unsigned char sig_buf[1024];
+	unsigned char *sig_buf_p = sig_buf;
+	BN_CTX *bn_ctx = NULL;
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	sig = DSA_SIG_new();
+	CKNULL_LOG(sig, -ENOMEM, "DSA_SIG_new() failed\n");
+
+	r = BN_bin2bn((const unsigned char *) data->R.buf, (int)data->R.len, r);
+	CKNULL(r, -ENOMEM);
+	s = BN_bin2bn((const unsigned char *) data->S.buf, (int)data->S.len, s);
+	CKNULL(s, -ENOMEM);
+
+	bn_ctx = BN_CTX_new();
+	CKINT(openssl_dsa_create_pkey(&key, &pqg->P, &pqg->Q, &pqg->G, NULL, 0,
+				      NULL, NULL, 1, 0, &data->Y, bn_ctx, md));
+
+	CKINT_O_LOG(openssl_dsa_SIG_set0(sig, r, s), "DSA_SIG_set0 failed\n");
+	sig_consumed = 1;
+
+	ctx = EVP_MD_CTX_create();
+	CKNULL(ctx, -ENOMEM);
+
+	if (!EVP_DigestVerifyInit_ex(ctx, NULL, EVP_MD_name(md), NULL, NULL,
+				     key, NULL)) {
+		ret = -EFAULT;
+		goto out;
+	}
+
+	sig_len = i2d_DSA_SIG(sig, &sig_buf_p);
+
+	ret = EVP_DigestVerify(ctx, sig_buf, sig_len, data->msg.buf,
+			       data->msg.len);
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		data->sigver_success = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN,
+			"Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (ctx)
+		EVP_MD_CTX_destroy(ctx);
+	if (sig)
+		DSA_SIG_free(sig);
+	if (key)
+		EVP_PKEY_free(key);
+	if (!sig_consumed && r)
+		BN_free(r);
+	if (!sig_consumed && s)
+		BN_free(s);
+
+	return ret;
+}
+
+static void openssl_dsa_free_key(void *privkey)
+{
+	EVP_PKEY *key = (EVP_PKEY *)privkey;
+
+	if (key)
+		EVP_PKEY_free(key);
+}
+
+static struct dsa_backend openssl_dsa =
+{
+	openssl_dsa_keygen,	/* dsa_keygen */
+	openssl_dsa_keyver,
+	openssl_dsa_siggen,	/* dsa_siggen */
+	openssl_dsa_sigver,	/* dsa_sigver */
+	openssl_dsa_pqg,	/* dsa_pqg */
+	openssl_dsa_pqggen,
+	openssl_dsa_keygen_en,
+	openssl_dsa_free_key
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_dsa_backend)
+static void openssl_dsa_backend(void)
+{
+	register_dsa_impl(&openssl_dsa);
+}
+
+/************************************************
+ * ECDSA cipher interface functions
+ ************************************************/
+static int _openssl_ecdsa_keygen(uint64_t curve, EVP_PKEY **out_key,
+				 EVP_PKEY_CTX **out_ctx)
+{
+	EVP_PKEY_CTX *ctx = *out_ctx;
+	EVP_PKEY *key = NULL;
+	int ret = 0, nid = 0;
+	char dgst[50];
+	CKINT_LOG(_openssl_ecdsa_curves(curve, &nid , dgst),
+		  "Conversion of curve failed\n");
+
+	char *digest = dgst;
+	if (!EVP_PKEY_CTX_set_group_name(ctx, digest)) {
+		logger(LOGGER_ERR, "EC_KEY_new_by_curve_name() failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (!EVP_PKEY_keygen(ctx, &key)) {
+		logger(LOGGER_ERR, "EC_KEY_generate_key() failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	*out_key = key;
+	*out_ctx = ctx;
+out:
+	return ret;
+}
+
+static int openssl_get_ecdsa_sig_rs_bytes(struct buffer *sig, struct buffer *r,
+					  struct buffer *s)
+{
+	int ret = 0;
+	size_t r1_len, s1_len;
+	const BIGNUM *r1, *s1;
+	// We need a copy of the pointer here because d2i_ECDSA_SIG modifies it.
+	const unsigned char *sig_buf = sig->buf;
+	ECDSA_SIG *sign = d2i_ECDSA_SIG(NULL, &sig_buf, sig->len);
+
+	CKNULL_LOG(sign, -EINVAL, "sign not generated\n");
+	r1 = ECDSA_SIG_get0_r(sign);
+	s1 = ECDSA_SIG_get0_s(sign);
+	CKNULL_LOG(r1, -EINVAL, "r not generated\n");
+	CKNULL_LOG(s1, -EINVAL, "s not generated\n");
+	r1_len = BN_num_bytes(r1);
+	s1_len = BN_num_bytes(s1);
+	CKINT(alloc_buf(r1_len, r));
+	CKINT(alloc_buf(s1_len, s));
+	CKINT(BN_bn2binpad(r1, r->buf, r1_len));
+	CKINT(BN_bn2binpad(s1, s->buf, s1_len));
+
+out:
+	if (sign)
+		ECDSA_SIG_free(sign);
+	return ret;
+}
+
+static int openssl_ecdsa_keygen(struct ecdsa_keygen_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+	CKNULL(ctx, -ENOMEM);
+	CKINT_O(EVP_PKEY_keygen_init(ctx));
+
+	CKINT(_openssl_ecdsa_keygen(data->cipher, &key, &ctx));
+
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_PRIV_KEY,
+					&data->d));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_EC_PUB_X,
+					&data->Qx));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_EC_PUB_Y,
+					&data->Qy));
+	
+	logger_binary(LOGGER_DEBUG, data->Qx.buf, data->Qx.len, "Qx");
+	logger_binary(LOGGER_DEBUG, data->Qy.buf, data->Qy.len, "Qy");
+	logger_binary(LOGGER_DEBUG, data->d.buf, data->d.len, "d");
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+
+	return ret;
+}
+
+static int openssl_ecdsa_create_pkey(EVP_PKEY **pkey, const char *curve_name,
+				     struct buffer *pub)
+{
+	int ret = 0;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+
+	bld = OSSL_PARAM_BLD_new();
+	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME,
+					curve_name, 0);
+	OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pub->buf,
+					 pub->len);
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+	EVP_PKEY_fromdata_init(ctx);
+	if(EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_PUBLIC_KEY, params) == 1)
+		ret = 1;
+
+	if(params)
+		OSSL_PARAM_free(params);
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_ecdsa_pkvver(struct ecdsa_pkvver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	int nid = NID_undef, ret = 0;
+	EVP_PKEY *key = NULL;
+	char dgst[50];
+	BUFFER_INIT(pub);
+	(void)parsed_flags;
+
+	CKINT(alloc_buf(data->Qx.len + data->Qy.len + 1, &pub));
+
+	pub.buf[0] = POINT_CONVERSION_UNCOMPRESSED;
+	memcpy(pub.buf + 1, data->Qx.buf, data->Qx.len);
+	memcpy(pub.buf + 1 + data->Qx.len, data->Qy.buf, data->Qy.len);
+
+	CKINT(_openssl_ecdsa_curves(data->cipher, &nid, dgst));
+
+	logger_binary(LOGGER_DEBUG, pub.buf, pub.len, "pub");
+
+	const char *digest = dgst;
+	ret = openssl_ecdsa_create_pkey(&key, digest, &pub);
+
+	if(ret){
+		logger(LOGGER_DEBUG, "ECDSA key successfully verified\n");
+		data->keyver_success = 1;
+	} else {
+		logger(LOGGER_DEBUG, "ECDSA key verification failed\n");
+		data->keyver_success = 0;
+	}
+	ret = 0;
+
+out:
+	free_buf(&pub);
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_ecdsa_keygen_en(uint64_t curve, struct buffer *Qx_buf,
+				   struct buffer *Qy_buf, void **privkey)
+{
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	int ret;
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+	CKNULL(ctx, -ENOMEM);
+	CKINT_O(EVP_PKEY_keygen_init(ctx));
+
+	CKINT(_openssl_ecdsa_keygen(curve, &key, &ctx));
+
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_EC_PUB_X, Qx_buf));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_EC_PUB_Y, Qy_buf));
+
+	logger_binary(LOGGER_DEBUG, Qx_buf->buf, Qx_buf->len, "Qx");
+	logger_binary(LOGGER_DEBUG, Qy_buf->buf, Qy_buf->len, "Qy");
+
+	*privkey = key;
+
+out:
+	if (ret && key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static void openssl_ecdsa_free_key(void *privkey)
+{
+	EVP_PKEY *ecdsa = (EVP_PKEY *)privkey;
+	if (ecdsa)
+		EVP_PKEY_free(ecdsa);
+}
+
+static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pk = NULL;
+	ECDSA_SIG *sig = NULL;
+	int ret = 0;
+	EVP_PKEY *key;
+	BUFFER_INIT(sig_buf);
+	const EVP_MD *md = NULL;
+
+	(void)parsed_flags;
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	if (!data->privkey) {
+		logger(LOGGER_ERR, "Private key missing\n");
+		return -EINVAL;
+	}
+
+	key = data->privkey;
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+	CKNULL(ctx, -EFAULT);
+	CKINT_O(EVP_PKEY_keygen_init(ctx));
+
+	CKINT(openssl_sig_gen(key, md, &data->msg, &sig_buf));
+	
+	openssl_get_ecdsa_sig_rs_bytes(&sig_buf, &data->R, &data->S);
+
+	logger_binary(LOGGER_DEBUG, data->R.buf, data->R.len, "R");
+	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
+
+	ret = 0;
+
+out:
+	free_buf(&sig_buf);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	if (pk)
+		EVP_PKEY_free(pk);
+	if (sig)
+		ECDSA_SIG_free(sig);
+
+	return ret;
+}
+
+static int openssl_ecdsa_convert(struct ecdsa_sigver_data *data,
+				 ECDSA_SIG **sig_out, EVP_PKEY **key_out)
+{
+	ECDSA_SIG *sig = NULL;
+	EVP_PKEY *key = NULL;
+	BIGNUM *R = NULL, *S = NULL;
+	int ret, nid = NID_undef;
+	char dgst[50];
+	BUFFER_INIT(pub);
+
+	logger_binary(LOGGER_DEBUG, data->R.buf, data->R.len, "R");
+	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
+
+	sig = ECDSA_SIG_new();
+	CKNULL(sig, -EFAULT);
+
+	R = BN_bin2bn((const unsigned char *) data->R.buf, (int)data->R.len,
+		      NULL);
+	CKNULL(R, -EFAULT);
+
+	S = BN_bin2bn((const unsigned char *) data->S.buf, (int)data->S.len,
+		      NULL);
+	CKNULL(S, -EFAULT);
+
+	CKINT_O(ECDSA_SIG_set0(sig, R, S));
+
+	CKINT(_openssl_ecdsa_curves(data->cipher, &nid, dgst));
+
+	CKINT(alloc_buf(data->Qx.len + data->Qy.len + 1, &pub));
+
+	pub.buf[0] = POINT_CONVERSION_UNCOMPRESSED;
+	memcpy(pub.buf + 1, data->Qx.buf, data->Qx.len);
+	memcpy(pub.buf + 1 + data->Qx.len, data->Qy.buf, data->Qy.len);
+
+	const char *digest = dgst;
+	ret = openssl_ecdsa_create_pkey(&key, digest, &pub);
+	CKNULL(key, -EFAULT);
+
+	logger_binary(LOGGER_DEBUG, data->Qx.buf, data->Qx.len, "Qx");
+	logger_binary(LOGGER_DEBUG, data->Qy.buf, data->Qy.len, "Qy");
+
+	*key_out = key;
+	*sig_out = sig;
+
+	ret = 0;
+
+out:
+	free_buf(&pub);
+	return ret;
+}
+
+static int
+openssl_ecdsa_sigver_primitive(struct ecdsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	ECDSA_SIG *sig = NULL;
+	unsigned char *der_sig = NULL;
+	size_t der_sig_len;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_ecdsa_convert(data, &sig, &key));
+
+	der_sig_len = (size_t)i2d_ECDSA_SIG(sig, &der_sig);
+
+	if (!der_sig_len) {
+		logger(LOGGER_ERR, "Failure to convert signature into DER\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	ctx = EVP_PKEY_CTX_new(key, NULL);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+	CKINT_O_LOG(EVP_PKEY_verify_init(ctx), "PKEY verify init failed\n");
+
+	ret = EVP_PKEY_verify(ctx, der_sig, der_sig_len, data->msg.buf,
+			      data->msg.len);
+	if (ret == 1) {
+		logger(LOGGER_DEBUG, "Signature verification successful\n");
+		data->sigver_success = 1;
+	} else {
+		logger(LOGGER_DEBUG, "Signature verification failed %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+		data->sigver_success = 0;
+	}
+	ret = 0;
+
+out:
+	if (der_sig)
+		free(der_sig);
+	if (sig)
+		ECDSA_SIG_free(sig);
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	ECDSA_SIG *sig = NULL;
+	unsigned int sig_len;
+	unsigned char *sig_buf_p = NULL;
+	int ret = 0;
+	const EVP_MD *md = NULL;
+	if (data->component)
+		return openssl_ecdsa_sigver_primitive(data, parsed_flags);
+
+	CKINT(openssl_ecdsa_convert(data, &sig, &key));
+
+	sig_len = (unsigned int)i2d_ECDSA_SIG(sig, &sig_buf_p);
+
+	ctx = EVP_MD_CTX_create();
+	CKNULL(ctx, -ENOMEM);
+
+	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
+
+	if (!EVP_DigestVerifyInit_ex(ctx, NULL, EVP_MD_name(md), NULL, NULL,
+				     key, NULL)) {
+		ERR_error_string(ERR_get_error(), NULL);
+		data->sigver_success = 0;
+		goto out;
+	}
+
+	ret = EVP_DigestVerify(ctx, sig_buf_p, sig_len, data->msg.buf,
+			       data->msg.len);
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		data->sigver_success = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN,
+			"Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (ctx)
+		EVP_MD_CTX_free(ctx);
+	if (sig)
+		ECDSA_SIG_free(sig);
+
+	return ret;
+}
+
+static struct ecdsa_backend openssl_ecdsa =
+{
+	openssl_ecdsa_keygen,   /* ecdsa_keygen_testing */
+	NULL,
+	openssl_ecdsa_pkvver,   /* ecdsa_pkvver */
+	openssl_ecdsa_siggen,   /* ecdsa_siggen */
+	openssl_ecdsa_sigver,   /* ecdsa_sigver */
+	openssl_ecdsa_keygen_en,
+	openssl_ecdsa_free_key,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_ecdsa_backend)
+static void openssl_ecdsa_backend(void)
+{
+	register_ecdsa_impl(&openssl_ecdsa);
+}

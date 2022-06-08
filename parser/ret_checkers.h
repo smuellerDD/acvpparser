@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -27,8 +27,11 @@ extern "C"
 
 #define CKINT(x) {							\
 	ret = x;							\
-	if (ret < 0)							\
+	if (ret < 0) {							\
+		logger(LOGGER_DEBUG,					\
+		       "Failure with return code %d\n", ret);		\
 		goto out;						\
+	}								\
 }
 
 #define CKINT_LOG(x, ...) {						\
@@ -42,6 +45,8 @@ extern "C"
 #define CKNULL(v, r) {							\
 	if (!v) {							\
 		ret = r;						\
+		logger(LOGGER_DEBUG,					\
+		       "Failure with return code %d\n", ret);		\
 		goto out;						\
 	}								\
 }

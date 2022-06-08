@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -304,8 +304,7 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 	/**********************************************************************
 	 * DH key generation
 	 **********************************************************************/
-	DH_DEF_CALLBACK(dh_keygen,
-				FLAG_OP_AFT | FLAG_OP_MASK_DH | FLAG_OP_ASYM_TYPE_KEYGEN);
+	DH_DEF_CALLBACK(dh_keygen, FLAG_OP_AFT | FLAG_OP_MASK_DH | FLAG_OP_ASYM_TYPE_KEYGEN);
 
 	const struct json_entry dh_keygen_testresult_entries[] = {
 		{"x",		{.data.buf = &dh_keygen_vector.X, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_KEYGEN},

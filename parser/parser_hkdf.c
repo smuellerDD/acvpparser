@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -35,16 +35,23 @@ static int hkdf_helper(const struct json_array *processdata,
 	int (*callback)(struct hkdf_data *vector, flags_t parsed_flags),
 			struct hkdf_data *vector)
 {
-
+	static const uint8_t literal[] = { 0x01, 0x23, 0x45, 0x67,
+					   0x89, 0xab, 0xcd, 0xef };
 	int ret = 0;
 
 	(void)testvector;
 	(void)processdata;
 	(void)testresults;
 
-	/* Create fixed info field */
+	/*
+	 * Create fixed info field
+	 *
+	 * TODO: this assumes
+	 * "uPartyInfo||vPartyInfo||literal[0123456789abcdef]"
+	 */
 	CKINT(alloc_buf(vector->fi_partyU.len + vector->fi_partyU_ephem.len +
-			vector->fi_partyV.len + vector->fi_partyV_ephem.len,
+			vector->fi_partyV.len + vector->fi_partyV_ephem.len +
+			sizeof(literal),
 			&vector->info));
 
 	/* Concatenate data */
@@ -61,6 +68,11 @@ static int hkdf_helper(const struct json_array *processdata,
 		       vector->fi_partyU_ephem.len + vector->fi_partyV.len,
 		       vector->fi_partyV_ephem.buf,
 		       vector->fi_partyV_ephem.len);
+
+	memcpy(vector->info.buf + vector->fi_partyU.len +
+	       vector->fi_partyU_ephem.len + vector->fi_partyV.len +
+	       vector->fi_partyV_ephem.len,
+	       literal, sizeof(literal));
 
 	logger_binary(LOGGER_DEBUG, vector->info.buf, vector->info.len, "info");
 

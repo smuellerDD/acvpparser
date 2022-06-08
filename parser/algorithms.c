@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2019 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -56,7 +56,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ACVP-TDES-CTR", ACVP_TDESCTR},
 	{"ACVP-TDES-KW", ACVP_TDESKW},
 	/* CTR DRBG */
-	{"3keyTDEA", ACVP_TDESCTR},
+	{"3keyTDEA", ACVP_TDESECB},
 
 	{"CMAC-AES", ACVP_AESCMAC},
 	{"CMAC-AES128", ACVP_AESCMAC},
@@ -91,6 +91,8 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"SHA3-256", ACVP_SHA3_256},
 	{"SHA3-384", ACVP_SHA3_384},
 	{"SHA3-512", ACVP_SHA3_512},
+	{"CSHAKE-128", ACVP_CSHAKE128},
+	{"CSHAKE-256", ACVP_CSHAKE256},
 	{"SHAKE-128", ACVP_SHAKE128},
 	{"SHAKE-256", ACVP_SHAKE256},
 	{"SHA2-224", ACVP_SHA224},
@@ -109,11 +111,13 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"KAS-ECC", ACVP_ECDH},
 	{"KAS-FFC-SSC", ACVP_KAS_FFC_R3_SSC},
 	{"KAS-FFC", ACVP_DH},
+	{"KAS-IFC-SSC", ACVP_KAS_IFC_SSC},
 	{"KAS-ED", ACVP_ECDH_ED},
 
 	{"kdf-components", ACVP_KDF_COMPONENT},
 	{"PBKDF", ACVP_PBKDF},
 	{"KAS-KDF", ACVP_HKDF},
+	{"KDA", ACVP_HKDF},
 	{"KDF", ACVP_KDF_800_108},
 	{"TLS-v1.3", ACVP_KDF_TLS13},
 	{"TLS-v1.2", ACVP_KDF_TLS12},
@@ -148,6 +152,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	/* KTS schema */
 	{"KTS-OAEP-basic", ACVP_KTS_SCHEMA_OAEP_BASIC},
 	{"KTS-OAEP-Party_V-confirmation", ACVP_KTS_SCHEMA_OAEP_PARTY_V_CONF},
+	{"KAS1", ACVP_KAS1_SCHEMA_BASIC},
 	{"KAS1-basic", ACVP_KAS1_SCHEMA_BASIC},
 	{"KAS1-Party_V-confirmation", ACVP_KAS1_SCHEMA_PARTY_V_CONF},
 	{"KAS2-basic", ACVP_KAS2_SCHEMA_BASIC},
@@ -168,9 +173,10 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"TDES", ACVP_TDESECB},
 
 	/* Conversion from uint64_t back to a name */
-	{"ctrDRBG_AES128", (ACVP_DRBGCTR | ACVP_AES128)},
+	{"ctrDRBG_AES128", ACVP_DRBGCTR | ACVP_AES128},
 	{"ctrDRBG_AES192", ACVP_DRBGCTR | ACVP_AES192},
 	{"ctrDRBG_AES256", ACVP_DRBGCTR | ACVP_AES256},
+	{"ctrDRBG_TDES", ACVP_DRBGCTR | ACVP_TDESECB},
 	{"hashDRBG_SHA-1", ACVP_DRBGHASH | ACVP_SHA1},
 	{"hashDRBG_SHA-224", ACVP_DRBGHASH | ACVP_SHA224},
 	{"hashDRBG_SHA-256", ACVP_DRBGHASH | ACVP_SHA256},

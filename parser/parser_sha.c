@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -335,7 +335,7 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	}
 
 	/* Referencing the backend functions */
-	const struct sha_callback sha_aft = { sha_backend->hash_generate, &vector, NULL};
+	const struct sha_callback sha_aft = { sha_backend->hash_generate, &vector, NULL };
 	const struct json_callback sha_callback_aft[] = {
 		{ .callback.sha = sha_aft, CB_TYPE_sha, FLAG_OP_MASK_SHA | FLAG_OP_AFT | FLAG_OP_VOT | FLAG_OP_LDT },
 	};

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -29,7 +29,7 @@ extern "C"
 #endif
 
 /**
- * @brief DH shashed shared secret generation
+ * @brief DH hashed shared secret generation
  *
  * @var cipher [in] one hash out of HASHMASK, one MAC out
  * 		      of HMACMASK when using KDF.
@@ -55,7 +55,7 @@ struct dh_ss_data {
 };
 
 /**
- * @brief DH shashed shared secret verification
+ * @brief DH hashed shared secret verification
  *
  * @var cipher [in] one hash out of HASHMASK, one MAC out
  * 		      of HMACMASK when using KDF.

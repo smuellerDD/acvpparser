@@ -1,6 +1,6 @@
 /* Logging support
  *
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -50,6 +50,9 @@ static void logger_severity(enum logger_verbosity severity, char *sev,
 	case LOGGER_ERR:
 		snprintf(sev, sevlen, "Error");
 		break;
+	case LOGGER_STATUS:
+		snprintf(sev, sevlen, "Status");
+		break;
 	case LOGGER_NONE:
 		break;
 	case LOGGER_MAX_LEVEL:
@@ -58,7 +61,9 @@ static void logger_severity(enum logger_verbosity severity, char *sev,
 	}
 }
 
-void logger(enum logger_verbosity severity, const char *fmt, ...)
+void _logger(enum logger_verbosity severity,
+	     const char *file, const char *func,
+	     const size_t line, const char *fmt, ...)
 {
 	time_t now;
 	struct tm now_detail;
@@ -95,6 +100,9 @@ void logger(enum logger_verbosity severity, const char *fmt, ...)
 	case LOGGER_ERR:
 		fprintf_color = &fprintf_red;
 		break;
+	case LOGGER_STATUS:
+		fprintf_color = &fprintf_magenta;
+		break;
 	case LOGGER_NONE:
 		break;
 	case LOGGER_MAX_LEVEL:
@@ -102,38 +110,35 @@ void logger(enum logger_verbosity severity, const char *fmt, ...)
 		fprintf_color = &fprintf;
 	}
 
-	fprintf_color(stderr, "ACVPParser (%.2d:%.2d:%.2d) %s: ",
-		      now_detail.tm_hour, now_detail.tm_min, now_detail.tm_sec,
-		      sev);
+	switch (logger_verbosity_level) {
+	case LOGGER_DEBUG2:
+	case LOGGER_DEBUG:
+		fprintf_color(stderr,
+			      "ACVPParser (%.2d:%.2d:%.2d) %s [%s:%s:%u]: ",
+			      now_detail.tm_hour, now_detail.tm_min,
+			      now_detail.tm_sec, sev, file, func, line);
+		break;
+	case LOGGER_VERBOSE:
+	case LOGGER_WARN:
+	case LOGGER_ERR:
+	case LOGGER_STATUS:
+	case LOGGER_NONE:
+	case LOGGER_MAX_LEVEL:
+	default:
+		fprintf_color(stderr,
+			      "ACVPParser (%.2d:%.2d:%.2d) %s: ",
+			      now_detail.tm_hour, now_detail.tm_min,
+			      now_detail.tm_sec, sev);
+		break;
+	}
+
 	fprintf(stderr, "%s", msg);
 }
 
-void logger_status(const char *fmt, ...)
-{
-	time_t now;
-	struct tm now_detail;
-	va_list args;
-	char msg[256];
-
-	if (logger_verbosity_level != LOGGER_WARN &&
-	    logger_verbosity_level != LOGGER_ERR)
-		return;
-
-	va_start(args, fmt);
-	vsnprintf(msg, sizeof(msg), fmt, args);
-	va_end(args);
-
-	now = time(NULL);
-	localtime_r(&now, &now_detail);
-
-	fprintf_magenta(stderr, "ACVPParser (%.2d:%.2d:%.2d) Status: ",
-			now_detail.tm_hour, now_detail.tm_min,
-			now_detail.tm_sec);
-	fprintf(stderr, "%s", msg);
-}
-
-void logger_binary(enum logger_verbosity severity,
-		   const unsigned char *bin, size_t binlen, const char *str)
+void _logger_binary(const enum logger_verbosity severity,
+		    const unsigned char *bin, const size_t binlen,
+		    const char *str, const char *file,
+		    const char *func, const size_t line)
 {
 	time_t now;
 	struct tm now_detail;
@@ -148,9 +153,28 @@ void logger_binary(enum logger_verbosity severity,
 	now = time(NULL);
 	localtime_r(&now, &now_detail);
 
-	snprintf(msg, sizeof(msg), "ACVPParser (%.2d:%.2d:%.2d) %s: %s",
-		 now_detail.tm_hour, now_detail.tm_min, now_detail.tm_sec,
-		 sev, str);
+	switch (logger_verbosity_level) {
+	case LOGGER_DEBUG2:
+	case LOGGER_DEBUG:
+		snprintf(msg, sizeof(msg),
+			 "ACVPParser (%.2d:%.2d:%.2d) %s [%s:%s:%zu]: %s",
+			 now_detail.tm_hour, now_detail.tm_min,
+			 now_detail.tm_sec, sev, file, func, line, str);
+		break;
+	case LOGGER_VERBOSE:
+	case LOGGER_WARN:
+	case LOGGER_ERR:
+	case LOGGER_STATUS:
+	case LOGGER_NONE:
+	case LOGGER_MAX_LEVEL:
+	default:
+		snprintf(msg, sizeof(msg), "ACVPParser (%.2d:%.2d:%.2d) %s: %s",
+			 now_detail.tm_hour, now_detail.tm_min,
+			 now_detail.tm_sec, sev, str);
+		break;
+	}
+
+
 	bin2print(bin, binlen, stderr, msg);
 }
 

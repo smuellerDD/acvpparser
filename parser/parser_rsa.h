@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -77,6 +77,13 @@ struct rsa_keygen_prime_data {
  * @var xq1 [out]
  * @var xq2 [out]
  * @var bitlen [out]
+ *
+ * The following buffers are for CRT key format.
+ * NOTE: These values must only be set when the key format is CRT. A backend can
+ * use the parsed_flags to check if FLAG_OP_RSA_CRT is present.
+ * @var dmp1 [out]
+ * @var dmq1 [out]
+ * @var iqmp [out]
  */
 struct rsa_keygen_data {
 	uint32_t modulus;
@@ -93,6 +100,10 @@ struct rsa_keygen_data {
 	struct buffer xq1;
 	struct buffer xq2;
 	unsigned int bitlen[4];
+
+	struct buffer dmp1;
+	struct buffer dmq1;
+	struct buffer iqmp;
 };
 
 /**
@@ -209,12 +220,15 @@ struct rsa_sigver_data {
  * @var msg [in] Message between 0 and n - 1
  * @var n [in] RSA modulus
  * @var d [in] RSA private exponent
+ * @var e [in] RSA e
  * @var signature [out] RSA signature of a successful operation
+ * @var sig_result [out] Is RSA signature operation successful (1) or not (0).
  */
 struct rsa_signature_primitive_data {
 	struct buffer msg;
 	struct buffer n;
 	struct buffer d;
+	struct buffer e;
 #if 0
 	union {
 		struct rsa_regular {
@@ -228,6 +242,7 @@ struct rsa_signature_primitive_data {
 	} u;
 #endif
 	struct buffer signature;
+	uint32_t sig_result;
 };
 
 /**

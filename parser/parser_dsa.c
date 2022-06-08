@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -31,6 +31,9 @@ static struct dsa_backend *dsa_backend = NULL;
 
 static int dsa_pqggen_helper(struct dsa_pqggen_data *pqg, flags_t parsed_flags)
 {
+	if (pqg->safeprime)
+		return 0;
+
 	if (!dsa_backend->dsa_pqggen) {
 		logger(LOGGER_ERR, "dsa_pqggen backend missing!\n");
 		return -EOPNOTSUPP;
@@ -227,10 +230,12 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 
 		/* PQ generation with probable primes */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prob_domain_param_seed, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROBABLE_PQ_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROBABLE_PQ_GEN},
 		{"counter",	{.data.integer = &dsa_pqg_vector.pq_prob_counter, WRITER_UINT},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROBABLE_PQ_GEN},
 
 		/* PQ generation with provable primes */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_firstseed, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROVABLE_PQ_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, WRITER_BIN},		FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"pSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_pseed, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"qSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_qseed, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"pCounter",	{.data.integer = &dsa_pqg_vector.pq_prov_pcounter, WRITER_UINT},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_PROVABLE_PQ_GEN},
@@ -254,6 +259,7 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 
 		/* canonical G generation */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_canon_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_CANONICAL_G_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"index",	{.data.buf = &dsa_pqg_vector.g_canon_index, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGGEN | FLAG_OP_DSA_CANONICAL_G_GEN},
 
 		/* PQ verification for probable and provable primes */
@@ -264,9 +270,11 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 		/* PQ verification with probable primes */
 		{"counter",	{.data.integer = &dsa_pqg_vector.pq_prob_counter, PARSER_UINT},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROBABLE_PQ_GEN},
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prob_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROBABLE_PQ_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROBABLE_PQ_GEN},
 
 		/* PQ verification with provable primes */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_firstseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"pSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_pseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"qSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_qseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
 		{"pCounter",	{.data.integer = &dsa_pqg_vector.pq_prov_pcounter, PARSER_UINT},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_PROVABLE_PQ_GEN},
@@ -275,15 +283,18 @@ static int dsa_tester(struct json_object *in, struct json_object *out,
 		/* canonical and unverifiable G verification */
 		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.pq_prov_firstseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"index",	{.data.buf = &dsa_pqg_vector.g_canon_index, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 
 		/* unverifiable G verification */
 		{"g",		{.data.buf = &dsa_pqg_vector.G, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN},
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_unver_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
-		{"h",		{.data.buf = &dsa_pqg_vector.g_unver_h, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
+		{"h",		{.data.buf = &dsa_pqg_vector.g_unver_h, PARSER_STRING},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_UNVERIFIABLE_G_GEN | FLAG_OPTIONAL},
 
 		/* canonical G verification */
 		{"domainSeed",	{.data.buf = &dsa_pqg_vector.g_canon_domain_param_seed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
+		{"domainSeed",	{.data.buf = &dsa_pqg_vector.domainseed, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 		{"index",	{.data.buf = &dsa_pqg_vector.g_canon_index, PARSER_BIN},	FLAG_OP_DSA_TYPE_PQGVER | FLAG_OP_DSA_CANONICAL_G_GEN},
 	};
 

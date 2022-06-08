@@ -70,7 +70,8 @@ static int kmac_tester(struct json_object *in, struct json_object *out,
 		{"key",		{.data.buf = &vector.key, PARSER_BIN},	FLAG_OP_AFT},
 		{"keyLen",	{.data.integer = &vector.keylen, PARSER_UINT},	FLAG_OP_AFT},
 		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT},
-		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_AFT},
+		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_AFT | FLAG_OPTIONAL},
+		{"customizationHex",	{.data.buf = &vector.customization, PARSER_BIN},	FLAG_OP_AFT | FLAG_OPTIONAL},
 	};
 	const struct json_array kmac_test = SET_ARRAY(kmac_test_entries, &kmac_testresult);
 
@@ -80,7 +81,8 @@ static int kmac_tester(struct json_object *in, struct json_object *out,
 		{"key",		{.data.buf = &vector.key, PARSER_BIN},	FLAG_OP_MVT},
 		{"keyLen",	{.data.integer = &vector.keylen, PARSER_UINT},	FLAG_OP_MVT},
 		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_MVT},
-		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_MVT},
+		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_MVT | FLAG_OPTIONAL},
+		{"customizationHex",	{.data.buf = &vector.customization, PARSER_BIN},	FLAG_OP_MVT | FLAG_OPTIONAL},
 	};
 	const struct json_array kmac_test_ver = SET_ARRAY(kmac_test_ver_entries, &kmac_testresult_ver);
 	/*
@@ -91,7 +93,7 @@ static int kmac_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry mac_testgroup_entries[] = {
-		{"xof",	{.data.integer = &vector.xof_enabled, PARSER_BOOL},	FLAG_OP_MVT | FLAG_OP_AFT},
+		{"xof",	{.data.integer = &vector.xof_enabled, PARSER_BOOL},	FLAG_OP_MVT | FLAG_OP_AFT | FLAG_OPTIONAL},
 		{"tests",	{.data.array = &kmac_test, PARSER_ARRAY},	FLAG_OP_AFT },
 		{"tests",	{.data.array = &kmac_test_ver, PARSER_ARRAY}, FLAG_OP_MVT},
 	};

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -164,7 +164,7 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 {
 	struct json_object *testresult = NULL, *resultsarray = NULL,
 			   *resultsobject = NULL;
-	static uint32_t failures = 0;
+	static uint32_t failures = 1;
 	unsigned int max;
 	int ret;
 	void *rsa_privkey = NULL;
@@ -173,8 +173,8 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	(void)testvector;
 	(void)testresults;
 
-	/* We try at most 30 times */
-	for (max = 0; max < 30; max++) {
+	/* We try at most these many times times */
+	for (max = 0; max < 200; max++) {
 		vector->dec_result = false;
 		free_buf(&vector->s);
 
@@ -362,33 +362,41 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA B.3.4, B.3.5, B.3.6 KeyGen KAT and KeyGen GDT
 	 **********************************************************************/
-	RSA_DEF_CALLBACK_HELPER(rsa_keygen, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES, rsa_keygen_helper);
+	RSA_DEF_CALLBACK_HELPER(rsa_keygen, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT, rsa_keygen_helper);
 
 	const struct json_entry rsa_keygen_testresult_entries[] = {
 		{"e",	{.data.buf = &rsa_keygen_vector.e, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"p",	{.data.buf = &rsa_keygen_vector.p, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"q",	{.data.buf = &rsa_keygen_vector.q, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"n",	{.data.buf = &rsa_keygen_vector.n, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"d",	{.data.buf = &rsa_keygen_vector.d, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT |  FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 
 		/* B.3.6 specific data */
 		{"xP",	{.data.buf = &rsa_keygen_vector.xp, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"xP1",	{.data.buf = &rsa_keygen_vector.xp1, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"xP2",	{.data.buf = &rsa_keygen_vector.xp2, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"xQ",	{.data.buf = &rsa_keygen_vector.xq, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"xQ1",	{.data.buf = &rsa_keygen_vector.xq1, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"xQ2",	{.data.buf = &rsa_keygen_vector.xq2, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
+
+		/* CRT key format specific data */
+		{"dmp1",	{.data.buf = &rsa_keygen_vector.dmp1, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
+		{"dmq1",	{.data.buf = &rsa_keygen_vector.dmq1, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
+		{"iqmp",	{.data.buf = &rsa_keygen_vector.iqmp, WRITER_BIN},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 	};
 	const struct json_testresult rsa_keygen_testresult = SET_ARRAY(rsa_keygen_testresult_entries, &rsa_keygen_callbacks);
 
@@ -398,21 +406,21 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA B.3.2 KeyGen KAT and KeyGen GDT
 	 **********************************************************************/
-	RSA_DEF_CALLBACK(rsa_keygen_prov_prime, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES);
+	RSA_DEF_CALLBACK(rsa_keygen_prov_prime, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT);
 
 	const struct json_entry rsa_keygen_prov_prime_testresult_entries[] = {
 		{"e",	{.data.buf = &rsa_keygen_prov_prime_vector.e, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"seed",	{.data.buf = &rsa_keygen_prov_prime_vector.seed, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"p",	{.data.buf = &rsa_keygen_prov_prime_vector.p, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"q",	{.data.buf = &rsa_keygen_prov_prime_vector.q, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"n",	{.data.buf = &rsa_keygen_prov_prime_vector.n, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"d",	{.data.buf = &rsa_keygen_prov_prime_vector.d, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 	};
 	const struct json_testresult rsa_keygen_prov_prime_testresult =
 		SET_ARRAY(rsa_keygen_prov_prime_testresult_entries,
@@ -424,20 +432,20 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA B.3.3 KeyGen KAT
 	 **********************************************************************/
-	RSA_DEF_CALLBACK(rsa_keygen_prime, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES);
+	RSA_DEF_CALLBACK(rsa_keygen_prime, FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT);
 
 	const struct json_entry rsa_keygen_prime_testresult_entries[] = {
 		{"testPassed",	{.data.integer = &rsa_keygen_prime_vector.keygen_success, WRITER_BOOL},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 	};
 
 	const struct json_entry rsa_keygen_prime_test_entries[] = {
 		{"e",		{.data.buf = &rsa_keygen_prime_vector.e, PARSER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 		{"p",	{.data.buf = &rsa_keygen_prime_vector.p, PARSER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 		{"q",		{.data.buf = &rsa_keygen_prime_vector.q, PARSER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 	};
 
 	const struct json_testresult rsa_keygen_prime_testresult =
@@ -504,6 +512,8 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry rsa_signature_primitive_testresult_entries[] = {
 		{"signature",	{.data.buf = &rsa_signature_primitive_vector.signature, WRITER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"testPassed",	{.data.integer = &rsa_signature_primitive_vector.sig_result, WRITER_BOOL},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 	};
 	const struct json_testresult rsa_signature_primitive_testresult = SET_ARRAY(rsa_signature_primitive_testresult_entries, &rsa_signature_primitive_callbacks);
 
@@ -514,6 +524,8 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 		{"n",		{.data.buf = &rsa_signature_primitive_vector.n, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"d",		{.data.buf = &rsa_signature_primitive_vector.d, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+		{"e",		{.data.buf = &rsa_signature_primitive_vector.e, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 #if 0
 		/* d is marked optional in case of CRT */
@@ -540,27 +552,27 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry rsa_decryption_primitive_testresult_entries[] = {
 		{"e",		{.data.buf = &rsa_decryption_primitive_vector.e, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"n",		{.data.buf = &rsa_decryption_primitive_vector.n, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"plainText",	{.data.buf = &rsa_decryption_primitive_vector.s, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"testPassed",	{.data.integer = &rsa_decryption_primitive_vector.dec_result, WRITER_BOOL},
-			         FLAG_OP_ASYM_TYPE_SIGVER | FLAG_OP_GDT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 	};
 	const struct json_testresult rsa_decryption_primitive_testresult = SET_ARRAY(rsa_decryption_primitive_testresult_entries, &rsa_decryption_primitive_callbacks);
 
 	const struct json_entry rsa_decryption_primitive_test_entries[] = {
 		{"cipherText",	{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 	};
 	const struct json_array rsa_decryption_primitive_test = SET_ARRAY(rsa_decryption_primitive_test_entries, &rsa_decryption_primitive_testresult);
 
 	const struct json_entry rsa_decryption_primitive_testresults_entries[] = {
 		{"tcId",	{.data.integer = &rsa_decryption_primitive_vector.tcid, PARSER_UINT},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"resultsArray",	{.data.array = &rsa_decryption_primitive_test, PARSER_ARRAY},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK}
 	};
 	const struct json_array rsa_decryption_primitive_testresults = SET_ARRAY(rsa_decryption_primitive_testresults_entries, NULL);
 
@@ -569,29 +581,29 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	 **********************************************************************/
 	const struct json_entry rsa_keygen_testgroup_entries[] = {
 		{"modulo",	{.data.integer = &rsa_keygen_vector.modulus, PARSER_UINT},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"modulo",	{.data.integer = &rsa_keygen_vector.modulus, PARSER_UINT},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 		{"fixedPubExp",	{.data.buf = &rsa_keygen_vector.e, PARSER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OPTIONAL},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
 		{"modulo",	{.data.integer = &rsa_keygen_prime_vector.modulus, PARSER_UINT},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 
 		{"modulo",	{.data.integer = &rsa_keygen_prov_prime_vector.modulus, PARSER_UINT},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"hashAlg",	{.data.largeint = &rsa_keygen_prov_prime_vector.cipher, PARSER_CIPHER},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 
 		{"tests",	{.data.array = &rsa_keygen_test, PARSER_ARRAY},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"tests",	{.data.array = &rsa_keygen_test, PARSER_ARRAY},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 
 		{"tests",	{.data.array = &rsa_keygen_prime_test, PARSER_ARRAY},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
 
 		{"tests",	{.data.array = &rsa_keygen_prov_prime_test, PARSER_ARRAY},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 	};
 	const struct json_array rsa_keygen_testgroup = SET_ARRAY(rsa_keygen_testgroup_entries, NULL);
 

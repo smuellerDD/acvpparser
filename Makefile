@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 
@@ -11,16 +11,18 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC=gcc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11 -Wno-variadic-macros
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
 OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)
 endif
 
+ifneq '' '$(findstring clang,$(CC))'
+CFLAGS          += -Wno-gnu-zero-variadic-macro-arguments
+endif
+
 ifeq ($(OS),Ubuntu)
 CFLAGS +=-DUBUNTU
-else
-CFLAGS +=-Wno-gnu-zero-variadic-macro-arguments
 endif
 
 #Hardening
@@ -279,13 +281,15 @@ endif
 ################## CONFIGURE BACKEND BouncyCastle ########
 
 ifeq (bouncycastle,$(firstword $(MAKECMDGOALS)))
-	BC_DEVEL_DIR := /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.275.b01-6.fc33.x86_64
+	BC_DEVEL_DIR := /usr/lib/jvm/default
+	BC_JAVAC := $(BC_DEVEL_DIR)/bin/javac
 	BC_BACKEND_DIR := ${CURDIR}/backend_interfaces/bouncycastle
-	BC_LIB_FILE := /usr/share/java/bcprov.jar
+	BC_LIB_FILE := bc-fips-1.0.2.3.jar
 
 	CFLAGS += -Wno-pedantic -DBC_BACKEND_DIR=\"$(BC_BACKEND_DIR)\" -DBC_LIB_FILE=\"$(BC_LIB_FILE)\"
 	C_SRCS += backends/backend_bouncycastle.c
 	INCLUDE_DIRS += $(BC_DEVEL_DIR)/include $(BC_DEVEL_DIR)/include/linux
+	LIBRARY_DIRS += $(BC_DEVEL_DIR)/lib/server
 	LIBRARY_DIRS += $(BC_DEVEL_DIR)/jre/lib/amd64/server
 	LIBRARIES += jvm
 endif
@@ -325,6 +329,13 @@ ifeq (jent,$(firstword $(MAKECMDGOALS)))
 	LIBRARIES += pthread
 endif
 
+################## CONFIGURE BACKEND Leancrypto ################
+
+ifeq (leancrypto,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_leancrypto.c
+	LIBRARIES += leancrypto
+endif
+
 ######################################################
 
 ################## CONFIGURE BACKEND libsodium ########
@@ -344,10 +355,10 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent shlib shlib_static default files
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent leancrypto shlib shlib_static default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|shlib|shlib_static>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|leancrypto|shlib|shlib_static>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -375,10 +386,11 @@ libica: $(NAME)
 cpacf: $(NAME)
 lrng: $(NAME)
 jent: $(NAME)
+leancrypto: $(NAME)
 shlib: $(SHLIB_NAME)
 shlib_static: $(SHLIB_NAME_STATIC)
 bouncycastle: $(NAME)
-	javac -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
+	$(BC_JAVAC) -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 
 $(NAME): $(OBJS)
 	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)

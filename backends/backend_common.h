@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -36,11 +36,13 @@
 #include "parser_ecdsa.h"
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
+#include "parser_ansi_x963.h"
 #include "parser_kdf_tls.h"
 #include "parser_kdf_ssh.h"
 #include "parser_kdf_ikev1.h"
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
+#include "parser_kdf_srtp.h"
 #include "parser_pbkdf.h"
 #include "parser_hkdf.h"
 #include "parser_rsa.h"

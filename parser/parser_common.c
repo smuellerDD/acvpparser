@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2021, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -97,7 +97,6 @@ static void vector_free_entry(const struct json_entry *entry)
 		array->arraysize = 0;
 		break;
 	case PARSER_UINT:
-	case PARSER_UINT64:
 	case WRITER_UINT:
 	case PARSER_UINT_RANDOM:
 	case PARSER_BOOL:
@@ -109,6 +108,8 @@ static void vector_free_entry(const struct json_entry *entry)
 		       entry->name, data->datatype);
 		*data->data.integer = 0;
 		break;
+
+	case PARSER_UINT64:
 	case PARSER_CIPHER:
 		logger(LOGGER_DEBUG, "Freeing entry %s with data type %d\n",
 		       entry->name, data->datatype);
@@ -415,6 +416,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(tls13)
 			CB_HANDLER(kmac)
 			CB_HANDLER(ansi_x963)
+			CB_HANDLER(kdf_srtp)
+			CB_HANDLER(cshake)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -588,6 +591,8 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_KDF_TYPE_IKEV2, {.string = "ikev2"}, "IKEv2 KDF"},
 	{FLAG_OP_KDF_TYPE_IKEV1, {.string = "ikev1"}, "IKEv1 KDF"},
 	{FLAG_OP_KDF_TYPE_SSH, {.string = "ssh"}, "SSHv2 KDF"},
+	{FLAG_OP_KDF_TYPE_ANSI_X963, {.string = "ansix9.63"}, "ANSI X9.63 KDF"},
+	{FLAG_OP_KDF_TYPE_SRTP, {.string = "srtp"}, "SRTP KDF"},
 
 	{0, {NULL}, NULL}
 };
@@ -602,9 +607,9 @@ static const struct parser_flagsconv flagsconv_rsarandpq[] = {
 	{0, {NULL}, NULL}
 };
 
-/* Flags conversion for RSA keyType */
-static const struct parser_flagsconv flagsconv_rsakeytype[] = {
-	{FLAG_OP_RSA_CRT, {.string = "crt"}, "RSA CRT key type"},
+/* Flags conversion for RSA keyFormat */
+static const struct parser_flagsconv flagsconv_rsakeyformat[] = {
+	{FLAG_OP_RSA_CRT, {.string = "crt"}, "RSA CRT key format"},
 	{0, {NULL}, NULL}
 };
 
@@ -652,7 +657,7 @@ static const struct parser_flagsconv flagsconv_dsa_mode[] = {
 	{0, {NULL}, NULL}
 };
 
-/* Flags conversino for ECDH and DH schema */
+/* Flags conversion for ECDH and DH schema */
 static const struct parser_flagsconv flagsconv_scheme[] = {
 	{FLAG_OP_ECDH_SCHEME_FULL_UNIFIED, {.string = "fullUnified"}, "Full Unified"},
 	{FLAG_OP_ECDH_SCHEME_FULL_MQV, {.string = "fullMqv"}, "ECDH full MQV"},
@@ -729,8 +734,8 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 			flagsconv_rsarandpq);
 	parse_flagblock(obj, parsed_flags, "sigType", json_type_string,
 			flagsconv_rsasigtype);
-	parse_flagblock(obj, parsed_flags, "keyType", json_type_string,
-			flagsconv_rsakeytype);
+	parse_flagblock(obj, parsed_flags, "keyFormat", json_type_string,
+			flagsconv_rsakeyformat);
 #if 0
 	parse_flagblock(obj, parsed_flags, "primeTest", flagsconv_rsaprimetest);
 #endif
