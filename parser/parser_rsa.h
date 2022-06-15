@@ -229,12 +229,14 @@ struct rsa_signature_primitive_data {
 	struct buffer n;
 	struct buffer d;
 	struct buffer e;
-#if 0
+#if 1
 	union {
 		struct rsa_regular {
 			struct buffer d;
 		} rsa_regular;
 		struct rsa_crt {
+			struct buffer p;
+			struct buffer q;
 			struct buffer dmp1;
 			struct buffer dmq1;
 			struct buffer iqmp;

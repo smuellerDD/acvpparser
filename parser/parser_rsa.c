@@ -527,8 +527,12 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 		{"e",		{.data.buf = &rsa_signature_primitive_vector.e, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
-#if 0
+#if 1
 		/* d is marked optional in case of CRT */
+		{"p",		{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.p, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"q",		{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.q, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
 		{"d",		{.data.buf = &rsa_signature_primitive_vector.u.rsa_regular.d, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OPTIONAL},
 		{"dmp1",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.dmp1, PARSER_BIN},
