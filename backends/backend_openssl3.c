@@ -2472,3 +2472,610 @@ static void openssl_ecdsa_backend(void)
 {
 	register_ecdsa_impl(&openssl_ecdsa);
 }
+
+static int rsa_create_pkey(EVP_PKEY **pkey,
+						const unsigned char *n, size_t n_len,
+						const unsigned char *e, size_t e_len,
+						const unsigned char *d, size_t d_len,
+						BN_CTX *bn_ctx)
+{
+	int ret = 0;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	unsigned char *n1 = NULL, *e1 = NULL, *d1 = NULL;
+	size_t n_len1 = 0, e_len1 = 0, d_len1 = 0;
+	BIGNUM *e_bn = NULL, *n_bn = NULL, *d_bn= NULL;
+
+	bld = OSSL_PARAM_BLD_new();
+	n_bn = BN_CTX_get(bn_ctx);
+	BN_bin2bn(n, n_len, n_bn);
+	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, n_bn);
+
+	if (e != NULL) {
+		e_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(e, e_len, e_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, e_bn);
+	}
+	if (d != NULL) {
+		d_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(d, d_len, d_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D, d_bn);
+	}
+
+	params = OSSL_PARAM_BLD_to_param(bld);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+	CKINT_O(EVP_PKEY_fromdata_init(ctx));
+	CKINT_O(EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_KEYPAIR, params));
+
+
+	pkey_get_bn_bytes(*pkey, OSSL_PKEY_PARAM_RSA_N,  &n1, &n_len1);
+	pkey_get_bn_bytes(*pkey, OSSL_PKEY_PARAM_RSA_E, &e1, &e_len1);
+	pkey_get_bn_bytes(*pkey, OSSL_PKEY_PARAM_RSA_D, &d1, &d_len1);
+	logger_binary(LOGGER_DEBUG, n1, n_len1, "N");
+	logger_binary(LOGGER_DEBUG, e1, e_len1, "E");
+	logger_binary(LOGGER_DEBUG, d1, d_len1, "D");
+out:
+	if(params)
+		OSSL_PARAM_free(params);
+	if(bld)
+		OSSL_PARAM_BLD_free(bld);
+	return ret;
+}
+
+static int rsa_create_pkey_crt(EVP_PKEY **pkey,
+						const unsigned char *n, size_t n_len,
+						const unsigned char *e, size_t e_len,
+						const unsigned char *p, size_t p_len,
+						const unsigned char *q, size_t q_len,
+						const unsigned char *dmp1, size_t dmp1_len,
+						const unsigned char *dmq1, size_t dmq1_len,
+						const unsigned char *iqmp, size_t iqmp_len,
+						BN_CTX *bn_ctx)
+{
+	int ret = 0, temp = 0;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	BIGNUM *e_bn = NULL, *n_bn = NULL, *p_bn= NULL, *q_bn= NULL, *dmp1_bn= NULL, *dmq1_bn= NULL, *iqmp_bn= NULL;
+	bld = OSSL_PARAM_BLD_new();
+	n_bn = BN_CTX_get(bn_ctx);
+	BN_bin2bn(n, n_len, n_bn);
+	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, n_bn);
+
+	if (e != NULL) {
+		e_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(e, e_len, e_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, e_bn);
+	}
+	if (p != NULL) {
+		p_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(p, p_len, p_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1, p_bn);
+	}
+	if (q != NULL) {
+		q_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(q, q_len, q_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2, q_bn);
+	}
+	if (dmp1 != NULL) {
+		dmp1_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(dmp1, dmp1_len, dmp1_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT1, dmp1_bn);
+	}
+	if (dmq1 != NULL) {
+		dmq1_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(dmq1, dmq1_len, dmq1_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_EXPONENT2, dmq1_bn);
+	}
+	if (iqmp != NULL) {
+		iqmp_bn = BN_CTX_get(bn_ctx);
+		BN_bin2bn(iqmp, iqmp_len, iqmp_bn);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, iqmp_bn);
+	}
+	if(p != NULL && q != NULL){
+		BIGNUM *d_bn = BN_dup(n_bn);
+		BN_sub(d_bn, d_bn, p_bn);
+		BN_sub(d_bn, d_bn, q_bn);
+		BN_add_word(d_bn, 1);
+		BN_mod_inverse(d_bn, e_bn, d_bn, bn_ctx);
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D, d_bn);
+	}
+
+	params = OSSL_PARAM_BLD_to_param(bld);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", "fips=yes");
+	EVP_PKEY_fromdata_init(ctx);
+	CKINT_O(EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_KEYPAIR, params));
+
+out:
+	return ret;
+}
+
+/************************************************
+ * CMAC/HMAC cipher interface functions
+ ************************************************/
+@@ -2569,3 +2692,498 @@ static void openssl_ecdsa_backend(void)
+{
+	register_ecdsa_impl(&openssl_ecdsa);
+}
+
+
+/************************************************
+ * RSA interface functions
+ ************************************************/
+
+#define RSA 		EVP_PKEY
+#define RSA_free(a)		EVP_PKEY_free(a)
+#define EVP_DigestSignInit(a,b,c,d,e)		EVP_DigestSignInit_ex(a,b,EVP_MD_name(c),NULL,NULL,e,NULL)
+#define EVP_DigestVerifyInit(a,b,c,d,e)		EVP_DigestVerifyInit_ex(a,b,EVP_MD_name(c),NULL,NULL,e,NULL)
+
+static int openssl_rsa_keygen_prime(struct rsa_keygen_prime_data *data,
+					flags_t parsed_flags)
+{
+	BIGNUM *e = NULL, *p = NULL, *q = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pkey = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	if (!data->e.len) {
+		logger(LOGGER_WARN, "RSA E missing\n");
+		return -EINVAL;
+	}
+
+	bld = OSSL_PARAM_BLD_new();
+	logger_binary(LOGGER_DEBUG, data->e.buf, data->e.len, "e");
+	logger_binary(LOGGER_DEBUG, data->p.buf, data->p.len, "p");
+	logger_binary(LOGGER_DEBUG, data->q.buf, data->q.len, "q");
+
+	e = BN_bin2bn((const unsigned char *) data->e.buf, (int)data->e.len, e);
+	CKNULL(e, -ENOMEM);
+
+	p = BN_bin2bn((const unsigned char *) data->p.buf, (int)data->p.len, p);
+	CKNULL(p, -ENOMEM);
+	if (BN_is_zero(p))
+		BN_one(p);
+	q = BN_bin2bn((const unsigned char *)data->q.buf, (int)data->q.len, q);
+	CKNULL(q, -ENOMEM);
+	OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, e);
+	if (p != NULL) {
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1, p);
+	}
+	if (q != NULL) {
+		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2, q);
+	}
+	params = OSSL_PARAM_BLD_to_param(bld);
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+	EVP_PKEY_keygen_init(ctx);
+	ret = EVP_PKEY_CTX_set_params(ctx, params);
+	data->keygen_success = 1;
+
+	if(EVP_PKEY_generate(ctx, &pkey) <= 0 || BN_check_prime(p, NULL, NULL) <= 0 || BN_check_prime(q, NULL, NULL) <= 0)
+		data->keygen_success = 0;
+
+out:
+	if(params)
+		OSSL_PARAM_free(params);
+	if(bld)
+		OSSL_PARAM_BLD_free(bld);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+int openssl_rsa_keygen_internal(struct buffer *ebuf, uint32_t modulus,
+					EVP_PKEY **outkey, struct buffer *nbuf,
+					struct buffer *dbuf, struct buffer *pbuf,
+					struct buffer *qbuf)
+{
+	BIGNUM *e = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	EVP_PKEY *pkey = NULL;
+	size_t p_len = 0, q_len = 0, egen_len = 0, d_len = 0, n_len = 0;
+	unsigned int retry = 0;
+	int ret = 0,temp = 0;
+	unsigned char *n = NULL, *p = NULL, *q = NULL, *d = NULL, *egen = NULL;
+
+	if (!ebuf->len) {
+		unsigned int a;
+		uint8_t bitsset = 0;
+
+		/* WARNING Buffer must be at least 3 bytes in size ! */
+		CKINT(alloc_buf(sizeof(unsigned int), ebuf));
+
+		/* generate random odd e */
+		RAND_bytes(ebuf->buf, (int)ebuf->len);
+		/* make sure it is odd */
+		ebuf->buf[ebuf->len - 1] |= 1;
+
+		for (a = 0; a < ebuf->len - 2; a++)
+			bitsset |= ebuf->buf[a];
+
+		/* Make sure that value is >= 65537 */
+		if (!bitsset)
+			ebuf->buf[ebuf->len - 3] |= 1;
+	}
+
+	logger(LOGGER_DEBUG, "modulus: %u\n", modulus);
+	logger_binary(LOGGER_DEBUG, ebuf->buf, ebuf->len, "e");
+
+#if 1
+	e = BN_bin2bn((const unsigned char *)ebuf->buf, (int)ebuf->len, e);
+	CKNULL(e, -ENOMEM);
+#else
+	e = BN_new();
+	CKNULL(e, -ENOMEM);
+	if (1 != BN_set_word(e, 65537)) {
+		logger(LOGGER_WARN, "BN_set_word() failed");
+		ret = -EFAULT;
+		goto out;
+	}
+#endif
+	do {
+		ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
+		EVP_PKEY_keygen_init(ctx);
+		EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, (int)modulus);
+		EVP_PKEY_CTX_set1_rsa_keygen_pubexp(ctx, e);
+		temp = EVP_PKEY_keygen(ctx, &pkey);
+		retry++;
+	} while (temp != 1 && retry < 100);
+	CKINT_O_LOG(temp, "RSA_generate_key_ex() failed: %s\n",
+				ERR_error_string(ERR_get_error(), NULL));
+
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_FACTOR1,
+										&p, &p_len);
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_FACTOR2,
+										&q, &q_len);
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_N,
+										&n, &n_len);
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_D,
+										&d, &d_len);
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_E,
+										&egen, &egen_len);
+
+	if (nbuf){
+		nbuf->buf =n;
+		nbuf->len = n_len;
+	}
+	if (dbuf){
+		dbuf->buf =d;
+		dbuf->len = d_len;
+	}
+	if (pbuf){
+		pbuf->buf =p;
+		pbuf->len = p_len;
+	}
+	if (qbuf){
+		qbuf->buf =q;
+		qbuf->len = q_len;
+	}
+
+	logger_binary(LOGGER_DEBUG, egen, egen_len, "egen");
+	logger_binary(LOGGER_DEBUG, ebuf->buf, ebuf->len, "ebuf");
+	if (outkey) {
+		*outkey = pkey;
+		pkey = NULL;
+	}
+
+out:
+	if (e)
+		BN_free(e);
+	if(bld)
+		OSSL_PARAM_BLD_free(bld);
+	if(ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_rsa_keygen(struct rsa_keygen_data *data,
+				flags_t parsed_flags)
+{
+	(void)parsed_flags;
+
+	return openssl_rsa_keygen_internal(&data->e, data->modulus, NULL,
+					&data->n, &data->d, &data->p,
+					&data->q);
+}
+
+static int openssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus,
+				void **privkey, struct buffer *nbuf)
+{
+	return openssl_rsa_keygen_internal(ebuf, modulus, (RSA **)privkey, nbuf,
+					NULL, NULL, NULL);
+}
+
+static void openssl_rsa_free_key(void *privkey)
+{
+	RSA *rsa = (RSA *)privkey;
+
+	if (rsa)
+		RSA_free(rsa);
+}
+
+static int openssl_rsa_siggen(struct rsa_siggen_data *data,
+				flags_t parsed_flags)
+{
+	const EVP_MD *md = NULL;
+	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
+	EVP_PKEY *pk = NULL;
+	size_t siglen = 0;
+	int ret = 0;
+
+	if (!data->privkey) {
+		logger(LOGGER_ERR, "Private key missing\n");
+		return -EINVAL;
+	}
+
+	CKINT(openssl_md_convert(data->cipher, &md));
+
+	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
+
+	pk = data->privkey;
+	CKNULL(pk, -ENOMEM);
+
+	CKINT(alloc_buf((size_t)EVP_PKEY_size(pk), &data->sig));
+	siglen = data->sig.len;
+
+	ctx = EVP_MD_CTX_create();
+	CKNULL(ctx, -ENOMEM);
+
+	CKINT_O_LOG(EVP_DigestSignInit(ctx, &pctx, md, NULL, pk),
+			"EVP_DigestSignInit failed: %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PSS_PADDING),
+				"Setting PSS type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx,
+						data->saltlen),
+				"Setting salt length to %u failed: %s\n",
+				data->saltlen,
+				ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_X931_PADDING),
+				"Setting X9.31 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	if(parsed_flags & FLAG_OP_RSA_SIG_PKCS15) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PADDING),
+				"Setting PKCS1 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	CKINT_O_LOG(EVP_DigestSignUpdate(ctx, data->msg.buf, data->msg.len),
+			"EVP_DigestSignUpdate failed: %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+
+	CKINT_O_LOG(EVP_DigestSignFinal(ctx, data->sig.buf, &siglen),
+			"EVP_DigestSignFinal failed: %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+
+	logger_binary(LOGGER_DEBUG, data->sig.buf, data->sig.len, "sig");
+
+out:
+	if (ctx)
+		EVP_MD_CTX_destroy(ctx);
+
+	return ret;
+}
+
+static int openssl_rsa_sigver(struct rsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	const EVP_MD *md = NULL;
+	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
+	BN_CTX *bn_ctx = NULL;
+	EVP_PKEY *pk = NULL;
+	int ret = 0;
+
+	if (!data->n.len || !data->e.len) {
+		logger(LOGGER_WARN, "RSA N or E missing\n");
+		return -EINVAL;
+	}
+
+	CKINT(left_pad_buf(&data->n, data->modulus / 8));
+	CKINT(left_pad_buf(&data->sig, data->modulus / 8));
+
+	CKINT(openssl_md_convert(data->cipher, &md));
+
+	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
+
+	bn_ctx = BN_CTX_new();
+	ret = rsa_create_pkey(&pk, data->n.buf, data->n.len, data->e.buf, data->e.len, NULL, 0, bn_ctx);
+	CKNULL(pk, -ENOMEM);
+
+	ctx = EVP_MD_CTX_create();
+	CKNULL(ctx, -ENOMEM);
+
+	CKINT_O(EVP_DigestVerifyInit(ctx, &pctx, md, NULL, pk));
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PSS_PADDING),
+				"Setting PSS type failed: %s\n",
+				ERR_error_string(ERR_get_error(), NULL));
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx,
+						data->saltlen),
+				"Setting salt length to %u failed: %s\n",
+				data->saltlen,
+				ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_X931_PADDING),
+				"Setting X9.31 type failed: %s\n",
+				ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	if(parsed_flags & FLAG_OP_RSA_SIG_PKCS15) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pctx,
+						RSA_PKCS1_PADDING),
+				"Setting PKCS1 type failed: %s\n", ERR_error_string(ERR_get_error(), NULL));
+	}
+
+	CKINT_O(EVP_DigestVerifyUpdate(ctx, data->msg.buf, data->msg.len));
+
+	ret = EVP_DigestVerifyFinal(ctx, data->sig.buf, data->sig.len);
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sig_result = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		data->sig_result = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN,
+			"Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (ctx)
+		EVP_MD_CTX_destroy(ctx);
+	if (pk)
+		EVP_PKEY_free(pk);
+	/* n and e do not need to be freed as they belong to the RSA context. */
+
+	return ret;
+}
+
+static int openssl_rsa_signature_primitive(struct rsa_signature_primitive_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	size_t outlen;
+	EVP_PKEY *pkey = NULL;
+	int ret = 0, temp = 0;
+	unsigned char *n = NULL, *e = NULL;
+	size_t n_len = 0, e_len = 0;
+
+	(void)parsed_flags;
+
+	BN_CTX *bn_ctx = NULL;
+	bn_ctx = BN_CTX_new();
+	logger_binary(LOGGER_DEBUG, data->n.buf, data->n.len, "N");
+	logger_binary(LOGGER_DEBUG, data->d.buf, data->d.len, "D");
+
+	CKINT_LOG(rsa_create_pkey_crt(&pkey, data->n.buf, data->n.len, data->e.buf, data->e.len, data->u.rsa_crt.p.buf, data->u.rsa_crt.p.len,
+							data->u.rsa_crt.q.buf, data->u.rsa_crt.q.len, data->u.rsa_crt.dmp1.buf, data->u.rsa_crt.dmp1.len, 
+							data->u.rsa_crt.dmq1.buf, data->u.rsa_crt.dmq1.len, data->u.rsa_crt.iqmp.buf, data->u.rsa_crt.iqmp.len, bn_ctx),
+							"pkey generation failed\n");
+	CKNULL(pkey, -ENOMEM);
+
+	CKNULL_LOG(pkey, -EFAULT, "Cannot allocate PKEY\n");
+
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_N,  &n, &n_len);
+	pkey_get_bn_bytes(pkey, OSSL_PKEY_PARAM_RSA_E, &e, &e_len);
+	logger_binary(LOGGER_DEBUG, n, n_len, "N");
+	logger_binary(LOGGER_DEBUG, e, e_len, "E");
+
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, "");
+
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+	CKINT_O_LOG(EVP_PKEY_encrypt_init(ctx), "PKEY decrypt init failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
+		    "Disabling padding failed\n");
+
+	/* Determine buffer length */
+	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &outlen, data->msg.buf,
+					data->msg.len),
+			"Getting Ciphertext length failed\n");
+
+	CKINT(alloc_buf(outlen, &data->signature));
+
+	temp = EVP_PKEY_encrypt(ctx, data->signature.buf, &outlen, data->msg.buf,
+				data->msg.len);
+
+	if (temp == 1) {
+		logger(LOGGER_DEBUG, "signature successful\n");
+	} else {
+		logger(LOGGER_DEBUG, "signature failed %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+	}
+
+out:
+	if (pkey)
+		EVP_PKEY_free(pkey);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int
+openssl_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *key = NULL;
+	size_t outlen = 0;
+	int ret = 0, temp=0;
+
+	(void)parsed_flags;
+
+	key = data->privkey;
+	CKNULL_LOG(key, -EFAULT, "Cannot allocate PKEY\n");
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, "");
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
+
+	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx), "PKEY decrypt init failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
+			"Disabling padding failed\n")
+
+	/* Determine buffer length */
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, data->msg.buf,
+					data->msg.len),
+			"Getting plaintext length failed\n");
+
+	CKINT(alloc_buf(outlen, &data->s));
+
+	temp = EVP_PKEY_decrypt(ctx, data->s.buf, &outlen, data->msg.buf,
+				data->msg.len);
+	if (temp == 1) {
+		logger(LOGGER_DEBUG, "Decryption successful\n");
+		data->dec_result = 1;
+	} else {
+		logger(LOGGER_DEBUG, "Decryption failed %s\n",
+			ERR_error_string(ERR_get_error(), NULL));
+		data->dec_result = 0;
+	}
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static struct rsa_backend openssl_rsa =
+{
+	openssl_rsa_keygen,     /* rsa_keygen */
+	openssl_rsa_siggen,     /* rsa_siggen */
+	openssl_rsa_sigver,     /* rsa_sigver */
+	openssl_rsa_keygen_prime,              /* rsa_keygen_prime */
+	NULL,		        /* rsa_keygen_prov_prime */
+	openssl_rsa_keygen_en,
+	openssl_rsa_free_key,
+	openssl_rsa_signature_primitive,
+	openssl_rsa_decryption_primitive,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_rsa_backend)
+static void openssl_rsa_backend(void)
+{
+	register_rsa_impl(&openssl_rsa);
+}
