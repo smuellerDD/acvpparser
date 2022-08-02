@@ -349,8 +349,19 @@ exec_module()
 					echo_deact "Operation not supported for $dir"
 				elif [ $ret -ne 0 ]
 				then
-					echo_fail "Execution for $dir failed (error code $ret) - executed command:"
-					echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_RESP"
+                    if [ -z "$DEBUG_FAILED_OUTPUT" ]; then
+					    echo_fail "Execution for $dir failed (error code $ret) - executed command:"
+					    echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_RESP"
+                    else
+                        [ -z "$DEBUG_FAILED_VERBOSITY" ] && DEBUG_FAILED_VERBOSITY="-v"
+                        echo_fail "Execution for $dir failed (error code $ret) - Verbose ($DEBUG_FAILED_VERBOSITY) output stored in $DEBUG_FAILED_OUTPUT"
+					    echo "$_LIB_EXEC $dir/$_LIB_REQ $dir/$_LIB_RESP" >>$DEBUG_FAILED_OUTPUT
+                        $_LIB_EXEC $DEBUG_FAILED_VERBOSITY $dir/$_LIB_REQ $dir/$_LIB_RESP >>$DEBUG_FAILED_OUTPUT 2>&1
+				        echo "" >>$DEBUG_FAILED_OUTPUT
+
+                        # De-colorize.
+                        sed -i 's/\x1b\[[0-9;]*m//g' $DEBUG_FAILED_OUTPUT
+                    fi
 				else
 					echo_pass "Processed $dir"
 				fi
