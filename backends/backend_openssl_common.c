@@ -414,7 +414,7 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 	case ACVP_SHA512:
 		l_type = EVP_sha512();
 		break;
-#ifdef OPENSSL_30X
+#ifdef OPENSSL_SHA512_TRUNCATED
 	case ACVP_HMACSHA2_512224:
 	case ACVP_SHA512224:
 		l_type = EVP_sha512_224();
@@ -424,7 +424,7 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type)
 		l_type = EVP_sha512_256();
 		break;
 #endif
-#ifdef OPENSSL_SSH_SHA3
+#ifdef OPENSSL_SHA3
 	case ACVP_HMACSHA3_224:
 	case ACVP_SHA3_224:
 		l_type = EVP_sha3_224();
@@ -540,72 +540,72 @@ out:
 	return ret;
 }
 
-int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char *digest)
+int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
 {
 	int nid;
-	char dgst[50];
+	char *name;
 	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
 
 	switch (curve & ACVP_CURVEMASK) {
 		case ACVP_NISTB163:
 			nid = NID_sect163r2;
-			strcpy(dgst, "B-163");
+			name = "B-163";
 			break;
 		case ACVP_NISTK163:
 			nid = NID_sect163k1;
-			strcpy(dgst, "K-163");
+			name = "K-163";
 			break;
 		case ACVP_NISTB233:
 			nid = NID_sect233r1;
-			strcpy(dgst, "B-233");
+			name = "B-233";
 			break;
 		case ACVP_NISTK233:
 			nid = NID_sect233k1;
-			strcpy(dgst, "K-233");
+			name = "K-233";
 			break;
 		case ACVP_NISTB283:
 			nid = NID_sect283r1;
-			strcpy(dgst, "B-283");
+			name = "B-283";
 			break;
 		case ACVP_NISTK283:
 			nid = NID_sect283k1;
-			strcpy(dgst, "K-283");
+			name = "K-283";
 			break;
 		case ACVP_NISTB409:
 			nid = NID_sect409r1;
-			strcpy(dgst, "B-409");
+			name = "B-409";
 			break;
 		case ACVP_NISTK409:
 			nid = NID_sect409k1;
-			strcpy(dgst, "K-409");
+			name = "K-409";
 			break;
 		case ACVP_NISTB571:
 			nid = NID_sect571r1;
-			strcpy(dgst, "B-571");
+			name = "B-571";
 			break;
 		case ACVP_NISTK571:
 			nid = NID_sect571k1;
-			strcpy(dgst, "K-571");
+			name = "K-571";
 			break;
 		case ACVP_NISTP192:
 			nid = NID_X9_62_prime192v1;
-			strcpy(dgst, "P-192");
+			name = "P-192";
 			break;
 		case ACVP_NISTP224:
 			nid = NID_secp224r1;
-			strcpy(dgst, "P-224");
+			name = "P-224";
 			break;
 		case ACVP_NISTP256:
 			nid = NID_X9_62_prime256v1;
-			strcpy(dgst, "P-256");
+			name = "P-256";
 			break;
 		case ACVP_NISTP384:
 			nid = NID_secp384r1;
-			strcpy(dgst, "P-384");
+			name = "P-384";
 			break;
 		case ACVP_NISTP521:
 			nid = NID_secp521r1;
-			strcpy(dgst, "P-521");
+			name = "P-521";
 			break;
 		default:
 			logger(LOGGER_ERR, "Unknown curve\n");
@@ -613,13 +613,13 @@ int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char *digest)
 	}
 
 	*out_nid = nid;
-	if(digest != NULL){
-		strcpy(digest, dgst);
+	if (curve_name != NULL) {
+		*curve_name = name;
 	}
 	return 0;
 }
 
-#ifdef OPENSSL_SSH_SHA3
+#ifdef OPENSSL_SHA3
 static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
 {
 	return EVP_DigestFinalXOF(ctx, md, size);
@@ -657,6 +657,33 @@ static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
 	CKINT_O_LOG(ret, "Cipher init failed\n");
 
 	EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+#ifdef OPENSSL_30X
+	char *cts_mode;
+	switch (data->cipher) {
+		case ACVP_CBC_CS1:
+			cts_mode = "CS1";
+			break;
+		case ACVP_CBC_CS2:
+			cts_mode = "CS2";
+			break;
+		case ACVP_CBC_CS3:
+			cts_mode = "CS3";
+			break;
+		default:
+			cts_mode = NULL;
+			break;
+	}
+
+	if (cts_mode) {
+		OSSL_PARAM params[2];
+		params[0] = OSSL_PARAM_construct_utf8_string(OSSL_CIPHER_PARAM_CTS_MODE,
+							     cts_mode, 0);
+		params[1] = OSSL_PARAM_construct_end();
+		CKINT_O_LOG(EVP_CIPHER_CTX_set_params(ctx, params),
+			    "EVP_CIPHER_CTX_set_params failed\n");
+	}
+#endif
 
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");
@@ -1520,6 +1547,102 @@ static void openssl_pbkdf_backend(void)
 	register_pbkdf_impl(&openssl_pbkdf);
 }
 
+#ifdef OPENSSL_SSH_KDF
+#include <openssl/ssl.h>
+#include <openssl/kdf.h>
+/************************************************
+ * TLS 1.2 KDF cipher interface functions
+ ************************************************/
+static int openssl_tls12_op(struct tls12_data *data, flags_t parsed_flags)
+{
+	EVP_PKEY_CTX *pctx = NULL;
+	const EVP_MD *md;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_md_convert(data->hashalg, &md));
+
+	/* Special case */
+	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1)
+		md = EVP_get_digestbynid(NID_md5_sha1);
+
+	CKNULL_LOG(md, -EFAULT, "Cipher implementation not found\n");
+
+	CKINT(alloc_buf(data->pre_master_secret.len, &data->master_secret));
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
+	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
+
+	CKINT_O(EVP_PKEY_derive_init(pctx));
+	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
+	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
+						  data->pre_master_secret.buf,
+						  (int)data->pre_master_secret.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+			(unsigned char *)TLS_MD_EXTENDED_MASTER_SECRET_CONST,
+			TLS_MD_EXTENDED_MASTER_SECRET_CONST_SIZE));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->session_hash.buf,
+						(int)data->session_hash.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_derive(pctx, data->master_secret.buf,
+				&data->master_secret.len));
+
+	logger_binary(LOGGER_DEBUG, data->master_secret.buf,
+		      data->master_secret.len, "master_secret");
+
+	EVP_PKEY_CTX_free(pctx);
+	pctx = NULL;
+
+	CKINT(alloc_buf(data->key_block_length / 8, &data->key_block));
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
+	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
+
+	CKINT_O(EVP_PKEY_derive_init(pctx));
+	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
+	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
+						  data->master_secret.buf,
+						  (int)data->master_secret.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+				(unsigned char *)TLS_MD_KEY_EXPANSION_CONST,
+				TLS_MD_KEY_EXPANSION_CONST_SIZE));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->server_random.buf,
+						(int)data->server_random.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
+						data->client_random.buf,
+						(int)data->client_random.len));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
+	CKINT_O(EVP_PKEY_derive(pctx, data->key_block.buf,
+				&data->key_block.len));
+
+	logger_binary(LOGGER_DEBUG, data->key_block.buf, data->key_block.len,
+		      "keyblock");
+
+	ret = 0;
+
+out:
+	EVP_PKEY_CTX_free(pctx);
+	return (ret);
+}
+
+static struct tls12_backend openssl_tls12 =
+{
+	openssl_tls12_op,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_tls12_backend)
+static void openssl_tls12_backend(void)
+{
+	register_tls12_impl(&openssl_tls12);
+}
+#endif
+
 #ifdef OPENSSL_ENABLE_TLS13
 #include <openssl/kdf.h>
 /************************************************
@@ -1546,11 +1669,11 @@ int openssl_hkdf_extract(const EVP_MD *md,
 
 	CKINT_O_LOG(EVP_PKEY_CTX_set_hkdf_md(pctx, md), "Setting MD failed\n");
 
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, key, keylen),
+	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, key, (int)keylen),
 		    "Setting HKDF key failed\n");
 
 
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, saltlen),
+	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_salt(pctx, salt, (int)saltlen),
 		    "Setting salt failed\n");
 
 	CKINT_O_LOG(EVP_PKEY_derive(pctx, secret, secretlen),
@@ -1582,10 +1705,10 @@ int openssl_hkdf_expand(const EVP_MD *md,
 
 	CKINT_O_LOG(EVP_PKEY_CTX_set_hkdf_md(pctx, md), "Setting MD failed\n");
 
-	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, secretlen),
+	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, secret, (int)secretlen),
 		    "Setting HKDF key failed\n");
 
-	CKINT_O_LOG(EVP_PKEY_CTX_add1_hkdf_info(pctx, fi, filen),
+	CKINT_O_LOG(EVP_PKEY_CTX_add1_hkdf_info(pctx, fi, (int)filen),
 		    "Setting fixed info string failed\n");
 
 	CKINT_O_LOG(EVP_PKEY_derive(pctx, dkm, dkmlen),
@@ -1785,12 +1908,9 @@ static int openssl_tls13_generate(struct tls13_data *data,
 	unsigned int mdbuflen;
 	int mdlen;
 
-	int ret;
+	(void)parsed_flags;
 
-	if (!(parsed_flags & FLAG_OP_TLS13_RUNNING_MODE_DHE)) {
-		logger(LOGGER_ERR, "Only DHE supported\n");
-		return -EOPNOTSUPP;
-	}
+	int ret;
 
 	CKINT(openssl_md_convert(data->hash, &md));
 	mdlen = EVP_MD_size(md);
@@ -1805,7 +1925,9 @@ static int openssl_tls13_generate(struct tls13_data *data,
 	CKINT(alloc_buf((size_t)mdlen, &data->resumption_master_secret));
 
 	/* Generate Early Secret without PSK */
-	CKINT_LOG(tls13_generate_secret(md, NULL, NULL, 0, secret),
+	CKINT_LOG(tls13_generate_secret(md, NULL,
+					data->psk.buf, data->psk.len,
+					secret),
 		  "Generation of Early Secret failed\n");
 
 	/* Generate secrets */
@@ -1936,3 +2058,70 @@ static void openssl_tls13_backend(void)
 }
 
 #endif /* OPENSSL_ENABLE_TLS13 */
+
+#ifdef OPENSSL_ENABLE_HKDF
+/************************************************
+ * SP800-56C rev1 cipher interface functions
+ ************************************************/
+static int openssl_hkdf_generate(struct hkdf_data *data,
+				 flags_t parsed_flags)
+{
+	BUFFER_INIT(local_dkm);
+	const EVP_MD *md = NULL;
+	uint8_t secret[EVP_MAX_MD_SIZE];
+	size_t mdlen;
+	uint32_t derived_key_bytes = data->dkmlen / 8;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_md_convert(data->hash & ACVP_HASHMASK, &md));
+	mdlen = (size_t)EVP_MD_size(md);
+
+	if (data->dkm.buf && data->dkm.len) {
+		CKINT(alloc_buf(derived_key_bytes, &local_dkm));
+	} else {
+		CKINT(alloc_buf(derived_key_bytes, &data->dkm));
+	}
+
+	/* Extract phase */
+	CKINT(openssl_hkdf_extract(md, data->z.buf, data->z.len,
+				   data->salt.buf, data->salt.len,
+				   secret, &mdlen));
+
+	/* Expand phase */
+	if (local_dkm.buf && local_dkm.len) {
+		CKINT(openssl_hkdf_expand(md, data->info.buf, data->info.len,
+					  secret, mdlen,
+					  local_dkm.buf, &local_dkm.len));
+
+		if (local_dkm.len != data->dkm.len ||
+		    memcmp(local_dkm.buf, data->dkm.buf, local_dkm.len)) {
+			logger(LOGGER_DEBUG, "HKDF validation result: fail\n");
+			data->validity_success = 0;
+		} else {
+			data->validity_success = 1;
+		}
+	} else {
+		CKINT(openssl_hkdf_expand(md, data->info.buf, data->info.len,
+					  secret, mdlen,
+					  data->dkm.buf, &data->dkm.len));
+	}
+
+out:
+	free_buf(&local_dkm);
+
+	return ret;
+}
+
+static struct hkdf_backend openssl_hkdf =
+{
+	openssl_hkdf_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_hkdf_backend)
+static void openssl_hkdf_backend(void)
+{
+	register_hkdf_impl(&openssl_hkdf);
+}
+#endif /* OPENSSL_ENABLE_HKDF */

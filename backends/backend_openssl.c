@@ -1221,6 +1221,8 @@ static void openssl_drbg_backend(void)
 	register_drbg_impl(&openssl_drbg);
 }
 
+#include <openssl/tls1.h>
+
 #ifdef OPENSSL_SSH_KDF
 #include <openssl/ssl.h>
 #include <openssl/kdf.h>
@@ -1317,96 +1319,6 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_kdf_tls_backend)
 static void openssl_kdf_tls_backend(void)
 {
 	register_kdf_tls_impl(&openssl_kdf_tls);
-}
-
-
-static int openssl_tls12_op(struct tls12_data *data, flags_t parsed_flags)
-{
-	EVP_PKEY_CTX *pctx = NULL;
-	const EVP_MD *md;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(openssl_md_convert(data->hashalg, &md));
-
-	/* Special case */
-	if ((data->hashalg & ACVP_HASHMASK) == ACVP_SHA1)
-		md = EVP_get_digestbynid(NID_md5_sha1);
-
-	CKNULL_LOG(md, -EFAULT, "Cipher implementation not found\n");
-
-	CKINT(alloc_buf(data->pre_master_secret.len, &data->master_secret));
-
-	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
-	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
-
-	CKINT_O(EVP_PKEY_derive_init(pctx));
-	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
-	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
-						  data->pre_master_secret.buf,
-						  data->pre_master_secret.len));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
-				TLS_MD_EXTENDED_MASTER_SECRET_CONST,
-				TLS_MD_EXTENDED_MASTER_SECRET_CONST_SIZE));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
-						data->session_hash.buf,
-						data->session_hash.len));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
-	CKINT_O(EVP_PKEY_derive(pctx, data->master_secret.buf,
-				&data->master_secret.len));
-
-	logger_binary(LOGGER_DEBUG, data->master_secret.buf,
-		      data->master_secret.len, "master_secret");
-
-	EVP_PKEY_CTX_free(pctx);
-	pctx = NULL;
-
-	CKINT(alloc_buf(data->key_block_length / 8, &data->key_block));
-
-	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
-	CKNULL_LOG(pctx, -EFAULT, "Cannot allocate TLS1 PRF\n");
-
-	CKINT_O(EVP_PKEY_derive_init(pctx));
-	CKINT_O(EVP_PKEY_CTX_set_tls1_prf_md(pctx, md));
-	CKINT_O(EVP_PKEY_CTX_set1_tls1_prf_secret(pctx,
-						  data->master_secret.buf,
-						  data->master_secret.len));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
-					TLS_MD_KEY_EXPANSION_CONST,
-					TLS_MD_KEY_EXPANSION_CONST_SIZE));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
-						data->server_random.buf,
-						data->server_random.len));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx,
-						data->client_random.buf,
-						data->client_random.len));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
-	CKINT_O(EVP_PKEY_CTX_add1_tls1_prf_seed(pctx, NULL, 0));
-	CKINT_O(EVP_PKEY_derive(pctx, data->key_block.buf,
-				&data->key_block.len));
-
-	logger_binary(LOGGER_DEBUG, data->key_block.buf, data->key_block.len,
-		      "keyblock");
-
-	ret = 0;
-
-out:
-	EVP_PKEY_CTX_free(pctx);
-	return (ret);
-}
-
-static struct tls12_backend openssl_tls12 =
-{
-	openssl_tls12_op,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(openssl_tls12_backend)
-static void openssl_tls12_backend(void)
-{
-	register_tls12_impl(&openssl_tls12);
 }
 
 /************************************************
@@ -4272,70 +4184,3 @@ static void openssl_kts_ifc_backend(void)
 {
 	register_kts_ifc_impl(&openssl_kts_ifc);
 }
-
-#ifdef OPENSSL_ENABLE_HKDF
-/************************************************
- * SP800-56C rev1 cipher interface functions
- ************************************************/
-static int openssl_hkdf_generate(struct hkdf_data *data,
-				 flags_t parsed_flags)
-{
-	BUFFER_INIT(local_dkm);
-	const EVP_MD *md = NULL;
-	uint8_t secret[EVP_MAX_MD_SIZE];
-	size_t mdlen;
-	uint32_t derived_key_bytes = data->dkmlen / 8;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(openssl_md_convert(data->hash & ACVP_HASHMASK, &md));
-	mdlen = (size_t)EVP_MD_size(md);
-
-	if (data->dkm.buf && data->dkm.len) {
-		CKINT(alloc_buf(derived_key_bytes, &local_dkm));
-	} else {
-		CKINT(alloc_buf(derived_key_bytes, &data->dkm));
-	}
-
-	/* Extract phase */
-	CKINT(openssl_hkdf_extract(md, data->z.buf, data->z.len,
-				   data->salt.buf, data->salt.len,
-				   secret, &mdlen));
-
-	/* Expand phase */
-	if (local_dkm.buf && local_dkm.len) {
-		CKINT(openssl_hkdf_expand(md, data->info.buf, data->info.len,
-					  secret, mdlen,
-					  local_dkm.buf, &local_dkm.len));
-
-		if (local_dkm.len != data->dkm.len ||
-		    memcmp(local_dkm.buf, data->dkm.buf, local_dkm.len)) {
-			logger(LOGGER_DEBUG, "HKDF validation result: fail\n");
-			data->validity_success = 0;
-		} else {
-			data->validity_success = 1;
-		}
-	} else {
-		CKINT(openssl_hkdf_expand(md, data->info.buf, data->info.len,
-					  secret, mdlen,
-					  data->dkm.buf, &data->dkm.len));
-	}
-
-out:
-	free_buf(&local_dkm);
-
-	return ret;
-}
-
-static struct hkdf_backend openssl_hkdf =
-{
-	openssl_hkdf_generate,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(openssl_hkdf_backend)
-static void openssl_hkdf_backend(void)
-{
-	register_hkdf_impl(&openssl_hkdf);
-}
-#endif /* OPENSSL_ENABLE_HKDF */

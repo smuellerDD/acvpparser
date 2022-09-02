@@ -1,3 +1,9 @@
+v2.1.5
+- enhancement: add support for KAS_IFC_SSC
+- enhancement: add DSA/ECDSA for OpenSSL 3
+- enhancement: add cSHAKE test support
+- enhancement: add OpenSSL3 support
+
 v2.1.4
 - enhancement: add OpenSSL DH keygen
 - enhancement: add regression test support for GCM internal IV, keyGen, sigGen, pqgGen, KAS-ECC, KAS-FFC, SP800-108 KDF

@@ -25,6 +25,9 @@
 
 #include "parser_common.h"
 
+#define ANSI_X942_DEF_CALLBACK_HELPER(flags, helper)				\
+			DEF_CALLBACK_HELPER(ansi_x942, ansi_x942, flags, helper)
+
 /******************************************************************************
  * ANSI X9.63 callback definitions
  ******************************************************************************/
@@ -347,6 +350,104 @@ static int kdf_tester_kdf_srtp(struct json_object *in, struct json_object *out,
 }
 
 /******************************************************************************
+ * ANSI X9.42 callback definitions
+ ******************************************************************************/
+static struct ansi_x942_backend *ansi_x942_backend = NULL;
+
+static int ansi_x942_helper(const struct json_array *processdata,
+			    flags_t parsed_flags,
+			    struct json_object *testvector,
+			    struct json_object *testresults,
+	int (*callback)(struct ansi_x942_data *vector, flags_t parsed_flags),
+			    struct ansi_x942_data *vector)
+{
+	const char *oid_buf;
+	size_t oid_len;
+	int ret;
+
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	if (vector->oid.len) {
+		oid_buf = (const char *)vector->oid.buf;
+		oid_len = vector->oid.len;
+
+		if (oid_len == strlen(OID_TDES) &&
+		    !strncmp(oid_buf, OID_TDES, oid_len)) {
+			vector->wrapalg = ACVP_TDESKW;
+		} else if (oid_len == strlen(OID_AES_128_KW) &&
+			!strncmp(oid_buf, OID_AES_128_KW, oid_len)) {
+			vector->wrapalg = ACVP_AES128;
+		} else if (oid_len == strlen(OID_AES_192_KW) &&
+			!strncmp(oid_buf, OID_AES_192_KW, oid_len)) {
+			vector->wrapalg = ACVP_AES192;
+		} else if (oid_len == strlen(OID_AES_256_KW) &&
+			!strncmp(oid_buf, OID_AES_256_KW, oid_len)) {
+			vector->wrapalg = ACVP_AES256;
+		} else {
+			logger_binary(LOGGER_WARN, vector->oid.buf, oid_len,
+				    "Unknown OID");
+		}
+	}
+
+	CKINT(callback(vector, parsed_flags));
+
+out:
+	return ret;
+}
+
+static int kdf_tester_ansi_x942(struct json_object *in, struct json_object *out,
+				uint64_t cipher)
+{
+	(void)cipher;
+
+	/**********************************************************************
+	 * ANSI X9.42 operation
+	 **********************************************************************/
+	ANSI_X942_DEF_CALLBACK_HELPER(FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942,
+				      ansi_x942_helper);
+
+	const struct json_entry ansi_x942_testresult_entries[] = {
+		{"derivedKey",		{.data.buf = &ansi_x942_vector.derived_key, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+	};
+	const struct json_testresult ansi_x942_testresult =
+		SET_ARRAY(ansi_x942_testresult_entries, &ansi_x942_callbacks);
+
+	const struct json_entry ansi_x942_test_entries[] = {
+		{"keyLen",		{.data.integer = &ansi_x942_vector.key_len, PARSER_UINT},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+		{"zz",			{.data.buf = &ansi_x942_vector.zz, PARSER_BIN},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+		{"partyUInfo",		{.data.buf = &ansi_x942_vector.party_u_info, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+		{"partyVInfo",		{.data.buf = &ansi_x942_vector.party_v_info, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+		{"suppPubInfo",		{.data.buf = &ansi_x942_vector.supp_pub_info, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+		{"suppPrivInfo",	{.data.buf = &ansi_x942_vector.supp_priv_info, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+		{"otherInfo"	,	{.data.buf = &ansi_x942_vector.other_info, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+	};
+
+	/* search for empty arrays */
+	const struct json_array ansi_x942_test = SET_ARRAY(ansi_x942_test_entries, &ansi_x942_testresult);
+
+	const struct json_entry ansi_x942_testgroup_entries[] = {
+		{"kdfType",		{.data.buf = &ansi_x942_vector.kdf_type, PARSER_STRING},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+		{"hashAlg",		{.data.largeint = &ansi_x942_vector.hashalg, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+		{"oid",			{.data.buf = &ansi_x942_vector.oid, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 | FLAG_OPTIONAL },
+		{"tests",		{.data.array = &ansi_x942_test, PARSER_ARRAY},			FLAG_OP_AFT | FLAG_OP_KDF_TYPE_ANSI_X942 },
+	};
+	const struct json_array ansi_x942_testgroup = SET_ARRAY(ansi_x942_testgroup_entries, NULL);
+
+	/**********************************************************************
+	 * KDF common test group
+	 **********************************************************************/
+	const struct json_entry ansi_x942_testanchor_entries[] = {
+		{"testGroups",			{.data.array = &ansi_x942_testgroup, PARSER_ARRAY},	FLAG_OP_KDF_TYPE_ANSI_X942 },
+	};
+	const struct json_array ansi_x942_testanchor = SET_ARRAY(ansi_x942_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&ansi_x942_testanchor, "1.0", in, out);
+}
+
+/******************************************************************************
  * KDF generic parser definitions
  ******************************************************************************/
 static int kdf_tester(struct json_object *in, struct json_object *out,
@@ -383,6 +484,10 @@ static int kdf_tester(struct json_object *in, struct json_object *out,
 	}
 	if (kdf_srtp_backend && !strncmp(mode, "srtp", 4)) {
 		CKINT(kdf_tester_kdf_srtp(in, out, cipher));
+		executed = true;
+	}
+	if (ansi_x942_backend && !strncmp(mode, "ansix9.42", 9)) {
+		CKINT(kdf_tester_ansi_x942(in, out, cipher));
 		executed = true;
 	}
 
@@ -443,4 +548,9 @@ void register_ansi_x963_impl(struct ansi_x963_backend *implementation)
 void register_kdf_srtp_impl(struct kdf_srtp_backend *implementation)
 {
 	register_backend(kdf_srtp_backend, implementation, "KDF_SRTP");
+}
+
+void register_ansi_x942_impl(struct ansi_x942_backend *implementation)
+{
+	register_backend(ansi_x942_backend, implementation, "ANSI_X9.42");
 }

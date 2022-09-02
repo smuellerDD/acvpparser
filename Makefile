@@ -323,7 +323,7 @@ endif
 
 ifeq (jent,$(firstword $(MAKECMDGOALS)))
 	JENT_SRC := /home/sm/hacking/sources/jitterentropy/jitterentropy-library
-	CFLAGS += -O0 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
+	CFLAGS += -O0 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -std=gnu11
 	C_SRCS += backends/backend_jent.c
 	INCLUDE_DIRS += $(JENT_SRC) $(JENT_SRC)/src
 	LIBRARIES += pthread
@@ -428,7 +428,7 @@ clean:
 	@- $(RM) $(wildcard *$(PARSERDIR)/json-c/*.plist)
 	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.plist)
 	@- $(RM) $(wildcard backends/*.plist)
-	@- $(RM) backend_interfaces/bouncycastle//bc_acvp.class
+	@- $(RM) backend_interfaces/bouncycastle//*.class
 	@- $(RM) acvpcert9.db acvpkey4.db
 
 distclean: clean

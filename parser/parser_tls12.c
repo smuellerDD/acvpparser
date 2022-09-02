@@ -35,6 +35,11 @@ static int kdf_tester_tls12(struct json_object *in, struct json_object *out,
 {
 	(void)cipher;
 
+	if (!tls12_backend) {
+		logger(LOGGER_WARN, "No TLS 1.2 backend set\n");
+		return -EOPNOTSUPP;
+	}
+
 	/**********************************************************************
 	 * KDF TLS operation
 	 **********************************************************************/

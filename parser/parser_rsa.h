@@ -34,7 +34,7 @@ extern "C"
  *	  for FIPS 186-4 B.3.3 tests as specified in the RSA CAVS specification
  *	  section 6.2.2.2.
  *
- * @var modulus [in] RSA modulus in bits
+ * @var modulus [in] RSA modulus size in bits
  * @var p [in] RSA P parameter
  * @var q [in] RSA Q parameter
  * @var e [in] RSA exponent
@@ -55,7 +55,7 @@ struct rsa_keygen_prime_data {
  *	  for FIPS 186-4 B.3.4/5/6 tests as specified in the RSA CAVS
  *	  specification section 6.2.2.1.
  *
- * @var modulus [in] RSA modulus in bits
+ * @var modulus [in] RSA modulus size in bits
  * @var n [out] RSA N parameter. Buffer must be allocated by module and is
  *		  released by parser.
  * @var d [out] RSA D parameter. Buffer must be allocated by module and is
@@ -300,7 +300,7 @@ struct rsa_decryption_primitive_data {
  * return 0 if the signature verification fails. Only if some general error is
  * detected a return code != must be returned.
  *
- * @var rsa_keygen RSA key generation for B.3.3 (CAVS test specification
+ * @var rsa_keygen RSA key generation for B.3.4/5/6 (CAVS test specification
  * 		     section 6.2.2.1)
  * @var rsa_siggen RSA signature generation
  * @var rsa_sigver RSA signature verification

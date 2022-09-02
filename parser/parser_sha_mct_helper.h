@@ -40,17 +40,18 @@ static inline int sha_ldt_helper(struct sha_data *data, struct buffer *msg_p)
 	int ret = 0;
 
 	if (data->ldt_expansion_size) {
+		size_t ldt_exp_bytes = data->ldt_expansion_size / 8;
 		size_t i, len = data->msg.len;
 
-		if (SIZE_MAX < data->ldt_expansion_size / 8) {
+		if (SIZE_MAX < ldt_exp_bytes) {
 			logger(LOGGER_ERR, "LDT size not supported on IUT\n");
 			return -EINVAL;
 		}
 
-		CKINT(alloc_buf(data->ldt_expansion_size / 8, msg_p));
+		CKINT(alloc_buf(ldt_exp_bytes, msg_p));
 		for (i = 0; i < msg_p->len; i += len) {
-			len = (data->ldt_expansion_size - i) < data->msg.len ?
-			      (data->ldt_expansion_size - i) : data->msg.len;
+			len = (ldt_exp_bytes - i) < data->msg.len ?
+			      (ldt_exp_bytes - i) : data->msg.len;
 
 			memcpy(msg_p->buf + i, data->msg.buf, len);
 		}
@@ -303,7 +304,6 @@ parser_cshake_inner_loop(struct cshake_data *data, flags_t parsed_flags,
 		outbits = be_bswap16(outbits);
 
 		/* New customization string */
-		memset(data->customization.buf, 0, data->customization.len);
 		new_cust_len = data->msg.len + sizeof(outbits);
 		free_buf(&data->customization);
 		CKINT_LOG(alloc_buf(new_cust_len, &data->customization),

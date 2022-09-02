@@ -164,7 +164,7 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 {
 	struct json_object *testresult = NULL, *resultsarray = NULL,
 			   *resultsobject = NULL;
-	static uint32_t failures = 1;
+	static uint32_t failures = 0;
 	unsigned int max;
 	int ret;
 	void *rsa_privkey = NULL;
@@ -174,7 +174,10 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	(void)testresults;
 
 	/* We try at most these many times times */
-	for (max = 0; max < 200; max++) {
+	for (max = 0; max < 400; max++) {
+		logger(LOGGER_DEBUG,
+			"%d/%d failures found, [0] = 0x%x, iteration %d/400\n",
+			failures, vector->num_failures, vector->msg.buf[0], max);
 		vector->dec_result = false;
 		free_buf(&vector->s);
 
@@ -186,18 +189,47 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 
 		CKINT(callback(vector, parsed_flags));
 
-		if (failures < vector->num_failures) {
-			/* We still have failures to create, so try it */
-			if (vector->dec_result)
+		/*
+		 * There should be totalFailingCases number of messages with
+		 * two leading one bits. Let us try to fail those. See
+		 * https://github.com/usnistgov/ACVP/issues/1219#issuecomment-900382457
+		 */
+		if (failures < vector->num_failures
+				&& (vector->msg.buf[0] & 0xc0) == 0xc0) {
+			/* This is a message which should fail relatively quickly with
+			 * randomly generated keys, and we still need more failures, so
+			 * keep trying until we have a failure here. */
+			if (vector->dec_result) {
+				logger(LOGGER_DEBUG,
+					"%d/%d failures found, vector[0] & 0xc0 == 0xc0 but"
+					" succeeded, retrying...\n", failures,
+					vector->num_failures);
 				continue;
-			failures++;
-		} else {
-			/* We only have successes to create, so try it */
-			if (!vector->dec_result)
-				continue;
+			}
+			break;
 		}
-		break;
+
+		/* Messages without two leading ones should pass, try until we found
+		 * a passing key. */
+		if ((vector->msg.buf[0] & 0xc0) != 0xc0 && !vector->dec_result) {
+			logger(LOGGER_DEBUG,
+				"%d/%d failures found, vector[0] & 0xc0 != 0xc0 but failed,"
+				" retrying...\n", failures, vector->num_failures);
+			continue;
+		}
+
+		/* If we arrive here, we either need more failures and the vector
+		 * doesn't start with 0b11, or we already have enough failures but the
+		 * vector does start with 0b11, so it's just down to trying repeatedly
+		 * until we find a solution. */
+		if (failures < vector->num_failures && !vector->dec_result)
+			break;
+		if (vector->dec_result)
+			break;
 	}
+
+	if (!vector->dec_result)
+		failures++;
 
 	/*
 	 * Create object with following structure:

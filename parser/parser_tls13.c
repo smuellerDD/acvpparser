@@ -35,6 +35,11 @@ static int kdf_tester_tls13(struct json_object *in, struct json_object *out,
 {
 	(void)cipher;
 
+	if (!tls13_backend) {
+		logger(LOGGER_WARN, "No TLS 1.3 backend set\n");
+		return -EOPNOTSUPP;
+	}
+
 	/**********************************************************************
 	 * TLS13 operation
 	 **********************************************************************/

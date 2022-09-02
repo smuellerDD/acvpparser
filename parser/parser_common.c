@@ -418,6 +418,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(ansi_x963)
 			CB_HANDLER(kdf_srtp)
 			CB_HANDLER(cshake)
+			CB_HANDLER(ansi_x942)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -593,6 +594,7 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_KDF_TYPE_SSH, {.string = "ssh"}, "SSHv2 KDF"},
 	{FLAG_OP_KDF_TYPE_ANSI_X963, {.string = "ansix9.63"}, "ANSI X9.63 KDF"},
 	{FLAG_OP_KDF_TYPE_SRTP, {.string = "srtp"}, "SRTP KDF"},
+	{FLAG_OP_KDF_TYPE_ANSI_X942, {.string = "ansix9.42"}, "ANSI X9.42 KDF"},
 
 	{0, {NULL}, NULL}
 };

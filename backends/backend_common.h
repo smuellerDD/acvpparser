@@ -37,6 +37,7 @@
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
 #include "parser_ansi_x963.h"
+#include "parser_ansi_x942.h"
 #include "parser_kdf_tls.h"
 #include "parser_kdf_ssh.h"
 #include "parser_kdf_ikev1.h"

@@ -98,6 +98,10 @@ extern "C"
  * Configuration of code
  ************************************************/
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+# define OPENSSL_30X
+#endif
+
 /*
  * Enable this option to compile the code for the OpenSSL 1.1.x
  * FIPS code base using the upstream CTR DRBG.
@@ -105,10 +109,6 @@ extern "C"
  * The default code base works with Fedora 29 / RHEL 8 code base with
  * the add-on CTR / HMAC / Hash DRBG.
  */
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-# define OPENSSL_30X
-#endif
-
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 # ifndef OPENSSL_DRBG_10X
 #  define OPENSSL_11X_UPSTREAM_DRBG
@@ -125,10 +125,17 @@ extern "C"
 #endif
 
 /*
+ * Enable SHA-512/224 and SHA-512/256 support
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+# define OPENSSL_SHA512_TRUNCATED
+#endif
+
+/*
  * Enable SHA3 support
  */
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
-# define OPENSSL_SSH_SHA3
+# define OPENSSL_SHA3
 #endif
 
 /*
@@ -185,7 +192,7 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type);
 
 int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		struct buffer *hashzz);
-int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char *dgst);
+int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_Name);
 
 #ifdef OPENSSL_ENABLE_TLS13
 int openssl_hkdf_extract(const EVP_MD *md,

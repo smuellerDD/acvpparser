@@ -28,6 +28,11 @@
 
 static struct hkdf_backend *hkdf_backend = NULL;
 
+/*
+ * TODO Fix the info parsing - but that is easier said than done as it is
+ * not nicely parseble.
+ */
+#undef HKDF_USE_LITERAL
 static int hkdf_helper(const struct json_array *processdata,
 		       flags_t parsed_flags,
 		       struct json_object *testvector,
@@ -37,6 +42,11 @@ static int hkdf_helper(const struct json_array *processdata,
 {
 	static const uint8_t literal[] = { 0x01, 0x23, 0x45, 0x67,
 					   0x89, 0xab, 0xcd, 0xef };
+#ifdef HKDF_USE_LITERAL
+	size_t literalsize = sizeof(literal);
+#else
+	size_t literalsize = 0;
+#endif
 	int ret = 0;
 
 	(void)testvector;
@@ -51,7 +61,7 @@ static int hkdf_helper(const struct json_array *processdata,
 	 */
 	CKINT(alloc_buf(vector->fi_partyU.len + vector->fi_partyU_ephem.len +
 			vector->fi_partyV.len + vector->fi_partyV_ephem.len +
-			sizeof(literal),
+			literalsize,
 			&vector->info));
 
 	/* Concatenate data */
@@ -69,10 +79,12 @@ static int hkdf_helper(const struct json_array *processdata,
 		       vector->fi_partyV_ephem.buf,
 		       vector->fi_partyV_ephem.len);
 
-	memcpy(vector->info.buf + vector->fi_partyU.len +
-	       vector->fi_partyU_ephem.len + vector->fi_partyV.len +
-	       vector->fi_partyV_ephem.len,
-	       literal, sizeof(literal));
+	if (literalsize) {
+		memcpy(vector->info.buf + vector->fi_partyU.len +
+		       vector->fi_partyU_ephem.len + vector->fi_partyV.len +
+		       vector->fi_partyV_ephem.len,
+		       literal, literalsize);
+	}
 
 	logger_binary(LOGGER_DEBUG, vector->info.buf, vector->info.len, "info");
 
@@ -90,7 +102,7 @@ static int hkdf_tester(struct json_object *in, struct json_object *out,
 	(void)cipher;
 
 	if (!hkdf_backend) {
-		logger(LOGGER_WARN, "No SP800-108 KDF backend set\n");
+		logger(LOGGER_WARN, "No HKDF backend set\n");
 		return -EOPNOTSUPP;
 	}
 
