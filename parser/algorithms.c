@@ -116,8 +116,8 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 
 	{"kdf-components", ACVP_KDF_COMPONENT},
 	{"PBKDF", ACVP_PBKDF},
-	{"KAS-KDF", ACVP_HKDF},
-	{"KDA", ACVP_HKDF},
+	{"KAS-KDF", ACVP_KDA},
+	{"KDA", ACVP_KDA},
 	{"KDF", ACVP_KDF_800_108},
 	{"TLS-v1.3", ACVP_KDF_TLS13},
 	{"TLS-v1.2", ACVP_KDF_TLS12},
@@ -128,6 +128,10 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"before fixed data", ACVP_KDF_108_BEFORE_FIXED},
 	{"middle fixed data", ACVP_KDF_108_MIDDLE_FIXED},
 	{"before iterator", ACVP_KDF_108_BEFORE_ITERATOR},
+	{"HKDF", ACVP_KDA_HKDF},
+	{"OneStep", ACVP_KDA_ONESTEP},
+	{"OneStepNoCounter", ACVP_KDA_ONESTEP_NO_COUNTER},
+	{"TwoStep", ACVP_KDA_TWOSTEP},
 
 	{"P-192", ACVP_NISTP192},
 	{"P-224", ACVP_NISTP224},

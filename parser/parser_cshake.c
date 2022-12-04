@@ -41,16 +41,15 @@ static int cshake_mct_helper(const struct json_array *processdata,
 					     flags_t parsed_flags),
 			     struct cshake_data *vector)
 {
-	uint32_t maxoutbytes = vector->maxoutlen / 8;
 	unsigned int i;
 	int ret;
 	struct json_object *testresult, *resultsarray = NULL;
+	uint8_t tmp[16];
 
 	(void)callback;
 	(void)processdata;
 
 	CKNULL(cshake_backend->cshake_generate, -EOPNOTSUPP);
-	CKNULL(maxoutbytes, -EOPNOTSUPP);
 
 	/* Create output stream. */
 	resultsarray = json_object_new_array();
@@ -59,13 +58,14 @@ static int cshake_mct_helper(const struct json_array *processdata,
 	CKNULL(testresult, -ENOMEM);
 	CKINT(json_add_test_data(testvector, testresult));
 
-	vector->outlen = maxoutbytes * 8;
+	vector->outlen = vector->maxoutlen;
 
 	/*
 	 * Ensure that we only look at the leftmost 16 bytes. This should be
 	 * a noop these days, but keep the check to be sure.
 	 */
-	vector->msg.len = min(vector->msg.len, 16);
+	vector->msg.len = min(vector->msg.len, sizeof(tmp));
+	memcpy(tmp, vector->msg.buf, vector->msg.len);
 
 	for (i = 0; i < 100; i++) {
 		struct json_object *single_mct_result;
@@ -86,10 +86,6 @@ static int cshake_mct_helper(const struct json_array *processdata,
 				       &vector->mac));
 		CKINT(json_object_object_add(single_mct_result, "outLen",
 				json_object_new_int((int)vector->mac.len * 8)));
-
-		/* hash becomes new message */
-		memcpy(vector->msg.buf, vector->mac.buf,
-		       min(vector->mac.len, vector->msg.len));
 	}
 
 	CKINT(json_object_object_add(testresult, "resultsArray", resultsarray));
@@ -154,7 +150,7 @@ static int cshake_tester(struct json_object *in, struct json_object *out,
 		{"msg",			{.data.buf = &vector.msg, PARSER_BIN},			FLAG_OP_AFT},
 		{"len",			{.data.integer = &vector.bitlen, PARSER_UINT},		FLAG_OP_AFT},
 		{"outLen",		{.data.integer = &vector.outlen, PARSER_UINT},		FLAG_OP_AFT},
-		{"functionName",	{.data.buf = &vector.function_name, PARSER_BIN},	FLAG_OP_AFT},
+		{"functionName",	{.data.buf = &vector.function_name, PARSER_STRING},	FLAG_OP_AFT},
 		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_AFT | FLAG_OPTIONAL},
 		{"customizationHex",	{.data.buf = &vector.customization, PARSER_BIN},	FLAG_OP_AFT | FLAG_OPTIONAL},
 	};

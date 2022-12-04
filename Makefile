@@ -333,6 +333,10 @@ endif
 
 ifeq (leancrypto,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_leancrypto.c
+	INCLUDE_DIRS += backend_interfaces/leancrypto/
+	ifeq ($(uname -m),x86_64)
+		CFLAGS += -mavx2 -mbmi2 -mpopcnt
+	endif
 	LIBRARIES += leancrypto
 endif
 

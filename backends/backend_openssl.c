@@ -605,6 +605,11 @@ static int tls1_PRF(uint64_t cipher,
 
 	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_TLS1_PRF, NULL);
 	if (pctx == NULL || EVP_PKEY_derive_init(pctx) <= 0
+		/*
+		 * Always pad the shared secret to the size of the prime,
+		 * even if it starts with 0.
+		 */
+		|| EVP_PKEY_CTX_set_dh_pad(pctx, 1) <= 0
 		|| EVP_PKEY_CTX_set_tls1_prf_md(pctx, md) <= 0
 		|| EVP_PKEY_CTX_set1_tls1_prf_secret(pctx, sec, slen) <= 0)
 		goto err;

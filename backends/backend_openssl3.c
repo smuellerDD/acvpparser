@@ -41,6 +41,11 @@ static void openssl_backend_init(void)
 		printf("Failed to load base provider\n");
 		exit(-EFAULT);
 	}
+	/* Explicitly set FIPS enabled for the default library context */
+	if (EVP_default_properties_enable_fips(NULL, 1) != 1) {
+		printf("Failed to enable FIPS mode\n");
+		exit(-EFAULT);
+	}
 }
 
 ACVP_DEFINE_DESTRUCTOR(openssl_backend_fini)
@@ -724,6 +729,12 @@ static int openssl_dh_ss_common(uint64_t cipher,
 	dctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, NULL);
 	CKNULL(dctx, -EFAULT);
 	CKINT_O_LOG(EVP_PKEY_derive_init(dctx), "EVP_PKEY_derive_init failed\n");
+	/*
+	 * Always pad the shared secret to the size of the prime, even if it
+	 * starts with 0.
+	 */
+	CKINT_O_LOG(EVP_PKEY_CTX_set_dh_pad(dctx, 1),
+		    "EVP_PKEY_CTX_set_dh_pad failed\n");
 	CKINT_O_LOG(EVP_PKEY_derive_set_peer(dctx, peerkey),
 		    "EVP_PKEY_derive_set_peer failed\n");
 	CKINT_O_LOG(EVP_PKEY_derive(dctx, NULL, &keylen),
@@ -828,7 +839,8 @@ static int openssl_dh_keyver(struct dh_keyver_data *data,
 	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, "fips=yes");
 	CKNULL(ctx, -EFAULT);
 
-	if (EVP_PKEY_check(ctx) > 0) {
+	if (EVP_PKEY_public_check(ctx) > 0 && EVP_PKEY_private_check(ctx) > 0 &&
+	    EVP_PKEY_check(ctx) > 0) {
 		data->keyver_success = 1;
 	} else {
 		data->keyver_success = 0;
@@ -962,6 +974,10 @@ openssl_ecdh_ss_common(uint64_t cipher,
 		logger(LOGGER_ERR, "EVP_PKEY_derive_set_peer filed: %d\n", ret);
 		goto out;
 	}
+	OSSL_PARAM_BLD_push_int(bld, OSSL_EXCHANGE_PARAM_EC_ECDH_COFACTOR_MODE,
+				1);
+	params = OSSL_PARAM_BLD_to_param(bld);
+	CKINT(EVP_PKEY_CTX_set_params(dctx, params));
 	ret = EVP_PKEY_derive(dctx, NULL, &ss.len);
 	if(ret <= 0) {
 		logger(LOGGER_ERR, "EVP_PKEY_derive filed: %d\n", ret);
@@ -1099,7 +1115,7 @@ static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
 static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 {
 
-	OSSL_PARAM params[4];
+	OSSL_PARAM params[4], *p;
 	char cipher[50];
 	char drbg_name[50];
 	EVP_RAND *rand = NULL;
@@ -1148,17 +1164,24 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	params[3] = OSSL_PARAM_construct_end();
 
 	CKINT(EVP_RAND_CTX_set_params(ctx, params));
-	/* Feed in the entropy and nonce */
-	logger_binary(LOGGER_DEBUG, data->entropy.buf, data->entropy.len, "entropy");
-	logger_binary(LOGGER_DEBUG, data->nonce.buf, data->nonce.len, "nonce");
 
-	params[0] = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_ENTROPY,
-			(void *)data->entropy.buf,
-			data->entropy.len);
-	params[1] = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_NONCE,
-			(void *)data->nonce.buf,
-			data->nonce.len);
-	params[2] = OSSL_PARAM_construct_end();
+	/* Feed in the entropy and nonce */
+	p = params;
+	if (data->entropy.buf && data->entropy.len) {
+		logger_binary(LOGGER_DEBUG, data->entropy.buf,
+			      data->entropy.len, "entropy");
+		*p++ = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_ENTROPY,
+							 (void *)data->entropy.buf,
+							 data->entropy.len);
+	}
+	if (data->nonce.buf && data->nonce.len) {
+		logger_binary(LOGGER_DEBUG, data->nonce.buf,
+			      data->nonce.len, "nonce");
+		*p++ = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_NONCE,
+							 (void *)data->nonce.buf,
+							 data->nonce.len);
+	}
+	*p++ = OSSL_PARAM_construct_end();
 
 	if (!EVP_RAND_instantiate(parent, strength, 0, NULL, 0, params)) {
 		EVP_RAND_CTX_free(ctx);
@@ -1857,7 +1880,8 @@ static int openssl_dsa_keyver(struct dsa_keyver_data *data,
 	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, "fips=yes");
 	CKNULL(ctx, -EFAULT);
 
-	if (EVP_PKEY_check(ctx) > 0) {
+	if (EVP_PKEY_public_check(ctx) > 0 && EVP_PKEY_private_check(ctx) > 0 &&
+	    EVP_PKEY_check(ctx) > 0) {
 		data->keyver_success = 1;
 	} else {
 		data->keyver_success = 0;
@@ -3142,4 +3166,187 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_ansi_x963_backend)
 static void openssl_ansi_x963_backend(void)
 {
 	register_ansi_x963_impl(&openssl_ansi_x963);
+}
+
+/************************************************
+ * KDA OneStep interface functions
+ ************************************************/
+static int openssl_kda_onestep_kdf(struct kda_onestep_data *data,
+				   flags_t parsed_flags)
+{
+	BUFFER_INIT(local_dkm);
+	EVP_KDF *kdf = NULL;
+	EVP_KDF_CTX *ctx = NULL;
+	const char *mac_alg;
+	const EVP_MD *md = NULL;
+	OSSL_PARAM params[6], *p = params;
+	uint32_t derived_key_bytes = data->dkmlen / 8;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	if (data->dkm.buf && data->dkm.len) {
+		CKINT(alloc_buf(derived_key_bytes, &local_dkm));
+	} else {
+		CKINT(alloc_buf(derived_key_bytes, &data->dkm));
+	}
+
+	kdf = EVP_KDF_fetch(NULL, "SSKDF", NULL);
+	CKNULL_LOG(kdf, -EFAULT, "Cannot allocate OneStep KDF\n");
+	ctx = EVP_KDF_CTX_new(kdf);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate OneStep KDF context\n");
+
+	if (data->aux_function & ACVP_CIPHERTYPE_KMAC) {
+		CKINT(convert_cipher_algo(data->aux_function & ACVP_KMACMASK,
+					  ACVP_CIPHERTYPE_KMAC, &mac_alg));
+		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
+							(char *)mac_alg,
+							strlen(mac_alg));
+	} else if (data->aux_function & ACVP_CIPHERTYPE_HMAC) {
+		mac_alg = "HMAC";
+		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
+							(char *)mac_alg,
+							strlen(mac_alg));
+
+		CKINT(openssl_md_convert(data->aux_function, &md));
+		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+							(char *)EVP_MD_name(md),
+							0);
+	} else {
+		CKINT(openssl_md_convert(data->aux_function,  &md));
+		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+							(char *)EVP_MD_name(md),
+							0);
+	}
+
+	if (data->salt.buf && data->salt.len) {
+		*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+							 data->salt.buf,
+							 data->salt.len);
+	}
+
+	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+						 data->z.buf,
+						 data->z.len);
+	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+						 data->info.buf,
+						 data->info.len);
+
+	*p = OSSL_PARAM_construct_end();
+
+	if (local_dkm.buf && local_dkm.len) {
+		CKINT_O(EVP_KDF_derive(ctx, local_dkm.buf, local_dkm.len,
+				       params));
+
+		if (local_dkm.len != data->dkm.len ||
+		    memcmp(local_dkm.buf, data->dkm.buf, local_dkm.len)) {
+			logger(LOGGER_DEBUG,
+			       "KDA OneStep validation result: fail\n");
+			data->validity_success = 0;
+		} else {
+			data->validity_success = 1;
+		}
+	} else {
+		CKINT_O(EVP_KDF_derive(ctx, data->dkm.buf, data->dkm.len,
+				       params));
+	}
+
+out:
+	free_buf(&local_dkm);
+
+	if (kdf)
+		EVP_KDF_free(kdf);
+	if (ctx)
+		EVP_KDF_CTX_free(ctx);
+	return ret;
+}
+
+static struct kda_onestep_backend openssl_kda_onestep =
+{
+	openssl_kda_onestep_kdf,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_kda_onestep_backend)
+static void openssl_kda_onestep_backend(void)
+{
+	register_kda_onestep_impl(&openssl_kda_onestep);
+}
+
+/************************************************
+ * KDA TwoStep interface functions
+ ************************************************/
+
+static int openssl_kda_twostep_kdf(struct kda_twostep_data *data,
+				   flags_t parsed_flags)
+{
+	BUFFER_INIT(local_dkm);
+	const EVP_MD *md = NULL;
+	EVP_PKEY_CTX *pctx = NULL;
+	uint32_t derived_key_bytes = data->dkmlen / 8;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	if (data->dkm.buf && data->dkm.len) {
+		CKINT(alloc_buf(derived_key_bytes, &local_dkm));
+	} else {
+		CKINT(alloc_buf(derived_key_bytes, &data->dkm));
+	}
+
+	CKINT(openssl_md_convert(data->mac,  &md));
+
+	pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
+	CKNULL(pctx, -EFAULT);
+	CKINT_O_LOG(EVP_PKEY_derive_init(pctx),
+		    "Initialization of TwoStep KDF failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_hkdf_mode(pctx,
+					   EVP_PKEY_HKDEF_MODE_EXTRACT_AND_EXPAND),
+		    "Setting TwoStep KDF mode failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set_hkdf_md(pctx, md), "Setting MD failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_salt(pctx, data->salt.buf,
+						data->salt.len),
+		    "Setting salt failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_set1_hkdf_key(pctx, data->z.buf, data->z.len),
+		    "Setting key failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_CTX_add1_hkdf_info(pctx, data->info.buf,
+						data->info.len),
+		    "Setting info failed\n");
+
+	if (local_dkm.buf && local_dkm.len) {
+		CKINT_O(EVP_PKEY_derive(pctx, local_dkm.buf, &local_dkm.len));
+
+		if (local_dkm.len != data->dkm.len ||
+		    memcmp(local_dkm.buf, data->dkm.buf, local_dkm.len)) {
+			logger(LOGGER_DEBUG,
+			       "KDA TwoStep validation result: fail\n");
+			data->validity_success = 0;
+		} else {
+			data->validity_success = 1;
+		}
+	} else {
+		CKINT_O(EVP_PKEY_derive(pctx, data->dkm.buf, &data->dkm.len));
+	}
+
+out:
+	free_buf(&local_dkm);
+
+	if (pctx)
+		EVP_PKEY_CTX_free(pctx);
+	return ret;
+}
+
+static struct kda_twostep_backend openssl_kda_twostep =
+{
+	openssl_kda_twostep_kdf,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_kda_twostep_backend)
+static void openssl_kda_twostep_backend(void)
+{
+	register_kda_twostep_impl(&openssl_kda_twostep);
 }

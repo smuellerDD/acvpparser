@@ -41,7 +41,7 @@ static inline int sha_ldt_helper(struct sha_data *data, struct buffer *msg_p)
 
 	if (data->ldt_expansion_size) {
 		size_t ldt_exp_bytes = data->ldt_expansion_size / 8;
-		size_t i, len = data->msg.len;
+		size_t i, len;
 
 		if (SIZE_MAX < ldt_exp_bytes) {
 			logger(LOGGER_ERR, "LDT size not supported on IUT\n");
@@ -208,7 +208,7 @@ parser_shake_inner_loop(struct sha_data *data, flags_t parsed_flags,
 					     flags_t parsed_flags))
 {
 	uint32_t minoutbytes = (data->minoutlen + 7) / 8,
-		 maxoutbytes = data->maxoutlen / 8;
+		 maxoutbytes = (data->maxoutlen) / 8;
 	size_t read_outbits;
 	uint32_t range = maxoutbytes - minoutbytes + 1;
 	uint16_t outbits = 0;
@@ -252,7 +252,6 @@ out:
 	return ret;
 }
 
-
 /**
  * @brief cSHAKE Monte-Carlo Testing inner loop implementation.
  *
@@ -273,7 +272,7 @@ parser_cshake_inner_loop(struct cshake_data *data, flags_t parsed_flags,
 		 maxoutbits = data->maxoutlen;
 	size_t read_outbits;
 	uint32_t range = maxoutbits - minoutbits + 1;
-	uint16_t outbits = 0;
+	uint16_t outbits = 0, outbits2;
 	unsigned int j;
 	int ret;
 
@@ -284,7 +283,7 @@ parser_cshake_inner_loop(struct cshake_data *data, flags_t parsed_flags,
 	CKNULL(maxoutbits, -EOPNOTSUPP);
 
 	for (j = 0; j < 1000; j++) {
-		size_t new_cust_len;
+		size_t new_cust_len, k;
 
 		free_buf(&data->mac);
 		CKINT_LOG(cshake_generate(data, parsed_flags),
@@ -304,13 +303,20 @@ parser_cshake_inner_loop(struct cshake_data *data, flags_t parsed_flags,
 		outbits = be_bswap16(outbits);
 
 		/* New customization string */
-		new_cust_len = data->msg.len + sizeof(outbits);
+		new_cust_len = data->msg.len + sizeof(outbits2);
 		free_buf(&data->customization);
 		CKINT_LOG(alloc_buf(new_cust_len, &data->customization),
 			  "Cannot allocate customization buffer\n");
 		memcpy(data->customization.buf, data->msg.buf, data->msg.len);
-		memcpy(data->customization.buf + data->msg.len, &outbits,
-		       sizeof(outbits));
+		outbits2 = be_bswap16(outbits);
+		memcpy(data->customization.buf + data->msg.len, &outbits2,
+		       sizeof(outbits2));
+
+		/* BitsToString */
+		for (k = 0; k < data->customization.len; k++) {
+			data->customization.buf[k] =
+				(data->customization.buf[k] % 26) + 65;
+		}
 
 		/* hash becomes new message */
 		memset(data->msg.buf, 0, data->msg.len);

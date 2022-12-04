@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2022, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2022, Joachim Vandersmissen <joachim@atsec.com>
  *
  * License: see LICENSE file
  *
@@ -17,8 +17,8 @@
  * DAMAGE.
  */
 
-#ifndef _PARSER_HKDF_H
-#define _PARSER_HKDF_H
+#ifndef _PARSER_KDA_ONESTEP_H
+#define _PARSER_KDA_ONESTEP_H
 
 #include "parser.h"
 #include "parser_flags.h"
@@ -29,15 +29,18 @@ extern "C"
 #endif
 
 /**
- * @brief RFC5869 KDF data structure
+ * @brief OneStep KDF data structure
  *
- * @var hash [in] hash to be used for the KDF - note, the backend must
- *		    use the hash to initialize the HMAC cipher as required by
- *		    the HKDF specification.
+ * @var aux_function [in] auxiliary function to be used for the KDF - note, the
+ * 			  backend must use the function to initialize the hash
+ * 			  or MAC cipher as required by the KDA OneStep
+ * 			  specification.
  * @var dkmlen [in] Length of output keying material in bits
+ * @var salt [in] salt for the OneStep KDF (not present when aux_function is a
+ * 		  hash algorithm)
  * @var z [in] Shared secret (input key material)
- * @var salt [in] salt for the HKDF
- * @var info [in] Additional information for the HKDF
+ * @var t [in] Secondary shared secret (For [SP800-56Cr2] only)
+ * @var info [in] Additional information for the OneStep KDF
  * @var dkm [in/out] The derived keying material (if buffer is non-NULL, a
 		     the backend shall validate the DKM with its own data
 		     and report via @val validity_success - if the buffer is
@@ -46,21 +49,30 @@ extern "C"
  *			 @var dkm (1) or whether it does not match (0).
  *
  * @var fixed_info_pattern [disregard]
+ * @var fixed_info_encoding [disregard]
+ * @var algorithm_id [disregard]
+ * @var context [disregard]
+ * @var label [disregard]
  * @var fi_partyU [disregard]
  * @var fi_partyU_ephem [disregard]
  * @var fi_partyV [disregard]
  * @var fi_partyV_ephem [disregard]
  */
-struct hkdf_data {
-	uint64_t hash;
+struct kda_onestep_data {
+	uint64_t aux_function;
 	uint32_t dkmlen;
-	struct buffer z;
 	struct buffer salt;
+	struct buffer z;
+	struct buffer t;
 	struct buffer info;
 	struct buffer dkm;
 	uint32_t validity_success;
 
 	struct buffer fixed_info_pattern;
+	uint64_t fixed_info_encoding;
+	struct buffer algorithm_id;
+	struct buffer context;
+	struct buffer label;
 	struct buffer fi_partyU;
 	struct buffer fi_partyU_ephem;
 	struct buffer fi_partyV;
@@ -72,16 +84,18 @@ struct hkdf_data {
  *
  * All functions return 0 on success or != 0 on error.
  *
- * @var hkdf Perform an SP800-108 key derivation
+ * @var hkdf Perform an SP 800-56Cr2 OneStep key derivation
  */
-struct hkdf_backend {
-	int (*hkdf)(struct hkdf_data *data, flags_t parsed_flags);
+struct kda_onestep_backend {
+	int (*kda_onestep)(struct kda_onestep_data *data, flags_t parsed_flags);
 };
 
-void register_hkdf_impl(struct hkdf_backend *implementation);
+void register_kda_onestep_impl(struct kda_onestep_backend *implementation);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _PARSER_HKDF_H */
+#endif /* _PARSER_KDA_ONESTEP_H */
+
+

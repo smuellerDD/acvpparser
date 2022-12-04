@@ -515,7 +515,7 @@ int openssl_hash_ss(uint64_t cipher, struct buffer *ss, struct buffer *hashzz)
 				goto out;
 			}
 			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-					"expexted shared secret hash");
+					"expected shared secret");
 			if (memcmp(hashzz->buf, ss->buf, hashzz->len))
 				ret = -ENOENT;
 			else
@@ -529,7 +529,7 @@ int openssl_hash_ss(uint64_t cipher, struct buffer *ss, struct buffer *hashzz)
 			ss->len = 0;
 
 			logger_binary(LOGGER_DEBUG, hashzz->buf, hashzz->len,
-					"Shared secret");
+					"shared secret");
 		}
 	}
 
@@ -1661,7 +1661,7 @@ int openssl_hkdf_extract(const EVP_MD *md,
 
 	/* Extract phase */
 	CKINT_O_LOG(EVP_PKEY_derive_init(pctx),
-		    "Initialiation of HKDF failed\n");
+		    "Initialization of HKDF failed\n");
 
 	CKINT_O_LOG(EVP_PKEY_CTX_hkdf_mode(pctx,
 					   EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY),

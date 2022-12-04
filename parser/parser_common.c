@@ -419,6 +419,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kdf_srtp)
 			CB_HANDLER(cshake)
 			CB_HANDLER(ansi_x942)
+			CB_HANDLER(kda_onestep)
+			CB_HANDLER(kda_twostep)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",

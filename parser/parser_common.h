@@ -43,7 +43,9 @@
 #include "parser_kdf_ikev2.h"
 #include "parser_kdf_108.h"
 #include "parser_pbkdf.h"
-#include "parser_hkdf.h"
+#include "parser_kda_hkdf.h"
+#include "parser_kda_onestep.h"
+#include "parser_kda_twostep.h"
 #include "parser_ifc.h"
 #include "parser_tls12.h"
 #include "parser_tls13.h"
@@ -244,6 +246,8 @@ DEF_CALLBACK_TYPE(ansi_x963)
 DEF_CALLBACK_TYPE(kdf_srtp)
 DEF_CALLBACK_TYPE(cshake)
 DEF_CALLBACK_TYPE(ansi_x942)
+DEF_CALLBACK_TYPE(kda_onestep)
+DEF_CALLBACK_TYPE(kda_twostep)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -307,6 +311,8 @@ enum {
 	CB_TYPE_kdf_srtp,
 	CB_TYPE_cshake,
 	CB_TYPE_ansi_x942,
+	CB_TYPE_kda_onestep,
+	CB_TYPE_kda_twostep,
 };
 struct json_callback {
 	union {
@@ -359,6 +365,8 @@ struct json_callback {
 		struct kdf_srtp_callback kdf_srtp;
 		struct cshake_callback cshake;
 		struct ansi_x942_callback ansi_x942;
+		struct kda_onestep_callback kda_onestep;
+		struct kda_twostep_callback kda_twostep;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;
