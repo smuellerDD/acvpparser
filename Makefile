@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2022, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 

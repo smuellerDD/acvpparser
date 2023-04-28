@@ -34,6 +34,15 @@ TARGET="openssl"
 MODULE_PREFIX="OpenSSL_"
 MODULE_POSTFIX="_"
 
+if $(echo $0 | grep -q "_openssl_3")
+then
+       MODULE_PREFIX="OpenSSL_3_"
+fi
+
+if [[ "$(openssl version | awk '{print $2}')" =~ 3\..* ]]; then
+	MODULE_PREFIX="OpenSSL_3_"
+fi
+
 EXEC_TYPES_DRBG10X__64_bit___="CFLAGS=-DOPENSSL_DRBG_10X"
 EXEC_TYPES_DRBG10X__32_bit___="CFLAGS=\"-m32 -DOPENSSL_DRBG_10X\" LDFLAGS=-m32"
 
@@ -44,156 +53,195 @@ CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 
 #	Common implementations
 
-EXEC_COMMON="TDES_C ECDSA_K_B ECDSA_SHA3_K_B FFC_DH KBKDF TLS_v1_3"
-
-#	Implementations for S390
+# See lib/module_implementations/definition_impl_openssl.c in acvpproxy
+EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3"
 
 if [ $(uname -m) = "s390x" ]; then
-	EXEC="$EXEC_COMMON 
-		AES_CPACF AESASM AESGCM_CPACF AESGCM_ASM_CPACF AESGCM_ASM_ASM 
-		SHA_CPACF SHA_ASM SHA3_CPACF SHA3_ASM 
-		SSH_CPACF SSH_ASM
-		ALL_NOPAI"
+	#	Implementations for s390x
 
-	CM_s390x_KIMD_GHASH="kimd:~0:~0x4000000000000000"
-	CM_s390x_KIMD_SHA="kimd:~0x70000000FC000000:~0"
+	EXEC="$EXEC_COMMON
+		AES_CPACF AESASM AESGCM_CPACF
+		AESGCM_ASM_CPACF AESGCM_ASM_ASM
+		SHA_CPACF SSH_CPACF SHA_ASM SSH_ASM
+		SHA3_CPACF SHA3_ASM"
+
+	# See https://www.openssl.org/docs/man3.0/man3/OPENSSL_s390xcap.html
+	CM_s390x_KIMD_SHA="kimd:~0x70000000FC000000:~0x0"
+	CM_s390x_KIMD_GHASH="kimd:~0x0:~0x4000000000000000"
 	CM_s390x_KIMD="kimd:~0x70000000FC000000:~0x4000000000000000"
-	CM_s390x_KLMD="klmd:~0x00000000FC000000:~0"
-	CM_s390x_KM="km:~0x380000002800:~0"
-	CM_s390x_KMC="kmc:~0x380000000000:~0"
-	CM_s390x_KMAC="kmac:~0x380000000000:~0"
-	CM_s390x_KMO="kmo:~0x380000000000:~0"
-	CM_s390x_KMF="kmf:~0x380000000000:~0"
-	CM_s390x_KMA="kma:~0x380000000000:~0"
-	CM_s390x_PCC="pcc:~0xE000000000000000:~0"
-	CM_s390x_KDSA="kdsa:~0x7070000000000000:~0"
-	
-CM_s390x_NOPAI="$CM_s390x_KIMD;$CM_s390x_KLMD;$CM_s390x_KM;$CM_s390x_KMC;$CM_s390x_KMAC;$CM_s390x_KMO;$CM_s390x_KMF;$CM_s390x_KMA;$CM_s390x_PCC;$CM_s390x_KDSA"
-	
-	#	Default configuration (CPACF enabled)
-	CIPHER_CALL_TDES_C=""
-	CIPHER_CALL_KBKDF="" 
-	CIPHER_CALL_TLS_v1_3=""
-	CIPHER_CALL_AES_CPACF="" 
-	CIPHER_CALL_SHA_CPACF="" 
-	CIPHER_CALL_SSH_CPACF="" 
-	CIPHER_CALL_SHA3_CPACF=""
+	CM_s390x_KLMD="klmd:~0x00000000FC000000:~0x0"
+	CM_s390x_KM="km:~0x0000380000002800:~0x0"
+	CM_s390x_KMC="kmc:~0x0000380000000000:~0x0"
+	CM_s390x_KMAC="kmac:~0x0000380000000000:~0x0"
+	CM_s390x_KMO="kmo:~0x0000380000000000:~0x0"
+	CM_s390x_KMF="kmf:~0x0000380000000000:~0x0"
+	CM_s390x_KMA="kma:~0x0000380000000000:~0x0"
+	CM_s390x_PCC="pcc:~0xE0C0C00000000000:~0x0"
+	CM_s390x_KDSA="kdsa:~0x7070000088880000:~0x0"
+	CM_s390x_NOPAI="$CM_s390x_KIMD;$CM_s390x_KLMD;$CM_s390x_KM;$CM_s390x_KMC;$CM_s390x_KMAC;$CM_s390x_KMO;$CM_s390x_KMF;$CM_s390x_KMA;$CM_s390x_PCC;$CM_s390x_KDSA"
+
+	CIPHER_CALL_AES_CPACF=""
+	CIPHER_CALL_AESASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
 
 	CIPHER_CALL_AESGCM_CPACF=""
-	#	Turns off KMA capabilities (builtin AES GCM) and leave  KIMD (GHASH) enabled
-	CIPHER_CALL_AESGCM_ASM_CPACF="OPENSSL_s390xcap=\"$CM_s390x_KMA\"" 
-	
-	#	Turns off all CPACF capabilities
+	# Turns off KMA capabilities (CPACF AES GCM) and leave KIMD (CPACF GHASH) enabled.
+	CIPHER_CALL_AESGCM_ASM_CPACF="OPENSSL_s390xcap=\"$CM_s390x_KMA\""
+	# Turns off all CPACF capabilities.
 	CIPHER_CALL_AESGCM_ASM_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
 
-	CIPHER_CALL_AESASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+	CIPHER_CALL_SHA_CPACF=""
+	CIPHER_CALL_SSH_CPACF=""
 	CIPHER_CALL_SHA_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
 	CIPHER_CALL_SSH_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
+
+	CIPHER_CALL_SHA3_CPACF=""
 	CIPHER_CALL_SHA3_ASM="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
-	CIPHER_CALL_ALL_NOPAI="OPENSSL_s390xcap=\"$CM_s390x_NOPAI\""
 	
 elif [ $(uname -m) = "aarch64" ]; then
+	#	Implementations for ARM
 
-	#	Implementations for ARM64
+	EXEC="$EXEC_COMMON
+		CE VPAES AES_C
+		CE_GCM_UNROLL8_EOR3 CE_GCM VPAES_GCM AES_C_GCM
+		SHA_CE NEON SHA_ASM SSH_ASM
+		SHA3_CE SHA3_ASM"
 
-	EXEC="$EXEC_COMMON 
-		SHA_ASM SHA3_ASM SSH_ASM 
-		AES_C AES_C_GCM 
-		NEON VPAES VPAES_GCM CE CE_GCM SHA_CE SHA3_CE"
+	# Unlike for s390x and x86, OPENSSL_armcap is taken at face value.
+	# Note that we can't simply set the bits in the environment variable and pass it to OpenSSL, as this would cause invalid instruction errors.
+	# Therefore, we first construct OPENSSL_armcap as OpenSSL would see it, and then mask off bits.
+	# See crypto/arm_arch.h.
+	armcap=0
+	lscpu | grep "Flags" | grep -q "asimd" && armcap=$((armcap | (1 << 0)))
+	lscpu | grep "Flags" | grep -q "neon" && armcap=$((armcap | (1 << 0)))
+	lscpu | grep "Flags" | grep -q "aes" && armcap=$((armcap | (1 << 2)))
+	lscpu | grep "Flags" | grep -q "sha1" && armcap=$((armcap | (1 << 3)))
+	lscpu | grep "Flags" | grep -q "sha2" && armcap=$((armcap | (1 << 4)))
+	lscpu | grep "Flags" | grep -q "pmull" && armcap=$((armcap | (1 << 5)))
+	lscpu | grep "Flags" | grep -q "sha512" && armcap=$((armcap | (1 << 6)))
+	lscpu | grep "Flags" | grep -q "cpuid" && armcap=$((armcap | (1 << 7)))
+	lscpu | grep "Flags" | grep -q "sm3" && armcap=$((armcap | (1 << 9)))
+	lscpu | grep "Flags" | grep -q "sm4" && armcap=$((armcap | (1 << 10)))
+	lscpu | grep "Flags" | grep -q "sha3" && armcap=$((armcap | (1 << 11)))
+	# TODO: how to set ARMV8_UNROLL8_EOR3?
 
-	# Unlike for x86, OPENSSL_armcap_P is taken at face value
-	# define ARMV7_NEON      (1<<0)
-	# define ARMV7_TICK      (1<<1)
-	# define ARMV8_AES       (1<<2)
-	# define ARMV8_SHA1      (1<<3)
-	# define ARMV8_SHA256    (1<<4)
-	# define ARMV8_PMULL     (1<<5)
-	# define ARMV8_SHA512    (1<<6)
-	CIPHER_CALL_TDES_C="OPENSSL_armcap_P=0"
-	CIPHER_CALL_AES_C_GCM="OPENSSL_armcap_P=0"
-	CIPHER_CALL_AES_C="OPENSSL_armcap_P=0"
-	CIPHER_CALL_SHA_ASM="OPENSSL_armcap_P=0"
-	CIPHER_CALL_SHA3_ASM="OPENSSL_armcap_P=0"
+	# IMPORTANT: The OPENSSL_armcap environment variable does NOT support hex!
 
-	# Set the NEON bit
-	CIPHER_CALL_VPAES="OPENSSL_armcap_P=1"
-	CIPHER_CALL_SHA_NEON="OPENSSL_armcap_P=1"
+	# Used by default.
+	CIPHER_CALL_CE="OPENSSL_armcap=$((armcap))"
+	# Remove bit 2 (AES).
+	CIPHER_CALL_VPAES="OPENSSL_armcap=$((armcap & ~0x04))"
+	# Remove bit 2 (AES) and 0 (NEON).
+	CIPHER_CALL_AES_C="OPENSSL_armcap=$((armcap & ~0x05))"
 
-	# Set the CE bits
-	CIPHER_CALL_CE="OPENSSL_armcap_P=7D"
-	CIPHER_CALL_CE_GCM="OPENSSL_armcap_P=7D"
-	CIPHER_CALL_SHA_CE="OPENSSL_armcap_P=7D"
-	CIPHER_CALL_SHA3_CE="OPENSSL_armcap_P=7D"
+	# Used by default.
+	CIPHER_CALL_CE_GCM_UNROLL8_EOR3="OPENSSL_armcap=$((armcap))"
+	# Remove bit 12 (UNROLL8_EOR3).
+	CIPHER_CALL_CE_GCM="OPENSSL_armcap=$((armcap & ~0x1000))"
+	# Remove bit 12 (UNROLL8_EOR3), 2 (AES), and 5 (PMULL).
+	CIPHER_CALL_VPAES_GCM="OPENSSL_armcap=$((armcap & ~0x1024))"
+	# Remove bit 12 (UNROLL8_EOR3), 2 (AES), 5 (PMULL), and 0 (NEON).
+	CIPHER_CALL_AES_C_GCM="OPENSSL_armcap=$((armcap & ~0x1025))"
 
-#	Implementations for PPC
+	# Used by default.
+	CIPHER_CALL_SHA_CE="OPENSSL_armcap=$((armcap))"
+	# Remove bit 3 (SHA1), 4 (SHA256), and 6 (SHA512).
+	CIPHER_CALL_NEON="OPENSSL_armcap=$((armcap & ~0x58))"
+	# Remove bit 3 (SHA1), 4 (SHA256), 6 (SHA512), and 0 (NEON).
+	CIPHER_CALL_SHA_ASM="OPENSSL_armcap=$((armcap & ~0x59))"
+	CIPHER_CALL_SSH_ASM=$CIPHER_CALL_SHA_ASM
+
+	# Used by default.
+	CIPHER_CALL_SHA3_CE="OPENSSL_armcap=$((armcap))"
+	# Remove bit 11 (SHA3) and 0 (NEON).
+	CIPHER_CALL_SHA3_ASM="OPENSSL_armcap=$((armcap & ~0x801))"
 
 elif [ $(uname -m) = "ppc" -o $(uname -m) = "ppc64" -o $(uname -m) = "ppcle" -o $(uname -m) = "ppc64le" ]; then
+	#	Implementations for PPC
+
 	EXEC="$EXEC_COMMON 
-		SHA_ASM SHA3_ASM SSH_ASM AESASM AESASM_ASM 
-		SHA_VMX SSH_VMX AES_VMX AES_VMX_ASM 
+		AESASM AESASM_ASM SHA_ASM SSH_ASM SHA3_ASM
+		AES_ISA AES_ISA_ASM SHA_ISA SSH_ISA
 		AES_Altivec AES_Altivec_ASM"
 
-	CIPHER_CALL_SHA_ASM="OPENSSL_ppccap=0"
-	CIPHER_CALL_SHA3_ASM="OPENSSL_ppccap=0"
-	CIPHER_CALL_SSH_ASM="OPENSSL_ppccap=0"
 	CIPHER_CALL_AESASM="OPENSSL_ppccap=0"
 	CIPHER_CALL_AESASM_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_SHA_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_SSH_ASM="OPENSSL_ppccap=0"
+	CIPHER_CALL_SHA3_ASM="OPENSSL_ppccap=0"
 
-	CIPHER_CALL_SHA_VMX="OPENSSL_ppccap=4"
-	CIPHER_CALL_SSH_VMX="OPENSSL_ppccap=4"
-	CIPHER_CALL_AES_VMX="OPENSSL_ppccap=4"
-	CIPHER_CALL_AES_VMX_ASM="OPENSSL_ppccap=4"
+	CIPHER_CALL_AES_ISA="OPENSSL_ppccap=20"
+	CIPHER_CALL_AES_ISA_ASM="OPENSSL_ppccap=20"
+	CIPHER_CALL_SHA_ISA="OPENSSL_ppccap=20"
+	CIPHER_CALL_SSH_ISA="OPENSSL_ppccap=20"
 
 	CIPHER_CALL_AES_Altivec="OPENSSL_ppccap=2"
 	CIPHER_CALL_AES_Altivec_ASM="OPENSSL_ppccap=2"
 
 else
-	#	Implementations for X64
+	#	Implementations for x86
 
-	EXEC="$EXEC_COMMON  
-		AESNI AESNI_AVX AESNI_CLMULNI AESNI_ASM 
-		AESASM AESASM_AVX AESASM_CLMULNI AESASM_ASM 
-		BAES_CTASM BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM 
-		SHA_AVX2 SHA_AVX SHA_SSSE3 SHA_ASM SHA3_AVX2 SHA3_ASM SHA3_AVX512 
-		SSH_AVX2 SSH_AVX SSH_SSSE3 SSH_ASM"
-	     
-	OPENSSL_REMOVE_AVX_SHA=":~0xe0200020"						# remove bits #64+21/29/30/31 (SHA512), #64+5 (AVX2)
-	OPENSSL_REMOVE_AVX=":~0x20"							# remove bit #64+5 (AVX2)
+	EXEC="$EXEC_COMMON
+		AESNI BAES_CTASM AESASM
+		AESNI_AVX AESNI_CLMULNI AESNI_ASM
+		BAES_CTASM_AVX BAES_CTASM_CLMULNI BAES_CTASM_ASM
+		AESASM_AVX AESASM_CLMULNI AESASM_ASM
+		SHA_SHANI SSH_SHANI SHA_AVX2 SSH_AVX2 SHA_AVX SSH_AVX SHA_SSSE3 SSH_SSSE3 SHA_ASM SSH_ASM
+		SHA3_AVX512VL SHA3_AVX512 SHA3_AVX2 SHA3_ASM"
 
-	# Assembler cipher and C block chaining modes
-	CIPHER_CALL_TDES_C=""
+	# See https://www.openssl.org/docs/man3.0/man3/OPENSSL_ia32cap.html
 
-	CIPHER_CALL_AESNI=""								# used by default
+	# Used by default.
+	CIPHER_CALL_AESNI=""
+	# Remove bit 57 (AES-NI).
+	CIPHER_CALL_BAES_CTASM="OPENSSL_ia32cap=~0x0200000000000000:~0x0"
+	# Remove bit 57 (AES-NI) and 41 (SSSE3).
+	CIPHER_CALL_AESASM="OPENSSL_ia32cap=~0x0200020000000000:~0x0"
 
-	CIPHER_CALL_AESNI_AVX="OPENSSL_ia32cap=~0x0${OPENSSL_REMOVE_AVX_SHA}"		# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2)
+	# Used by default.
+	CIPHER_CALL_AESNI_AVX=""
+	# Remove bit 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_AESNI_CLMULNI="OPENSSL_ia32cap=~0x1040000000000000:~0x00000600C0230000"
+	# Remove bit 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_AESNI_ASM="OPENSSL_ia32cap=~0x1040000200000000:~0x00000600C0230000"
+	# Remove bit 57 (AES-NI).
+	CIPHER_CALL_BAES_CTASM_AVX="OPENSSL_ia32cap=~0x0200000000000000:~0x0"
+	# Remove bit 57 (AES-NI), 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_BAES_CTASM_CLMULNI="OPENSSL_ia32cap=~0x1240000000000000:~0x00000600C0230000"
+	# Remove bit 57 (AES-NI), 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_BAES_CTASM_ASM="OPENSSL_ia32cap=~0x1240000200000000:~0x00000600C0230000"
+	# Remove bit 57 (AES-NI) and 41 (SSSE3).
+	CIPHER_CALL_AESASM_AVX="OPENSSL_ia32cap=~0x0200020000000000:~0x0"
+	# Remove bit 57 (AES-NI), 41 (SSSE3), 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_AESASM_CLMULNI="OPENSSL_ia32cap=~0x1240020000000000:~0x00000600C0230000"
+	# Remove bit 57 (AES-NI), 41 (SSSE3), 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	CIPHER_CALL_AESASM_ASM="OPENSSL_ia32cap=~0x1240020200000000:~0x00000600C0230000"
 
-	CIPHER_CALL_AESNI_CLMULNI="OPENSSL_ia32cap=~0x1000000000000000${OPENSSL_REMOVE_AVX}"		# remove bit #64+5 (AVX2), 60 (AVX) - AVX takes precedence over CLMUL for GHASH, so clear the AVX bit here.
+	# Used by default.
+	CIPHER_CALL_SHA_SHANI=""
+	CIPHER_CALL_SSH_SHANI=$CIPHER_CALL_SHA_SHANI
+	# Remove bit 64+29 (SHA-NI) and 64+16/17/21/30/31 (AVX512).
+	CIPHER_CALL_SHA_AVX2="OPENSSL_ia32cap=~0x0:~0x00000000E0230000"
+	CIPHER_CALL_SSH_AVX2=$CIPHER_CALL_SHA_AVX2
+	# Remove bit 64+29 (SHA-NI), 64+16/17/21/30/31 (AVX512), 64+5 (AVX2), and 64+3/8 (BMI).
+	CIPHER_CALL_SHA_AVX="OPENSSL_ia32cap=~0x0:~0x00000000E0230128"
+	CIPHER_CALL_SSH_AVX=$CIPHER_CALL_SHA_AVX
+	# Remove bit 64+29 (SHA-NI), 64+16/17/21/30/31 (AVX512), 64+5 (AVX2), 64+3/8 (BMI), and 60 (AVX).
+	CIPHER_CALL_SHA_SSSE3="OPENSSL_ia32cap=~0x1000000000000000:~0x00000000E0230128"
+	CIPHER_CALL_SSH_SSSE3=$CIPHER_CALL_SHA_SSSE3
+	# Remove bit 64+29 (SHA-NI), 64+16/17/21/30/31 (AVX512), 64+5 (AVX2), 64+3/8 (BMI), 60 (AVX), and 41 (SSSE3).
+	CIPHER_CALL_SHA_ASM="OPENSSL_ia32cap=~0x1000020000000000:~0x00000000E0230128"
+	CIPHER_CALL_SSH_ASM=$CIPHER_CALL_SHA_ASM
 
-	CIPHER_CALL_AESNI_ASM="OPENSSL_ia32cap=~0x01000000:0x0"				# remove bit 24 (XMM)
-
-	CIPHER_CALL_AESASM="OPENSSL_ia32cap=~0x200020000000000:0x0"			# remove bits 57 (AESNI), 41 (SSSE3) - clear SSSE3 as BAES_CTASM would takes precedence otherwise
-
-	CIPHER_CALL_AESASM_AVX="OPENSSL_ia32cap=~0x200020000000000${OPENSSL_REMOVE_AVX_SHA}"	# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2), 57 (AESNI), 41 (SSSE3) - clear SSSE3 as BAES_CTASM would takes precedence otherwise
-
-	CIPHER_CALL_AESASM_CLMULNI="OPENSSL_ia32cap=~0x300020000000000${OPENSSL_REMOVE_AVX}"	# remove bits #64+5 (AVX2), 60 (AVX), 57 (AESNI), 41 (SSSE3) - AVX takes precedence over CLMUL for GHASH, so clear the AVX bit here.
-
-	CIPHER_CALL_AESASM_ASM="OPENSSL_ia32cap=~0x300020200000000${OPENSSL_REMOVE_AVX}"	# remove bits #64+5 (AVX2), 60 (AVX), 57 (AESNI), 41 (SSSE3), 33 (CLMULNI) - AVX takes precedence over CLMUL for GHASH, so clear the AVX bit here.
-
-	CIPHER_CALL_BAES_CTASM="OPENSSL_ia32cap=~0x200020200000000${OPENSSL_REMOVE_AVX_SHA}"	# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2), 57 (AESNI), 41 (SSSE3), 33 (CLMULNI)
-
-	CIPHER_CALL_BAES_CTASM_AVX="OPENSSL_ia32cap=~0x200000000000000${OPENSSL_REMOVE_AVX}"	# remove bits #64+5 (AVX2), 57 (AESNI)
-
-	CIPHER_CALL_BAES_CTASM_CLMULNI="OPENSSL_ia32cap=~0x200000000000000${OPENSSL_REMOVE_AVX}"	# remove bits #64+5 (AVX2), 57 (AESNI)
-
-	CIPHER_CALL_BAES_CTASM_ASM="OPENSSL_ia32cap=~0x200000200000000${OPENSSL_REMOVE_AVX}"		# remove bits #64+5 (AVX2), 57 (AESNI), bit 33 (CLMULNI)
-
-	CIPHER_CALL_SHA3_AVX512=""							# used by default if support found)
-	CIPHER_CALL_SHA_AVX2="OPENSSL_ia32cap=${OPENSSL_REMOVE_AVX_SHA}"		# remove bits #64+21/29/30/31 (SHA512)
-	CIPHER_CALL_SHA3_AVX2=$CIPHER_CALL_SHA_AVX2
-	CIPHER_CALL_SHA_AVX="OPENSSL_ia32cap=~0x0${OPENSSL_REMOVE_AVX_SHA}"		# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2)
-	CIPHER_CALL_SHA_SSSE3="OPENSSL_ia32cap=~0x1000000000000000${OPENSSL_REMOVE_AVX_SHA}"	# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2), 60 (AVX)
-	CIPHER_CALL_SHA_ASM="OPENSSL_ia32cap=~0x1000020000000000${OPENSSL_REMOVE_AVX_SHA}"	# remove bits #64+21/29/30/31 (SHA512) , #64+5 (AVX2), 60 (AVX), 41 (SSSE3)
-	CIPHER_CALL_SHA3_ASM=$CIPHER_CALL_SHA_ASM
+	# OpenSSL doesn't actually use acceleration for SHA-3 yet.
+	# Still, we can imagine a kind of precedence as follows:
+	# Used by default.
+	CIPHER_CALL_SHA3_AVX512VL=""
+	# Remove bit 64+31 (AVX512VL).
+	CIPHER_CALL_SHA3_AVX512="OPENSSL_ia32cap=~0x0:~0x0000000080000000"
+	# Remove bit 64+29 (SHA-NI) and 64+16/17/21/30/31 (AVX512).
+	CIPHER_CALL_SHA3_AVX2="OPENSSL_ia32cap=~0x0:~0x00000000E0230000"
+	# Remove bit 64+29 (SHA-NI), 64+16/17/21/30/31 (AVX512), 64+5 (AVX2), 64+3/8 (BMI), 60 (AVX), and 41 (SSSE3).
+	CIPHER_CALL_SHA3_ASM="OPENSSL_ia32cap=~0x1000020000000000:~0x00000000E0230128"
 
 fi
 

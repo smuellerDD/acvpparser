@@ -1,6 +1,6 @@
 /* Jitter RNG ACVP Test Tool for SHA-3 256 conditioner
  *
- * Copyright (C) 2020 - 2022, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2020 - 2023, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *

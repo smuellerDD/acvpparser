@@ -32,18 +32,39 @@
 MODULE_PREFIX="leancrypto__"
 MODULE_POSTFIX="_"
 
+EXEC="C"
+
+if [ $(uname -m) = "aarch64" ]; then
+	EXEC="$EXEC
+	      ARM_NEON"
+elif [ $(uname -m) = "arm" ]; then
+	EXEC="$EXEC
+	      ARM_NEON"
+elif [ $(uname -m) = "x86_64" ]; then
+	EXEC="$EXEC
+	      AVX2 AVX512 AVX2_4X"
+fi
+
+CIPHER_CALL_C="LC_SHA3=\"C\""
+CIPHER_CALL_AVX2="LC_SHA3=\"AVX2\""
+CIPHER_CALL_AVX512="LC_SHA3=\"AVX512\""
+CIPHER_CALL_ARM_NEON="LC_SHA3=\"ARM_NEON\""
+CIPHER_CALL_AVX2_4X="LC_SHAKE=\"AVX2-4X\""
+
 do_test() {
-	exec=$1
 	PATH=.:$PATH
 
-	eval CIPHER_CALL=\$CIPHER_CALL_$exec
+	for exec in $EXEC; do
 
-	local modulename="${MODULE_PREFIX}${exec}${MODULE_POSTFIX}"
-	eval "$CIPHER_CALL exec_module ${modulename}"
+		eval CIPHER_CALL=\$CIPHER_CALL_$exec
+
+		local modulename="${MODULE_PREFIX}${exec}${MODULE_POSTFIX}"
+		eval "$CIPHER_CALL exec_module ${modulename}"
+	done
 }
 
 build_tool "leancrypto"
-do_test "C_C"
+do_test
 
 ########################################################
 

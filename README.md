@@ -142,7 +142,7 @@ that will be invoked by the ACVP parser. See
 `backend_interfaces/strongswan/README` for details on compiling the
 interface application.
 
-Ensure that the inteface application is found via the PATH environment
+Ensure that the interface application is found via the PATH environment
 variable.
 
 ## Backend-specific Hints: OpenSSH
@@ -152,7 +152,7 @@ that will be invoked by the ACVP parser. See
 `backend_interfaces/openssh/README` for details on compiling the
 interface application.
 
-Ensure that the inteface application is found via the PATH environment
+Ensure that the interface application is found via the PATH environment
 variable.
 
 ## Backend-specific Hints: BoringSSL
@@ -261,4 +261,4 @@ for a particular cipher type will fail.
 # Author
 
 Stephan Mueller  <smueller@chronox.de>
-Copyright (C) 2018 - 2021
+Copyright (C) 2018 - 2023

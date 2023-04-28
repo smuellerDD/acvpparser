@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2022, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2023, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -179,6 +179,15 @@ static int openssl_rsa_set0_factors(RSA *r, BIGNUM *p, BIGNUM *q)
 {
 	r->p = p;
 	r->q = q;
+	return 1;
+}
+
+static int openssl_rsa_set0_crt_params(RSA *r, BIGNUM *dmp1, BIGNUM *dmq1,
+				       BIGNUM *iqmp)
+{
+	r->dmp1 = dmp1;
+	r->dmq1 = dmq1;
+	r->iqmp = iqmp;
 	return 1;
 }
 
@@ -638,6 +647,12 @@ err:
 static int openssl_rsa_set0_factors(RSA *r, BIGNUM *p, BIGNUM *q)
 {
 	return RSA_set0_factors(r, p, q);
+}
+
+static int openssl_rsa_set0_crt_params(RSA *r, BIGNUM *dmp1, BIGNUM *dmq1,
+				       BIGNUM *iqmp)
+{
+	return RSA_set0_crt_params(r, dmp1, dmq1, iqmp);
 }
 
 static int openssl_rsa_set0_key(RSA *r, BIGNUM *n, BIGNUM *e, BIGNUM *d)
@@ -3942,9 +3957,13 @@ static int openssl_rsa_kas_ifc_set_key(RSA *rsa,
 				       struct buffer *e_buf,
 				       struct buffer *d_buf,
 				       struct buffer *p_buf,
-				       struct buffer *q_buf)
+				       struct buffer *q_buf,
+				       struct buffer *dmp1_buf,
+				       struct buffer *dmq1_buf,
+				       struct buffer *iqmp_buf)
 {
 	BIGNUM *n = NULL, *e = NULL, *d = NULL, *p = NULL, *q = NULL;
+	BIGNUM *dmp1 = NULL, *dmq1 = NULL, *iqmp = NULL;
 	int ret;
 
 	n = BN_bin2bn((const unsigned char *)n_buf->buf, (int)n_buf->len, n);
@@ -3957,11 +3976,22 @@ static int openssl_rsa_kas_ifc_set_key(RSA *rsa,
 	CKNULL(p, -ENOMEM);
 	q = BN_bin2bn((const unsigned char *)q_buf->buf, (int)q_buf->len, q);
 	CKNULL(q, -ENOMEM);
+	dmp1 = BN_bin2bn((const unsigned char *)dmp1_buf->buf,
+			 (int)dmp1_buf->len, dmp1);
+	CKNULL(dmp1, -ENOMEM);
+	dmq1 = BN_bin2bn((const unsigned char *)dmq1_buf->buf,
+			 (int)dmq1_buf->len, dmq1);
+	CKNULL(dmq1, -ENOMEM);
+	iqmp = BN_bin2bn((const unsigned char *)iqmp_buf->buf,
+			 (int)iqmp_buf->len, iqmp);
+	CKNULL(iqmp, -ENOMEM);
 
 	CKINT_O_LOG(openssl_rsa_set0_key(rsa, n, e, d),
 		    "Assembly of RSA key failed\n");
 	CKINT_O_LOG(openssl_rsa_set0_factors(rsa, p, q),
 		    "Assembly of RSA factors failed\n");
+	CKINT_O_LOG(openssl_rsa_set0_crt_params(rsa, dmp1, dmq1, iqmp),
+		    "Assembly of RSA CRT params failed\n");
 
 out:
 	return ret;
@@ -3994,7 +4024,10 @@ static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
 
 		CKINT(openssl_rsa_kas_ifc_set_key(rsa, &resp_val->n,
 						  &resp_val->e, &resp_val->d,
-						  &resp_val->p, &resp_val->q));
+						  &resp_val->p, &resp_val->q,
+						  &resp_val->dmp1,
+						  &resp_val->dmq1,
+						  &resp_val->iqmp));
 
 		c_p = &resp_val->c;
 	} else {
@@ -4004,7 +4037,9 @@ static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
 
 		CKINT(openssl_rsa_kas_ifc_set_key(rsa, &resp->n,
 						  &resp->e, &resp->d,
-						  &resp->p, &resp->q));
+						  &resp->p, &resp->q,
+						  &resp->dmp1, &resp->dmq1,
+						  &resp->iqmp));
 
 		c_p = &resp->c;
 	}

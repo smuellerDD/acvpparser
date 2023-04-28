@@ -1,6 +1,6 @@
 /*
  * Copyright 2021 VMware, Inc.
- * Copyright (C) 2022, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2022 - 2023, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -2370,13 +2370,19 @@ out:
 }
 
 static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
-				   struct buffer *e, struct buffer *d)
+				   struct buffer *e, struct buffer *d,
+				   struct buffer *p, struct buffer *q,
+				   struct buffer *dmp1, struct buffer *dmq1,
+				   struct buffer *iqmp)
 {
 	int ret = 0;
+	BN_CTX *bn_ctx = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
 	BIGNUM *n_bn = NULL, *e_bn = NULL, *d_bn = NULL;
+	BIGNUM *p_bn = NULL, *q_bn = NULL;
+	BIGNUM *dmp1_bn = NULL, *dmq1_bn = NULL, *iqmp_bn = NULL;
 	int selection = EVP_PKEY_PUBLIC_KEY;
 
 	bld = OSSL_PARAM_BLD_new();
@@ -2397,6 +2403,51 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 		selection = EVP_PKEY_KEYPAIR;
 	}
 
+	if (p && q && dmp1 && dmq1 && iqmp) {
+		p_bn = BN_new();
+		BN_bin2bn(p->buf, p->len, p_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1,
+					       p_bn));
+		q_bn = BN_new();
+		BN_bin2bn(q->buf, q->len, q_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR2,
+					       q_bn));
+		dmp1_bn = BN_new();
+		BN_bin2bn(dmp1->buf, dmp1->len, dmp1_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld,
+					       OSSL_PKEY_PARAM_RSA_EXPONENT1,
+					       dmp1_bn));
+		dmq1_bn = BN_new();
+		BN_bin2bn(dmq1->buf, dmq1->len, dmq1_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld,
+					       OSSL_PKEY_PARAM_RSA_EXPONENT2,
+					       dmq1_bn));
+		iqmp_bn = BN_new();
+		BN_bin2bn(iqmp->buf, iqmp->len, iqmp_bn);
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld,
+					       OSSL_PKEY_PARAM_RSA_COEFFICIENT1,
+					       iqmp_bn));
+
+		if (!d) {
+			/*
+			 * OpenSSL *requires* that RSA-CRT key pairs also
+			 * contain the d value, but the ACVP server doesn't
+			 * actually provide that in some cases. Therefore, we
+			 * compute it ourselves.
+			 * See: https://github.com/openssl/openssl/issues/16782
+			 */
+			d_bn = BN_dup(n_bn);
+			BN_sub(d_bn, d_bn, p_bn);
+			BN_sub(d_bn, d_bn, q_bn);
+			BN_add_word(d_bn, 1);
+			BN_mod_inverse(d_bn, e_bn, d_bn, bn_ctx);
+		}
+
+		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D,
+					       d_bn));
+		selection = EVP_PKEY_KEYPAIR;
+	}
+
 	params = OSSL_PARAM_BLD_to_param(bld);
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, "RSA", NULL);
@@ -2405,6 +2456,8 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 	CKINT_O(EVP_PKEY_fromdata(ctx, key, selection, params));
 
 out:
+	if (bn_ctx)
+		BN_CTX_free(bn_ctx);
 	if (ctx)
 		EVP_PKEY_CTX_free(ctx);
 	if (bld)
@@ -2417,6 +2470,16 @@ out:
 		BN_free(e_bn);
 	if (d_bn)
 		BN_free(d_bn);
+	if (p_bn)
+		BN_free(p_bn);
+	if (q_bn)
+		BN_free(q_bn);
+	if (dmp1_bn)
+		BN_free(dmp1_bn);
+	if (dmq1_bn)
+		BN_free(dmq1_bn);
+	if (iqmp_bn)
+		BN_free(iqmp_bn);
 	return ret;
 }
 
@@ -2586,7 +2649,8 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 	int ret = 0;
 	const EVP_MD *md = NULL;
 
-	CKINT(openssl_rsa_create_pkey(&key, &data->n, &data->e, NULL));
+	CKINT(openssl_rsa_create_pkey(&key, &data->n, &data->e, NULL, NULL,
+				      NULL, NULL, NULL, NULL));
 
 	CKINT(openssl_md_convert(data->cipher & ACVP_HASHMASK, &md));
 	CKINT(openssl_sig_ver(key, md, parsed_flags, data->saltlen, &data->msg,
@@ -2670,6 +2734,7 @@ static int openssl_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data,
 		CKINT(left_pad_buf(&init_val->n, data->modulus >> 3));
 
 		CKINT(openssl_rsa_create_pkey(&pk, &init_val->n, &init_val->e,
+					      NULL, NULL, NULL, NULL, NULL,
 					      NULL));
 
 		dkm_p = &init_val->dkm;
@@ -2679,7 +2744,8 @@ static int openssl_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data,
 
 		CKINT(left_pad_buf(&init->n, data->modulus >> 3));
 
-		CKINT(openssl_rsa_create_pkey(&pk, &init->n, &init->e, NULL));
+		CKINT(openssl_rsa_create_pkey(&pk, &init->n, &init->e, NULL,
+					      NULL, NULL, NULL, NULL, NULL));
 
 		if (!init->dkm.len) {
 			CKINT(alloc_buf(keylen >> 3, &init->dkm));
@@ -2823,7 +2889,9 @@ static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
 		CKINT(left_pad_buf(&resp_val->n, data->modulus >> 3));
 
 		CKINT(openssl_rsa_create_pkey(&pk, &resp_val->n, &resp_val->e,
-					      &resp_val->d));
+					      &resp_val->d, &resp_val->p,
+					      &resp_val->q, &resp_val->dmp1,
+					      &resp_val->dmq1, &resp_val->iqmp));
 
 		c_p = &resp_val->c;
 	} else {
@@ -2831,8 +2899,9 @@ static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
 
 		CKINT(left_pad_buf(&resp->n, data->modulus >> 3));
 
-		CKINT(openssl_rsa_create_pkey(&pk, &resp->n, &resp->e,
-					      &resp->d));
+		CKINT(openssl_rsa_create_pkey(&pk, &resp->n, &resp->e, &resp->d,
+					      &resp->p, &resp->q, &resp->dmp1,
+					      &resp->dmq1, &resp->iqmp));
 
 		c_p = &resp->c;
 	}

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2018 - 2022, Stephan Müller <smueller@chronox.de>
- * Copyright 2022 VMware, Inc.
+ * Copyright (C) 2018 - 2023, Stephan Müller <smueller@chronox.de>
+ * Copyright 2023 VMware, Inc.
  *
  * License: see LICENSE file
  *

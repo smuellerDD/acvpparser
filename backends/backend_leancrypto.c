@@ -1,6 +1,6 @@
 /* Backend for leancrypto
  *
- * Copyright (C) 2022, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2022 - 2023, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -357,35 +357,35 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 			cipher);
 			return -EOPNOTSUPP;
 		}
-	} else if (envstr && !strncasecmp(envstr, "ARM8_NEON", 6)) {
+	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 6)) {
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
-			*lc_hash = lc_sha3_224_arm8_neon;
+			*lc_hash = lc_sha3_224_arm_neon;
 			break;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
-			*lc_hash = lc_sha3_256_arm8_neon;
+			*lc_hash = lc_sha3_256_arm_neon;
 			break;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
-			*lc_hash = lc_sha3_384_arm8_neon;
+			*lc_hash = lc_sha3_384_arm_neon;
 			break;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
-			*lc_hash = lc_sha3_512_arm8_neon;
+			*lc_hash = lc_sha3_512_arm_neon;
 			break;
 		case ACVP_SHAKE128:
-			*lc_hash = lc_shake128_arm8_neon;
+			*lc_hash = lc_shake128_arm_neon;
 			break;
 		case ACVP_SHAKE256:
-			*lc_hash = lc_shake256_arm8_neon;
+			*lc_hash = lc_shake256_arm_neon;
 			break;
 		case ACVP_CSHAKE128:
-			*lc_hash = lc_cshake128_arm8_neon;
+			*lc_hash = lc_cshake128_arm_neon;
 			break;
 		case ACVP_CSHAKE256:
-			*lc_hash = lc_cshake256_arm8_neon;
+			*lc_hash = lc_cshake256_arm_neon;
 			break;
 		default:
 			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
