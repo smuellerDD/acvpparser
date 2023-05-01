@@ -707,6 +707,7 @@ static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
 	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *) data->priv;
 	size_t origlen = data->data.len;
 	int outl;
+	int ret = 0;
 
 	logger_binary(LOGGER_DEBUG, data->data.buf, data->data.len,
 		      (parsed_flags & FLAG_OP_ENC) ?
@@ -724,17 +725,49 @@ static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
 		origlen = data->data.len;
 		data->data.len = data->data_len_bits;
 	}
+	if (data->cipher == ACVP_XTS) {
+		BIGNUM *tweak = NULL;
+		int pos = 0;
+		int len = data->data.len;
+		int dataUnitBytes = data->xts_data_unit_len >> 3;
 
-	if (!EVP_CipherUpdate(ctx, data->data.buf, &outl, data->data.buf,
-			      (int)data->data.len)) {
-		logger(LOGGER_WARN, "Update failed\n");
-		return -EFAULT;
-	}
+		tweak = BN_bin2bn(data->iv.buf, data->iv.len, NULL);
+		CKNULL(tweak, -ENOMEM);
+		while (len > 0) {
+			int d_len = (len > dataUnitBytes)? dataUnitBytes : len;
 
-	if (!EVP_CipherFinal_ex(ctx, data->data.buf, &outl)) {
-		logger(LOGGER_WARN, "Final failed: %s\n",
-		       ERR_error_string(ERR_get_error(), NULL));
-		return -EFAULT;
+			if (!EVP_CipherUpdate(ctx, data->data.buf + pos, &outl, data->data.buf + pos, d_len)) {
+				logger(LOGGER_WARN, "Update failed\n");
+				return -EFAULT;
+			}
+
+			pos += outl;
+			len -= outl;
+			if (!EVP_CipherFinal_ex(ctx, data->data.buf + pos, &outl)) {
+				logger(LOGGER_WARN, "Final failed: %s\n",
+					ERR_error_string(ERR_get_error(), NULL));
+				return -EFAULT;
+			}
+
+			if (!BN_add_word(tweak, 1)) {
+				logger(LOGGER_WARN, "BN_add_word() failed");
+				return -EFAULT;
+			}
+			BN_bn2bin(tweak, ctx->iv + data->iv.len - BN_num_bytes(tweak));
+		}
+		BN_free(tweak);
+	} else {
+		if (!EVP_CipherUpdate(ctx, data->data.buf, &outl, data->data.buf,
+					(int)data->data.len)) {
+			logger(LOGGER_WARN, "Update failed\n");
+			return -EFAULT;
+		}
+
+		if (!EVP_CipherFinal_ex(ctx, data->data.buf, &outl)) {
+			logger(LOGGER_WARN, "Final failed: %s\n",
+				ERR_error_string(ERR_get_error(), NULL));
+			return -EFAULT;
+		}
 	}
 
 	if (data->data.len != origlen)
@@ -744,7 +777,8 @@ static int openssl_mct_update(struct sym_data *data, flags_t parsed_flags)
 		      (parsed_flags & FLAG_OP_ENC) ?
 		      "ciphertext" : "plaintext");
 
-	return 0;
+out:
+	return ret;
 }
 
 /*
