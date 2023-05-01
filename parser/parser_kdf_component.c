@@ -278,6 +278,7 @@ static int kdf_tester_ikev2(struct json_object *in, struct json_object *out,
 	const struct json_entry kdf_ikev2_testgroup_entries[] = {
 		{"hashAlg",			{.data.largeint = &kdf_ikev2_vector.hashalg, PARSER_CIPHER},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT},
 		{"derivedKeyingMaterialLength",	{.data.integer = &kdf_ikev2_vector.dkmlen, PARSER_UINT},	FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT },
+		{"dhLength",			{.data.integer = &kdf_ikev2_vector.dhlen, PARSER_UINT},		FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT },
 		{"tests",			{.data.array = &kdf_ikev2_test, PARSER_ARRAY},			FLAG_OP_KDF_TYPE_IKEV2 | FLAG_OP_AFT },
 	};
 	const struct json_array kdf_ikev2_testgroup = SET_ARRAY(kdf_ikev2_testgroup_entries, NULL);
