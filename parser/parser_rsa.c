@@ -337,11 +337,28 @@ static int rsa_keygen_helper(const struct json_array *processdata,
 	int (*callback)(struct rsa_keygen_data *vector, flags_t parsed_flags),
 			struct rsa_keygen_data *vector)
 {
-
 	int ret = 0;
+	const char *bitlens_name = "bitlens";
+	struct json_object *json_nobj;
+	unsigned int i;
 
-	(void)testvector;
+	if (!json_find_key(testvector, bitlens_name, &json_nobj, json_type_array)) {
+		if (!json_nobj) {
+			logger(LOGGER_ERR,
+				"Parsing of entry %s with expected array failed\n", bitlens_name);
+			return -EINVAL;
+		}
+		vector->bitlen_in = (unsigned int)json_object_array_length(json_nobj);
+		for (i = 0; i < vector->bitlen_in; i++) {
+			struct json_object *testvector =
+				json_object_array_get_idx(json_nobj, i);
 
+			CKNULL_LOG(testvector, -EINVAL, "No vector\n");
+			vector->bitlen[i] = json_object_get_int(testvector);
+		}
+	} else {
+		vector->bitlen_in = 0;
+	}
 	CKINT(callback(vector, parsed_flags));
 
 	if (parsed_flags & FLAG_OP_RSA_PQ_B36_PRIMES) {
@@ -364,7 +381,7 @@ static int rsa_keygen_helper(const struct json_array *processdata,
 		bitlenarray = json_object_new_array();
 		CKNULL(bitlenarray, -ENOMEM);
 		/* Append the output JSON stream with test results. */
-		json_object_object_add(testresult, "bitlens", bitlenarray);
+		json_object_object_add(testresult, bitlens_name, bitlenarray);
 		json_object_array_add(bitlenarray,
 				json_object_new_int((int)vector->bitlen[0]));
 		json_object_array_add(bitlenarray,
@@ -432,8 +449,23 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_testresult rsa_keygen_testresult = SET_ARRAY(rsa_keygen_testresult_entries, &rsa_keygen_callbacks);
 
-	/* search for empty arrays */
-	const struct json_array rsa_keygen_test = {NULL, 0 , &rsa_keygen_testresult};
+	const struct json_entry rsa_keygen_test_entries[] = {
+		{"xP",	{.data.buf = &rsa_keygen_vector.xp, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"xP1",	{.data.buf = &rsa_keygen_vector.xp1, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"xP2",	{.data.buf = &rsa_keygen_vector.xp2, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"xQ",	{.data.buf = &rsa_keygen_vector.xq, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"xQ1",	{.data.buf = &rsa_keygen_vector.xq1, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"xQ2",	{.data.buf = &rsa_keygen_vector.xq2, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+		{"e",	{.data.buf = &rsa_keygen_vector.e, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OPTIONAL },
+	};
+	const struct json_array rsa_keygen_test = SET_ARRAY(rsa_keygen_test_entries, &rsa_keygen_testresult);
 
 	/**********************************************************************
 	 * RSA B.3.2 KeyGen KAT and KeyGen GDT
