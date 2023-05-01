@@ -164,20 +164,29 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 {
 	struct json_object *testresult = NULL, *resultsarray = NULL,
 			   *resultsobject = NULL;
-	static uint32_t failures = 0;
-	unsigned int max;
+	static uint32_t failures = 0, total_cases = 0;
 	int ret;
 	void *rsa_privkey = NULL;
+	unsigned int it;
+	const unsigned int iteration_limit = 30;
+	const unsigned int probing_limit = 15;
+	unsigned int fails = 0, successes = 0;
+	static struct rsa_decryption_primitive_data *fails_mem;
 
 	(void)processdata;
 	(void)testvector;
 	(void)testresults;
 
+	if (total_cases == 0) {
+		fails_mem = calloc(vector->num, sizeof(struct rsa_decryption_primitive_data));
+		CKNULL(fails_mem, -ENOMEM);
+	}
+	logger(LOGGER_DEBUG, "CASE %u/%u\n", total_cases + 1, vector->num);
 	/* We try at most these many times times */
-	for (max = 0; max < 400; max++) {
+	for (it = 1; it <= iteration_limit; it++) {
 		logger(LOGGER_DEBUG,
-			"%d/%d failures found, [0] = 0x%x, iteration %d/400\n",
-			failures, vector->num_failures, vector->msg.buf[0], max);
+			"%u/%u failures found, [0] = 0x%x, iteration %u/%u\n",
+			failures, vector->num_failures, vector->msg.buf[0], it, iteration_limit);
 		vector->dec_result = false;
 		free_buf(&vector->s);
 
@@ -188,7 +197,35 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 		vector->privkey = rsa_privkey;
 
 		CKINT(callback(vector, parsed_flags));
-
+		if (vector->dec_result)
+			successes++;
+		else {
+			fails++;
+			if (!fails_mem[total_cases].e.buf) {
+				logger(LOGGER_DEBUG, "Storing failure e and n for future use\n");
+				copy_ptr_buf(&fails_mem[total_cases].e, &vector->e);
+				copy_ptr_buf(&fails_mem[total_cases].n, &vector->n);
+				vector->e.buf = NULL;
+				vector->n.buf = NULL;
+				alloc_buf(vector->e.len, &vector->e);
+				alloc_buf(vector->n.len, &vector->n);
+			}
+		}
+		if (it >= probing_limit)
+		{
+			int have_to_fail = ( (vector->num - total_cases) <=
+								 (vector->num_failures - failures) );
+			if (vector->dec_result) {
+				/* Don't accept success if the test have to fail */
+				if (!have_to_fail)
+					break;
+			} else {
+				if (failures < vector->num_failures &&
+				    (have_to_fail || successes == 0))
+					break;
+			}
+		}
+		continue;
 		/*
 		 * There should be totalFailingCases number of messages with
 		 * two leading one bits. Let us try to fail those. See
@@ -227,9 +264,15 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 		if (vector->dec_result)
 			break;
 	}
+	total_cases++;
 
-	if (!vector->dec_result)
+	if (!vector->dec_result) {
 		failures++;
+		if (failures > vector->num_failures) {
+			logger(LOGGER_ERR, "Failures limit exceeded\n");
+			return -EFAULT;
+		}
+	}
 
 	/*
 	 * Create object with following structure:
@@ -283,7 +326,6 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	/* One object holding the test results */
 	resultsobject = json_object_new_object();
 	CKNULL(resultsobject, -ENOMEM);
-	json_object_array_add(resultsarray, resultsobject);
 
 	CKINT(json_add_bin2hex(resultsobject, "e", &vector->e));
 	CKINT(json_add_bin2hex(resultsobject, "n", &vector->n));
@@ -296,6 +338,7 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	CKINT(json_object_object_add(resultsobject, "testPassed",
 			json_object_new_boolean((int)vector->dec_result)));
 	free_buf(&vector->s);
+	json_object_array_add(resultsarray, resultsobject);
 
 	/*
 	 * Sanity check that we have the exact number of expected failures.
@@ -310,9 +353,26 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 		for (i = 0; i < vector->num; i++) {
 			testresult = json_object_array_get_idx(resultsarray, i);
 
-			if (!json_get_bool(testresult, "testPassed", &boolean) &&
-			    !boolean)
+			if (!json_get_bool(testresult, "testPassed", &boolean) && !boolean)
 				count++;
+
+			if (failures < vector->num_failures && boolean &&
+				fails_mem[i].e.buf) {
+				logger(LOGGER_DEBUG, "Found needed failure for case: %u\n", i);
+				failures++;
+				count++;
+				json_object_object_del(testresult, "plainText");
+				json_object_object_del(testresult, "e");
+				json_object_object_del(testresult, "n");
+				CKINT(json_add_bin2hex(testresult, "e", &fails_mem[i].e));
+				CKINT(json_add_bin2hex(testresult, "n", &fails_mem[i].n));
+				json_object_object_del(testresult, "testPassed");
+				CKINT(json_object_object_add(testresult, "testPassed",
+						json_object_new_boolean(0)));
+			}
+			/* Release memory if any */
+			free_buf(&fails_mem[i].e);
+			free_buf(&fails_mem[i].n);
 		}
 
 		if (count != vector->num_failures) {
@@ -322,6 +382,8 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 			ret = -EFAULT;
 			goto out;
 		}
+		/* Release failures memory */
+		free(fails_mem);
 	}
 
 	ret = FLAG_RES_DATA_WRITTEN;
