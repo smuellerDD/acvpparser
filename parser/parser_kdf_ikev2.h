@@ -33,6 +33,7 @@ extern "C"
  *
  * @var hashalg [in] Hash algorithm to be used for PRF.
  * @var dkmlen [in] Length of derived key material to be produced
+ * @var dhlen [in] Length of Diffie Hellman shared secret
  * @var n_init [in] Value of initiator nonce (Ni in RFC 5996)
  * @var n_resp [in] Value of responder nonce (Nr in RFC 5996)
  * @var spi_init [in] Security parameter indice of the initiator
@@ -54,6 +55,7 @@ extern "C"
 struct kdf_ikev2_data {
 	uint64_t hashalg;
 	uint32_t dkmlen;
+	uint32_t dhlen;
 	struct buffer n_init;
 	struct buffer n_resp;
 	struct buffer spi_init;
