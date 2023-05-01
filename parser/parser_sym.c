@@ -1056,6 +1056,7 @@ static int sym_aes_tester(struct json_object *in, struct json_object *out,
 		{"ct",		{.data.buf = &vector.data, PARSER_BIN},	FLAG_OP_DEC | FLAG_OP_AFT},
 
 		{"payloadLen",	{.data.integer = &vector.data_len_bits, PARSER_UINT},	FLAG_OPTIONAL | FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
+		{"dataUnitLen",	{.data.integer = &vector.xts_data_unit_len, PARSER_UINT},	FLAG_OPTIONAL | FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
 	};
 	const struct json_array sym_test_aft = SET_ARRAY(sym_test_aft_entries, &sym_testresult_aft);
 

@@ -50,6 +50,7 @@ extern "C"
  * @var xts_sequence_no [in] If XTS sequence number is requested, it is
  *			       stored in this variable. In this case, the IV
  *			       is NULL.
+ * @var xts_data_unit_len [in] Length of XTS data unit in bits.
  * @var inner_loop_final_cj1[out] This value is optional and contains the final
  * 				  C[j-1] cipher text from the inner loop for
  *				  AES. If this value is set the inner loop of
@@ -81,6 +82,7 @@ struct sym_data {
 	struct buffer data;
 	uint32_t data_len_bits;
 	uint32_t xts_sequence_no;
+	uint32_t xts_data_unit_len;
 	struct buffer inner_loop_final_cj1;
 	uint32_t integrity_error;
 	struct buffer kwcipher;
