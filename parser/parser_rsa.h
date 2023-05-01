@@ -76,6 +76,7 @@ struct rsa_keygen_prime_data {
  * @var xq [out]
  * @var xq1 [out]
  * @var xq2 [out]
+ * @var bitlen_in [in]
  * @var bitlen [out]
  *
  * The following buffers are for CRT key format.
@@ -99,6 +100,7 @@ struct rsa_keygen_data {
 	struct buffer xq;
 	struct buffer xq1;
 	struct buffer xq2;
+	unsigned int bitlen_in;
 	unsigned int bitlen[4];
 
 	struct buffer dmp1;
