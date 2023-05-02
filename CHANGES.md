@@ -1,3 +1,9 @@
+v2.1.6
+- fix: cSHAKE MCT now working
+- enhancement: KDA One/Twostep parser added
+- enhancement: OpenSSL KDA One/Twostep support added
+- enhancement: various fixes for OpenSSL3
+
 v2.1.5
 - enhancement: add support for KAS_IFC_SSC
 - enhancement: add DSA/ECDSA for OpenSSL 3
