@@ -10,7 +10,7 @@ LIBDIR := lib
 
 PARSERDIR := parser
 
-CC=gcc
+CC ?= gcc
 CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11 -Wno-variadic-macros
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
