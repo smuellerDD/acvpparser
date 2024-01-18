@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -154,6 +154,25 @@ out:
 	return ret;
 }
 
+// This function will be called for both the 1.0 and SP 800-56Br2 revisions of
+// the decryption primitive testing.
+// For the 1.0 revision, the test contains one test case, which itself contains
+// a "resultsArray"; a list of ciphertexts. Therefore, this function will be
+// called once for each entry in that resultsArray.
+// However, the SP 800-56Br2 test cases don't have this resultsArray. Instead,
+// they specify the RSA parameters (n, e, d, etc.) directly.
+// Because of this JSON difference between the two revisions, all JSON fields
+// are marked as OPTIONAL, so we distinguish between the cases as follows:
+// 1) If the "d" value is present in the vector, we are testing the SP 800-56Br2
+//    revision, which is trivial.
+// 2) Otherwise, if the "msg" value is present in the vector, we are testing one
+//    entry in the resultsArray for the 1.0 revision, which requires a
+//    significant amount of code.
+// 3) Finally, it is possible that no values at all are persent in the vector.
+//    This is due to the way the JSON entries are parsed by the parser: because
+//    all fields are marked OPTIONAL, there is one more call to this function
+//    for the 1.0 revision, this time at the test case level, rather than the
+//    resultsArray entry level. This function call can safely be ignored.
 static int rsa_decprim_helper(const struct json_array *processdata,
 			      flags_t parsed_flags,
 			      struct json_object *testvector,
@@ -170,13 +189,27 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 	unsigned int it;
 	const unsigned int iteration_limit = 30;
 	const unsigned int probing_limit = 15;
-	unsigned int fails = 0, successes = 0;
+	unsigned int successes = 0;
 	static struct rsa_decryption_primitive_data *fails_mem;
 
 	(void)processdata;
 	(void)testvector;
-	(void)testresults;
 
+	if (vector->d.len) {
+		// Case 1 as described above.
+		logger(LOGGER_DEBUG, "Performing SP 800-56Br2 decryption primitive testing\n");
+		CKINT(callback(vector, parsed_flags));
+		goto out;
+	}
+
+	if (!vector->msg.len) {
+		// Case 3 as described above.
+		ret = FLAG_RES_DATA_WRITTEN;
+		goto out;
+	}
+
+	// Case 2 as described above.
+	logger(LOGGER_DEBUG, "Performing 1.0 decryption primitive testing\n");
 	if (total_cases == 0) {
 		fails_mem = calloc(vector->num, sizeof(struct rsa_decryption_primitive_data));
 		CKNULL(fails_mem, -ENOMEM);
@@ -200,7 +233,6 @@ static int rsa_decprim_helper(const struct json_array *processdata,
 		if (vector->dec_result)
 			successes++;
 		else {
-			fails++;
 			if (!fails_mem[total_cases].e.buf) {
 				logger(LOGGER_DEBUG, "Storing failure e and n for future use\n");
 				copy_ptr_buf(&fails_mem[total_cases].e, &vector->e);
@@ -412,11 +444,11 @@ static int rsa_keygen_helper(const struct json_array *processdata,
 		}
 		vector->bitlen_in = (unsigned int)json_object_array_length(json_nobj);
 		for (i = 0; i < vector->bitlen_in; i++) {
-			struct json_object *testvector =
+			struct json_object *tv =
 				json_object_array_get_idx(json_nobj, i);
 
-			CKNULL_LOG(testvector, -EINVAL, "No vector\n");
-			vector->bitlen[i] = json_object_get_int(testvector);
+			CKNULL_LOG(tv, -EINVAL, "No vector\n");
+			vector->bitlen[i] = (unsigned int)json_object_get_int(tv);
 		}
 	} else {
 		vector->bitlen_in = 0;
@@ -427,7 +459,6 @@ static int rsa_keygen_helper(const struct json_array *processdata,
 		struct json_object *bitlenarray = NULL;
 		struct json_object *testresult = NULL;
 		const struct json_entry *entry;
-		unsigned int i;
 
 		testresult = json_object_new_object();
 		CKNULL(testresult, -ENOMEM);
@@ -629,7 +660,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	/**********************************************************************
 	 * RSA signature primitive regular key type
 	 **********************************************************************/
-	RSA_DEF_CALLBACK(rsa_signature_primitive, FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK);
+	RSA_DEF_CALLBACK(rsa_signature_primitive, FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT);
 
 	/*
 	 * Define which test result data should be written to the test result
@@ -637,40 +668,40 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry rsa_signature_primitive_testresult_entries[] = {
 		{"signature",	{.data.buf = &rsa_signature_primitive_vector.signature, WRITER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
 		{"testPassed",	{.data.integer = &rsa_signature_primitive_vector.sig_result, WRITER_BOOL},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
 	};
 	const struct json_testresult rsa_signature_primitive_testresult = SET_ARRAY(rsa_signature_primitive_testresult_entries, &rsa_signature_primitive_callbacks);
 
 
 	const struct json_entry rsa_signature_primitive_test_entries[] = {
 		{"message",	{.data.buf = &rsa_signature_primitive_vector.msg, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
 		{"n",		{.data.buf = &rsa_signature_primitive_vector.n, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		{"e",		{.data.buf = &rsa_signature_primitive_vector.e, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		/* ACVP server currently does not provide d for RSA-CRT keys. */
 		{"d",		{.data.buf = &rsa_signature_primitive_vector.d, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
-		{"e",		{.data.buf = &rsa_signature_primitive_vector.e, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
-#if 0
-		/* d is marked optional in case of CRT */
-		{"d",		{.data.buf = &rsa_signature_primitive_vector.u.rsa_regular.d, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OPTIONAL},
-		{"dmp1",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.dmp1, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
-		{"dmq1",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.dmq1, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
-		{"iqmp",	{.data.buf = &rsa_signature_primitive_vector.u.rsa_crt.iqmp, PARSER_BIN},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
-#endif
+		{"p",		{.data.buf = &rsa_signature_primitive_vector.p, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"q",		{.data.buf = &rsa_signature_primitive_vector.q, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"dmp1",	{.data.buf = &rsa_signature_primitive_vector.dmp1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"dmq1",	{.data.buf = &rsa_signature_primitive_vector.dmq1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"iqmp",	{.data.buf = &rsa_signature_primitive_vector.iqmp, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
 	};
 	const struct json_array rsa_signature_primitive_test = SET_ARRAY(rsa_signature_primitive_test_entries, &rsa_signature_primitive_testresult);
 
 	/**********************************************************************
 	 * RSA decryption primitive
 	 **********************************************************************/
-	RSA_DEF_CALLBACK_HELPER(rsa_decryption_primitive, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT, rsa_decprim_helper);
+	RSA_DEF_CALLBACK_HELPER(rsa_decryption_primitive, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT, rsa_decprim_helper);
 
 	/*
 	 * Define which test result data should be written to the test result
@@ -688,19 +719,45 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	};
 	const struct json_testresult rsa_decryption_primitive_testresult = SET_ARRAY(rsa_decryption_primitive_testresult_entries, &rsa_decryption_primitive_callbacks);
 
-	const struct json_entry rsa_decryption_primitive_test_entries[] = {
+	const struct json_entry rsa_decryption_primitive_sp800_56b_testresult_entries[] = {
+		{"pt",		{.data.buf = &rsa_decryption_primitive_vector.s, WRITER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		{"testPassed",	{.data.integer = &rsa_decryption_primitive_vector.dec_result, WRITER_BOOL},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+	};
+	const struct json_testresult rsa_decryption_primitive_sp800_56b_testresult = SET_ARRAY(rsa_decryption_primitive_sp800_56b_testresult_entries, &rsa_decryption_primitive_callbacks);
+
+	const struct json_entry rsa_decryption_primitive_testresults_entries[] = {
 		{"cipherText",	{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
 			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
 	};
-	const struct json_array rsa_decryption_primitive_test = SET_ARRAY(rsa_decryption_primitive_test_entries, &rsa_decryption_primitive_testresult);
+	const struct json_array rsa_decryption_primitive_testresults = SET_ARRAY(rsa_decryption_primitive_testresults_entries, &rsa_decryption_primitive_testresult);
 
-	const struct json_entry rsa_decryption_primitive_testresults_entries[] = {
+	const struct json_entry rsa_decryption_primitive_test__entries[] = {
 		{"tcId",	{.data.integer = &rsa_decryption_primitive_vector.tcid, PARSER_UINT},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK},
-		{"resultsArray",	{.data.array = &rsa_decryption_primitive_test, PARSER_ARRAY},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK}
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT},
+		{"resultsArray",{.data.array = &rsa_decryption_primitive_testresults, PARSER_ARRAY},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OPTIONAL},
+		{"ct",		{.data.buf = &rsa_decryption_primitive_vector.msg, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"dmp1",	{.data.buf = &rsa_decryption_primitive_vector.dmp1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"dmq1",	{.data.buf = &rsa_decryption_primitive_vector.dmq1, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"iqmp",	{.data.buf = &rsa_decryption_primitive_vector.iqmp, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"p",		{.data.buf = &rsa_decryption_primitive_vector.p, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"q",		{.data.buf = &rsa_decryption_primitive_vector.q, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"d",		{.data.buf = &rsa_decryption_primitive_vector.d, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"n",		{.data.buf = &rsa_decryption_primitive_vector.n, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
+		{"e",		{.data.buf = &rsa_decryption_primitive_vector.e, PARSER_BIN},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_SIG_MASK | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
 	};
-	const struct json_array rsa_decryption_primitive_testresults = SET_ARRAY(rsa_decryption_primitive_testresults_entries, NULL);
+	const struct json_array rsa_decryption_primitive_test_ = SET_ARRAY(rsa_decryption_primitive_test__entries, &rsa_decryption_primitive_sp800_56b_testresult);
 
 	/**********************************************************************
 	 * RSA common test group
@@ -775,16 +832,16 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 
 	const struct json_entry rsa_signature_primitive_testgroup_entries[] = {
 		{"tests",	{.data.array = &rsa_signature_primitive_test, PARSER_ARRAY},
-			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT}
+			         FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_CRT}
 	};
 	const struct json_array rsa_signature_primitive_testgroup = SET_ARRAY(rsa_signature_primitive_testgroup_entries, NULL);
 
 	const struct json_entry rsa_decryption_primitive_testgroup_entries[] = {
 		{"modulo",	{.data.integer = &rsa_decryption_primitive_vector.modulus, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
-		{"totalFailingCases",	{.data.integer = &rsa_decryption_primitive_vector.num_failures, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
-		{"totalTestCases",	{.data.integer = &rsa_decryption_primitive_vector.num, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT},
-		{"tests",	{.data.array = &rsa_decryption_primitive_testresults, PARSER_ARRAY},
-			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT}
+		{"totalFailingCases",	{.data.integer = &rsa_decryption_primitive_vector.num_failures, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OPTIONAL},
+		{"totalTestCases",	{.data.integer = &rsa_decryption_primitive_vector.num, PARSER_UINT}, FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OPTIONAL},
+		{"tests",	{.data.array = &rsa_decryption_primitive_test_, PARSER_ARRAY},
+			         FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE | FLAG_OP_AFT | FLAG_OP_RSA_CRT}
 	};
 	const struct json_array rsa_decryption_primitive_testgroup = SET_ARRAY(rsa_decryption_primitive_testgroup_entries, NULL);
 

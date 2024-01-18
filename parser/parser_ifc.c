@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2020 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -47,13 +47,17 @@ static int kas_ifc_tester(struct json_object *in, struct json_object *out,
 	/*******************************************************************
 	 * KTS IFC Responder validation test
 	 *******************************************************************/
-	const struct json_entry kts_ifc_resp_val_testresult_entries[] = {
+	const struct json_entry kas_ifc_resp_val_testresult_entries[] = {
 		{"testPassed",	{.data.integer = &kts_ifc_vector.u.kts_ifc_resp_validation.validation_success, WRITER_BOOL},
 			         FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
-	const struct json_testresult kts_ifc_resp_val_testresult = SET_ARRAY(kts_ifc_resp_val_testresult_entries, &kts_ifc_callbacks);
+	const struct json_testresult kas_ifc_resp_val_testresult = SET_ARRAY(kas_ifc_resp_val_testresult_entries, &kts_ifc_callbacks);
 
-	const struct json_entry kts_ifc_resp_val_test_entries[] = {
+	const struct json_entry kas_ifc_resp_val_test_entries[] = {
+		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.server_n, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.server_e, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"serverP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.server_p, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"serverQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.server_q, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.n, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.e, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.p, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
@@ -62,93 +66,115 @@ static int kas_ifc_tester(struct json_object *in, struct json_object *out,
 		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dmp1, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dmq1, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.iqmp, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"iutC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.iut_c, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.c, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"z",		{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"hashZ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dkm_hash, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 	};
-	const struct json_array kts_ifc_resp_val_tests = SET_ARRAY(kts_ifc_resp_val_test_entries, &kts_ifc_resp_val_testresult);
+	const struct json_array kas_ifc_resp_val_tests = SET_ARRAY(kas_ifc_resp_val_test_entries, &kas_ifc_resp_val_testresult);
 
 	/*******************************************************************
 	 * KTS IFC Initiator validation test
 	 *******************************************************************/
-	const struct json_entry kts_ifc_init_val_testresult_entries[] = {
+	const struct json_entry kas_ifc_init_val_testresult_entries[] = {
 		{"testPassed",	{.data.integer = &kts_ifc_vector.u.kts_ifc_init_validation.validation_success, WRITER_BOOL},
 			         FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
 	};
-	const struct json_testresult kts_ifc_init_val_testresult = SET_ARRAY(kts_ifc_init_val_testresult_entries, &kts_ifc_callbacks);
+	const struct json_testresult kas_ifc_init_val_testresult = SET_ARRAY(kas_ifc_init_val_testresult_entries, &kts_ifc_callbacks);
 
-	const struct json_entry kts_ifc_init_val_test_entries[] = {
-		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.n, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.e, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"iutC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.c, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"serverP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.p, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
-		{"serverQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.q, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
-		{"z",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
+	const struct json_entry kas_ifc_init_val_test_entries[] = {
+		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.n, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.e, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"serverP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.p, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"serverQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.q, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_n, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_e, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_p, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_q, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_d, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_dmp1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_dmq1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.iut_iqmp, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.c, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.server_c, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"z",		{.data.buf = &kts_ifc_vector.u.kts_ifc_init_validation.dkm, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
 	};
-	const struct json_array kts_ifc_init_val_tests = SET_ARRAY(kts_ifc_init_val_test_entries, &kts_ifc_init_val_testresult);
+	const struct json_array kas_ifc_init_val_tests = SET_ARRAY(kas_ifc_init_val_test_entries, &kas_ifc_init_val_testresult);
 
 	/*******************************************************************
 	 * KTS IFC Responder test
 	 *******************************************************************/
-	const struct json_entry kts_ifc_resp_testresult_entries[] = {
+	const struct json_entry kas_ifc_resp_testresult_entries[] = {
+		{"iutC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.iut_c, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"z",		{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dkm, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
-	const struct json_testresult kts_ifc_resp_testresult = SET_ARRAY(kts_ifc_resp_testresult_entries, &kts_ifc_callbacks);
+	const struct json_testresult kas_ifc_resp_testresult = SET_ARRAY(kas_ifc_resp_testresult_entries, &kts_ifc_callbacks);
 
-	const struct json_entry kts_ifc_resp_test_entries[] = {
-		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.n, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.e, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.p, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.q, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.d, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
-		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dmp1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
-		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dmq1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
-		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.iqmp, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
-		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.c, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
+	const struct json_entry kas_ifc_resp_test_entries[] = {
+		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.server_n, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.server_e, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.n, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.e, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.p, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.q, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.d, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dmp1, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.dmq1, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.iqmp, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp.c, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
-	const struct json_array kts_ifc_resp_tests = SET_ARRAY(kts_ifc_resp_test_entries, &kts_ifc_resp_testresult);
+	const struct json_array kas_ifc_resp_tests = SET_ARRAY(kas_ifc_resp_test_entries, &kas_ifc_resp_testresult);
 
 	/*******************************************************************
 	 * KTS IFC Initiator test
 	 *******************************************************************/
-	const struct json_entry kts_ifc_init_testresult_entries[] = {
+	const struct json_entry kas_ifc_init_testresult_entries[] = {
 		{"iutC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_c, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
 		{"z",		{.data.buf = &kts_ifc_vector.u.kts_ifc_init.dkm, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
 	};
-	const struct json_testresult kts_ifc_init_testresult = SET_ARRAY(kts_ifc_init_testresult_entries, &kts_ifc_callbacks);
+	const struct json_testresult kas_ifc_init_testresult = SET_ARRAY(kas_ifc_init_testresult_entries, &kts_ifc_callbacks);
 
-	const struct json_entry kts_ifc_init_test_entries[] = {
-		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.n, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.e, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
+	const struct json_entry kas_ifc_init_test_entries[] = {
+		{"serverN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.n, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"serverE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.e, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
+		{"iutN",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_n, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_e, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_p, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_q, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_d, PARSER_BIN},		FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_dmp1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_dmq1, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.iut_iqmp, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
+		{"serverC",	{.data.buf = &kts_ifc_vector.u.kts_ifc_init.server_c, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OPTIONAL},
 	};
-	const struct json_array kts_ifc_init_tests = SET_ARRAY(kts_ifc_init_test_entries, &kts_ifc_init_testresult);
+	const struct json_array kas_ifc_init_tests = SET_ARRAY(kas_ifc_init_test_entries, &kas_ifc_init_testresult);
 
-	const struct json_entry kts_ifc_testgroup_entries[] = {
+	const struct json_entry kas_ifc_testgroup_entries[] = {
 		{"scheme",		{.data.largeint = &kts_ifc_vector.schema, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"keyGenerationMethod",	{.data.largeint = &kts_ifc_vector.key_generation_method, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"modulo",		{.data.integer = &kts_ifc_vector.modulus, PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
 		/* Generation tests */
-		{"tests",	{.data.array = &kts_ifc_init_tests, PARSER_ARRAY},
+		{"tests",	{.data.array = &kas_ifc_init_tests, PARSER_ARRAY},
 				FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"tests",	{.data.array = &kts_ifc_resp_tests, PARSER_ARRAY},
+		{"tests",	{.data.array = &kas_ifc_resp_tests, PARSER_ARRAY},
 				FLAG_OP_AFT | FLAG_OP_KAS_ROLE_RESPONDER},
 
 		/* Validation tests */
-		{"tests",	{.data.array = &kts_ifc_init_val_tests, PARSER_ARRAY},
+		{"tests",	{.data.array = &kas_ifc_init_val_tests, PARSER_ARRAY},
 				FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR},
-		{"tests",	{.data.array = &kts_ifc_resp_val_tests, PARSER_ARRAY},
+		{"tests",	{.data.array = &kas_ifc_resp_val_tests, PARSER_ARRAY},
 				FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 	};
-	const struct json_array kts_ifc_testgroup = SET_ARRAY(kts_ifc_testgroup_entries, NULL);
+	const struct json_array kas_ifc_testgroup = SET_ARRAY(kas_ifc_testgroup_entries, NULL);
 
-	const struct json_entry kts_ifc_testanchor_entries[] = {
-		{"testGroups",	{.data.array = &kts_ifc_testgroup, PARSER_ARRAY},	0},
+	const struct json_entry kas_ifc_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &kas_ifc_testgroup, PARSER_ARRAY},	0},
 	};
-	const struct json_array kts_ifc_testanchor = SET_ARRAY(kts_ifc_testanchor_entries, NULL);
+	const struct json_array kas_ifc_testanchor = SET_ARRAY(kas_ifc_testanchor_entries, NULL);
 
 	/* Process all. */
-	return process_json(&kts_ifc_testanchor, "1.0", in, out);
+	return process_json(&kas_ifc_testanchor, "1.0", in, out);
 }
 
 static int kts_ifc_tester(struct json_object *in, struct json_object *out,
@@ -177,7 +203,7 @@ static int kts_ifc_tester(struct json_object *in, struct json_object *out,
 		{"iutE",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.e, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"iutP",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.p, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"iutQ",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.q, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
-		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.d, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutD",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.d, PARSER_BIN},		FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutDmp1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dmp1, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutDmq1",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.dmq1, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"iutIqmp",	{.data.buf = &kts_ifc_vector.u.kts_ifc_resp_validation.iqmp, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},

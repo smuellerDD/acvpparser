@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -66,8 +66,30 @@ struct kdf_108_data {
 	uint32_t derived_key_length;
 	struct buffer key;
 	struct buffer iv;
+	struct buffer context;
+	struct buffer label;
 	uint32_t break_location;
 	struct buffer fixed_data;
+	struct buffer derived_key;
+};
+
+/**
+ * @brief SP800-108 KMAC KDF data structure
+ *
+ * @var mac [in] MAC to be used for the KDF
+ * @var derived_key_length [in] Length of the derived key material to be
+ *				produced by the KDF in bits.
+ * @var key [in] Key derivation key
+ * @var context [in] Context to be used.
+ * @var label [in] Label to be used, can be empty.
+ * @var derived_key [out] The derived keying material output.
+ */
+struct kdf_108_kmac_data {
+	uint64_t mac;
+	uint32_t derived_key_length;
+	struct buffer key;
+	struct buffer context;
+	struct buffer label;
 	struct buffer derived_key;
 };
 
@@ -80,6 +102,8 @@ struct kdf_108_data {
  */
 struct kdf_108_backend {
 	int (*kdf_108)(struct kdf_108_data *data, flags_t parsed_flags);
+	int (*kdf_108_kmac)(struct kdf_108_kmac_data *data,
+			    flags_t parsed_flags);
 };
 
 void register_kdf_108_impl(struct kdf_108_backend *implementation);

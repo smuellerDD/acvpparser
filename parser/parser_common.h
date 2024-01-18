@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -236,6 +236,7 @@ DEF_CALLBACK_TYPE(kdf_ssh)
 DEF_CALLBACK_TYPE(kdf_ikev1)
 DEF_CALLBACK_TYPE(kdf_ikev2)
 DEF_CALLBACK_TYPE(kdf_108)
+DEF_CALLBACK_TYPE(kdf_108_kmac)
 DEF_CALLBACK_TYPE(pbkdf)
 DEF_CALLBACK_TYPE(hkdf)
 DEF_CALLBACK_TYPE(kts_ifc)
@@ -301,6 +302,7 @@ enum {
 	CB_TYPE_kdf_ikev1,
 	CB_TYPE_kdf_ikev2,
 	CB_TYPE_kdf_108,
+	CB_TYPE_kdf_108_kmac,
 	CB_TYPE_pbkdf,
 	CB_TYPE_hkdf,
 	CB_TYPE_kts_ifc,
@@ -355,6 +357,7 @@ struct json_callback {
 		struct kdf_ikev1_callback kdf_ikev1;
 		struct kdf_ikev2_callback kdf_ikev2;
 		struct kdf_108_callback kdf_108;
+		struct kdf_108_kmac_callback kdf_108_kmac;
 		struct pbkdf_callback pbkdf;
 		struct hkdf_callback hkdf;
 		struct kts_ifc_callback kts_ifc;
@@ -502,10 +505,6 @@ int write_one_entry(const struct json_entry *entry,
 
 #define DEF_CALLBACK(type, name, flags)					\
 	DEF_CALLBACK_HELPER(type, name, flags, NULL)
-
-int match_expected_vector(const char *actualfile, const char *expectedfile);
-int perform_testing(const char *infile, const char *outfile);
-int perform_testing_regression(const char *infile, const char *expectedfile);
 
 #ifdef __cplusplus
 }

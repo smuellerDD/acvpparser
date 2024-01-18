@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+# Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
 #
 ############## Configuration settings ###############
 
@@ -10,7 +10,7 @@ LIBDIR := lib
 
 PARSERDIR := parser
 
-CC ?= gcc
+CC ?= cc
 CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11 -Wno-variadic-macros
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))

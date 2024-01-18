@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2023, Stephan Müller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2024, Stephan Müller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -1699,6 +1699,7 @@ out:
 static struct kdf_108_backend openssl_kdf108_backend =
 {
 	openssl_kdf108,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_kdf_108_backend)

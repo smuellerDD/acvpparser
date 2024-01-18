@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -114,7 +114,7 @@ static struct cavs_tester drbg =
 };
 
 ACVP_DEFINE_CONSTRUCTOR(register_drbg)
-static void register_drbg()
+static void register_drbg(void)
 {
 	register_tester(&drbg, "DRBG");
 }

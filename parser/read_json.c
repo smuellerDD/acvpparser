@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -17,12 +17,15 @@
  * DAMAGE.
  */
 
+#define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
 #include <strings.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -455,10 +458,56 @@ int json_write_data(struct json_object *jobj, const char *filename)
 	return 0;
 }
 
+static int check_filetype(int fd, struct stat *sb)
+{
+	int ret = fstat(fd, sb);
+
+	if (ret)
+		return -errno;
+
+	/* Do not return an error in case we cannot validate the data. */
+	if ((sb->st_mode & S_IFMT) != S_IFREG &&
+	    (sb->st_mode & S_IFMT) != S_IFLNK)
+		return -EINVAL;
+
+	return 0;
+}
+
 int json_read_data(const char *filename, struct json_object **inobj)
 {
-	struct json_object *o =  json_object_from_file(filename);
+	struct json_object *o;
 	int ret;
+
+#if 0
+	o = json_object_from_file(filename);
+#else
+	struct stat sb;
+	char *data;
+	int fd = -1;
+
+	fd = open(filename, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		logger(LOGGER_ERR, "Cannot open file %s: %s\n", filename,
+		       strerror(errno));
+		return -EIO;
+	}
+
+	ret = check_filetype(fd, &sb);
+	if (ret) {
+		close(fd);
+		return ret;
+	}
+
+	data = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (data == MAP_FAILED) {
+		ret = -errno;
+		close(fd);
+		return ret;
+	}
+	o = json_tokener_parse(data);
+	munmap(data, (size_t)sb.st_size);
+	close(fd);
+#endif
 
 	if (!o) {
 		logger(LOGGER_ERR, "Cannot parse input file %s\n", filename);

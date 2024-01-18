@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2015 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -48,15 +48,13 @@ struct eddsa_keygen_data {
  * @brief EDDSA key verification data structure holding the data for the cipher
  *	  operations specified in eddsa_pkvver.
  *
- * @var q [in] ED public key
- * @var d [in] ED private key
+ * @var q [in] EDDSA public key
  * @var cipher [in] Cipher pointing to the curve
  * @var keyver_success [out] Is EDDSA key verification with given parameters
- *			       successful (1) or whether it failed (0).
+ *			     successful (1) or whether it failed (0).
  */
 struct eddsa_keyver_data {
 	struct buffer q;
-	struct buffer d;
 	uint64_t cipher;
 	uint32_t keyver_success;
 };
@@ -77,20 +75,25 @@ struct eddsa_keyver_data {
  *	 EDDSA key and the n and e parameter are stored in a global variable.
  *
  * @var msg [in] Plaintext message to be signed.
- * @var q [out] EDDSA coordinate of public point Q that was used to
- *		  sign the message
+ * @var context [in] The context string defined in FIPS 186-5 sections 7.6 and
+ *		     7.8.
+ * @var q [out] EDDSA coordinate of public point Q that was used to sign the
+ *		message.
  * @var signature [out] generated EDDSA signature
  * @var cipher [in] Curve and hash algorithm to be used for EDDSA signature
- *		      generation.
+ *		    generation.
+ * @var prehash [in] Prehash EdDSA is enabled or not.
  * @var privkey [in] EDDSA private key to be used for signature generation.
- *		  This variable is only set if eddsa_keygen_en callback
- *		  provided.
+ *		     This variable is only set if eddsa_keygen_en callback
+ *		     provided.
  */
 struct eddsa_siggen_data {
 	struct buffer msg;
+	struct buffer context;
 	struct buffer q;
 	struct buffer signature;
 	uint64_t cipher;
+	uint32_t prehash;
 	void *privkey;
 };
 
@@ -100,20 +103,21 @@ struct eddsa_siggen_data {
  *	  CAVS specification.
  *
  * @var msg [in] Plaintext message to be signature verified.
- * @var q [in] EDDSA coordinate of public point Q that was used to
- *		 sign the message
+ * @var q [in] EDDSA coordinate of public point Q that was used to sign the
+ *	       message.
  * @var signature [in] EDDSA signature to be verified
  * @var cipher [in] Curve and hash algorithm to be used for EDDSA signature
- *		      generation.
+ *		    generation.
+ * @var prehash [in] Prehash EdDSA is enabled or not.
  * @var sigver_success [out] Is EDDSA signature verification with given
- *			       parameters successful (1) or whether it
- *			       failed (0).
+ *			     parameters successful (1) or whether it failed (0).
  */
 struct eddsa_sigver_data {
 	struct buffer msg;
 	struct buffer q;
 	struct buffer signature;
 	uint64_t cipher;
+	uint32_t prehash;
 	uint32_t sigver_success;
 };
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -409,6 +409,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kdf_ikev1)
 			CB_HANDLER(kdf_ikev2)
 			CB_HANDLER(kdf_108)
+			CB_HANDLER(kdf_108_kmac)
 			CB_HANDLER(pbkdf)
 			CB_HANDLER(hkdf)
 			CB_HANDLER(kts_ifc)
@@ -597,17 +598,23 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_KDF_TYPE_ANSI_X963, {.string = "ansix9.63"}, "ANSI X9.63 KDF"},
 	{FLAG_OP_KDF_TYPE_SRTP, {.string = "srtp"}, "SRTP KDF"},
 	{FLAG_OP_KDF_TYPE_ANSI_X942, {.string = "ansix9.42"}, "ANSI X9.42 KDF"},
+	{FLAG_OP_KDF_TYPE_800_108_KMAC, {.string = "KMAC"}, "KBKDF KMAC"},
 
 	{0, {NULL}, NULL}
 };
 
 /* Flags conversion for RSA randPQ */
 static const struct parser_flagsconv flagsconv_rsarandpq[] = {
-	{FLAG_OP_RSA_PQ_B32_PRIMES, {.string = "B.3.2"}, "RSA rand PQ primes Appendix B.3.2"},
-	{FLAG_OP_RSA_PQ_B33_PRIMES, {.string = "B.3.3"}, "RSA rand PQ primes Appendix B.3.3"},
-	{FLAG_OP_RSA_PQ_B34_PRIMES, {.string = "B.3.4"}, "RSA rand PQ primes Appendix B.3.4"},
-	{FLAG_OP_RSA_PQ_B35_PRIMES, {.string = "B.3.5"}, "RSA rand PQ primes Appendix B.3.5"},
-	{FLAG_OP_RSA_PQ_B36_PRIMES, {.string = "B.3.6"}, "RSA rand PQ primes Appendix B.3.6"},
+	{FLAG_OP_RSA_PQ_B32_PRIMES, {.string = "B.3.2"}, "FIPS 186-4 Appendix B.3.2 primes"},
+	{FLAG_OP_RSA_PQ_B33_PRIMES, {.string = "B.3.3"}, "FIPS 186-4 Appendix B.3.3 primes"},
+	{FLAG_OP_RSA_PQ_B34_PRIMES, {.string = "B.3.4"}, "FIPS 186-4 Appendix B.3.4 primes"},
+	{FLAG_OP_RSA_PQ_B35_PRIMES, {.string = "B.3.5"}, "FIPS 186-4 Appendix B.3.5 primes"},
+	{FLAG_OP_RSA_PQ_B36_PRIMES, {.string = "B.3.6"}, "FIPS 186-4 Appendix B.3.6 primes"},
+	{FLAG_OP_RSA_PROVABLE_PRIMES, {.string = "provable"}, "provable primes"},
+	{FLAG_OP_RSA_PROBABLE_PRIMES, {.string = "probable"}, "probable primes"},
+	{FLAG_OP_RSA_PROVABLE_WITH_PROVABLE_AUX, {.string = "provableWithProvableAux"}, "provable primes based on auxiliary provable primes"},
+	{FLAG_OP_RSA_PROBABLE_WITH_PROVABLE_AUX, {.string = "probableWithProvableAux"}, "probable primes based on auxiliary provable primes"},
+	{FLAG_OP_RSA_PROBABLE_WITH_PROBABLE_AUX, {.string = "probableWithProbableAux"}, "probable primes based on auxiliary probable primes"},
 	{0, {NULL}, NULL}
 };
 
@@ -712,6 +719,13 @@ static const struct parser_flagsconv flagsconv_tls13_runningmode[] = {
 	{0, {NULL}, NULL}
 };
 
+static const struct parser_flagsconv flagsconv_kdf_mode[] = {
+	{FLAG_OP_KDF_TYPE_800_108, {.string = "counter"}, "KBKDF counter mode"},
+	{FLAG_OP_KDF_TYPE_800_108, {.string = "feedback"}, "KBKDF feedback mode"},
+	{FLAG_OP_KDF_TYPE_800_108, {.string = "double pipeline iteration"}, "KBKDF double pipeline iteration mode"},
+	{0, {NULL}, NULL}
+};
+
 /**
  * @brief For each JSON hierarchy level, the flags are parsed and accumulated
  *	  in the parsed_flags variable.
@@ -739,6 +753,8 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 	parse_flagblock(obj, parsed_flags, "sigType", json_type_string,
 			flagsconv_rsasigtype);
 	parse_flagblock(obj, parsed_flags, "keyFormat", json_type_string,
+			flagsconv_rsakeyformat);
+	parse_flagblock(obj, parsed_flags, "keyMode", json_type_string,
 			flagsconv_rsakeyformat);
 #if 0
 	parse_flagblock(obj, parsed_flags, "primeTest", flagsconv_rsaprimetest);
@@ -778,6 +794,10 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 	parse_flagblock(obj, parsed_flags, "runningMode", json_type_string,
 			flagsconv_tls13_runningmode);
 
+	/* KBKDF */
+	parse_flagblock(obj, parsed_flags, "kdfMode", json_type_string,
+			flagsconv_kdf_mode);
+
 	return 0;
 }
 
@@ -795,9 +815,8 @@ static int parse_array(const struct json_entry *entry,
 	uint32_t i;
 	int ret = 0;
 
-	CKINT_LOG(json_find_key(readdata, entry->name, &json_nobj,
-				json_type_array),
-		  "Name %s not found\n", entry->name);
+	CKINT(json_find_key(readdata, entry->name, &json_nobj,
+			    json_type_array));
 
 	if (!json_nobj) {
 		logger(LOGGER_ERR,
@@ -855,9 +874,8 @@ static int parse_buffer_array(const struct json_entry *entry,
 		goto out;
 	}
 
-	CKINT_LOG(json_find_key(readdata, entry->name, &json_nobj,
-				json_type_array),
-		  "Name %s not found\n", entry->name);
+	CKINT(json_find_key(readdata, entry->name, &json_nobj,
+			    json_type_array));
 
 	if (!json_nobj) {
 		logger(LOGGER_ERR,

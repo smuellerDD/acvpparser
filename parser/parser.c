@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -129,7 +129,8 @@ static int versionstring(char *buf, size_t buflen)
 }
 #endif
 
-int match_expected_vector(const char *actualfile, const char *expectedfile)
+static int match_expected_vector(const char *actualfile,
+				 const char *expectedfile)
 {
 	int ret = 0;
 
@@ -153,7 +154,7 @@ int match_expected_vector(const char *actualfile, const char *expectedfile)
 	return ret;
 }
 
-int perform_testing(const char *infile, const char *outfile)
+static int perform_testing(const char *infile, const char *outfile)
 {
 	struct json_object *inobj = NULL, *outobj = NULL;
 	int ret;
@@ -208,7 +209,8 @@ static int validate_result(struct json_object *outobj,
 	}
 }
 
-int perform_testing_regression(const char *infile, const char *expectedfile)
+static int perform_testing_regression(const char *infile,
+				      const char *expectedfile)
 {
 	struct json_object *inobj = NULL, *outobj = NULL, *expected = NULL;
 	int ret;
@@ -633,6 +635,94 @@ out:
 	return ret;
 }
 
+static int check_xts_apple(struct json_object *out,
+			   struct json_object *expected)
+{
+	struct json_object *data, *versiondata, *testgroups;
+	struct json_object *e_data, *e_versiondata, *e_testgroups;
+	size_t i;
+	int ret = 0;
+
+	CKINT(json_split_version(out, &data, &versiondata));
+	CKINT(json_split_version(expected, &e_data, &e_versiondata));
+
+	CKINT(json_find_key(data, "testGroups", &testgroups, json_type_array));
+	CKINT(json_find_key(e_data, "testGroups", &e_testgroups,
+			    json_type_array));
+
+	if (json_object_array_length(testgroups) !=
+	    json_object_array_length(e_testgroups)) {
+		logger(LOGGER_ERR, "Array size mismatch\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = -EINVAL;
+	for (i = 0; i < json_object_array_length(testgroups); i++) {
+		size_t j;
+		struct json_object *tests, *testsobj =
+				json_object_array_get_idx(testgroups, i);
+		struct json_object *e_tests, *e_testsobj =
+				json_object_array_get_idx(e_testgroups, i);
+
+		CKNULL_LOG(testsobj, -EFAULT, "testGroups not found\n");
+		CKNULL_LOG(e_testsobj, -EFAULT, "testGroups not found\n");
+
+		CKINT(json_find_key(testsobj, "tests", &tests,
+				    json_type_array));
+		CKINT(json_find_key(e_testsobj, "tests", &e_tests,
+				    json_type_array));
+
+		if (json_object_array_length(tests) !=
+		    json_object_array_length(e_tests)) {
+			logger(LOGGER_ERR, "Array size mismatch\n");
+			ret = -EINVAL;
+			goto out;
+		}
+
+		ret = -EINVAL;
+		for (j = 0; j < json_object_array_length(tests); j++) {
+			const char *e_str, *str;
+			size_t str_len, e_str_len;
+			struct json_object *testobj =
+				json_object_array_get_idx(tests, j);
+			struct json_object *e_testobj =
+				json_object_array_get_idx(e_tests, j);
+			int enc = 1;
+
+			CKNULL_LOG(testobj, -EFAULT,
+				   "tests object not found\n");
+			CKNULL_LOG(e_testobj, -EFAULT,
+				   "tests object not found\n");
+
+			/* Check generated result for ciphertext */
+			ret = json_get_string(testobj, "ct", &str);
+			/* If it does not exist, check for plaintext */
+			if (ret) {
+				CKINT(json_get_string(testobj, "pt", &str));
+				CKINT(json_get_string(e_testobj, "pt", &e_str));
+				enc = 0;
+			} else {
+				CKINT(json_get_string(e_testobj, "ct", &e_str));
+			}
+
+			str_len = strlen(str);
+			e_str_len = strlen(e_str);
+
+			if (str_len != e_str_len ||
+			    strncasecmp(str, e_str, str_len)) {
+				ret = -EINVAL;
+				goto out;
+			} else {
+				logger_status("AES-XTS %s successful verified\n", enc ? "encyption" : "decryption");
+			}
+		}
+	}
+
+out:
+	return ret;
+}
+
 /*
  * Regression test for non-known-answer tests
  *
@@ -737,6 +827,28 @@ static int merge_acvp(const char *dstfile, const char *srcfile, char *replace)
 	 */
 	} else if (!strncmp(algo, "KDF", 3)) {
 		ret = validate_result(outobj, src);
+		goto out;
+
+	/*
+	 * Covering:
+	 *
+	 * --replace "algorithm:ACVP-AES-XTS"
+	 *	algorithm:ACVP-AES-XTS -> algorithm:ACVP-AES-XTS
+	 *
+	 * I.e. the algorithm name is not changed, but the checker is special.
+	 *
+	 * To invoke that for the Apple AES-XTS verification testing where Apple
+	 * gives us test responses with all data points including the Apple-
+	 * generated tweak value, invoke the parser as follows:
+	 *
+	 * acvp-parser --replace "algorithm:ACVP-AES-XTS" testvector-response.json testvector-response.json
+	 *
+	 * We need to provide the response file twice as the parser wants 2
+	 * files, but for our testing we only use the first one. This is
+	 * expected to have all data points, including pt, ct, tweak, key.
+	 */
+	} else if (!strncmp(algo, "ACVP-AES-XTS", 12)) {
+		ret = check_xts_apple(outobj, src);
 		goto out;
 
 	} else {

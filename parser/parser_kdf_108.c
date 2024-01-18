@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2018 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -34,16 +34,16 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 		return -EOPNOTSUPP;
 	}
 
-	DEF_CALLBACK(kdf_108, kdf_108, FLAG_OP_AFT);
+	DEF_CALLBACK(kdf_108, kdf_108, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108);
 
 	/*
 	 * Define which test result data should be written to the test result
 	 * JSON file.
 	 */
 	const struct json_entry kdf_108_testresult_entries[] = {
-		{"breakLocation",{.data.integer = &kdf_108_vector.break_location, WRITER_UINT}, FLAG_OP_AFT},
-		{"fixedData",	{.data.buf = &kdf_108_vector.fixed_data, WRITER_BIN}, FLAG_OP_AFT},
-		{"keyOut",	{.data.buf = &kdf_108_vector.derived_key, WRITER_BIN}, FLAG_OP_AFT},
+		{"breakLocation",	{.data.integer = &kdf_108_vector.break_location, WRITER_UINT}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"fixedData",		{.data.buf = &kdf_108_vector.fixed_data, WRITER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"keyOut",		{.data.buf = &kdf_108_vector.derived_key, WRITER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
 	};
 	const struct json_testresult kdf_108_testresult = SET_ARRAY(kdf_108_testresult_entries, &kdf_108_callbacks);
 
@@ -52,12 +52,12 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 	 * file.
 	 */
 	const struct json_entry kdf_108_test_entries[] = {
-		{"keyIn",	{.data.buf = &kdf_108_vector.key, PARSER_BIN}, FLAG_OP_AFT},
-		{"iv",		{.data.buf = &kdf_108_vector.iv, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
+		{"keyIn",		{.data.buf = &kdf_108_vector.key, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"iv",			{.data.buf = &kdf_108_vector.iv, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108 | FLAG_OPTIONAL},
 
 		/* Support for regression test */
-		{"breakLocation",{.data.integer = &kdf_108_vector.break_location, PARSER_UINT}, FLAG_OP_AFT | FLAG_OPTIONAL},
-		{"fixedData",	{.data.buf = &kdf_108_vector.fixed_data, PARSER_BIN}, FLAG_OP_AFT | FLAG_OPTIONAL},
+		{"breakLocation",	{.data.integer = &kdf_108_vector.break_location, PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108 | FLAG_OPTIONAL},
+		{"fixedData",		{.data.buf = &kdf_108_vector.fixed_data, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108 | FLAG_OPTIONAL},
 	};
 	const struct json_array kdf_108_test =
 		SET_ARRAY(kdf_108_test_entries, &kdf_108_testresult);
@@ -70,23 +70,62 @@ static int kdf_108_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry kdf_108_testgroup_entries[] = {
-		{"macMode",		{.data.largeint = &kdf_108_vector.mac, PARSER_CIPHER}, FLAG_OP_AFT},
-		{"kdfMode",		{.data.largeint = &kdf_108_vector.kdfmode, PARSER_CIPHER}, FLAG_OP_AFT},
-		{"counterLocation",	{.data.largeint = &kdf_108_vector.counter_location, PARSER_CIPHER}, FLAG_OP_AFT},
+		{"macMode",		{.data.largeint = &kdf_108_vector.mac, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"kdfMode",		{.data.largeint = &kdf_108_vector.kdfmode, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"counterLocation",	{.data.largeint = &kdf_108_vector.counter_location, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
 
-		{"keyOutLength",	{.data.integer = &kdf_108_vector.derived_key_length, PARSER_UINT}, FLAG_OP_AFT},
-		{"counterLength",	{.data.integer = &kdf_108_vector.counter_length, PARSER_UINT}, FLAG_OP_AFT},
+		{"keyOutLength",	{.data.integer = &kdf_108_vector.derived_key_length, PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"counterLength",	{.data.integer = &kdf_108_vector.counter_length, PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
 
-		{"tests",		{.data.array = &kdf_108_test, PARSER_ARRAY}, FLAG_OP_AFT},
+		{"tests",		{.data.array = &kdf_108_test, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
 	};
 	const struct json_array kdf_108_testgroup = SET_ARRAY(kdf_108_testgroup_entries, NULL);
+
+	DEF_CALLBACK(kdf_108, kdf_108_kmac, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC);
+
+	/*
+	 * Define which test result data should be written to the test result
+	 * JSON file.
+	 */
+	const struct json_entry kdf_108_kmac_testresult_entries[] = {
+		{"derivedKey",		{.data.buf = &kdf_108_kmac_vector.derived_key, WRITER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+	};
+	const struct json_testresult kdf_108_kmac_testresult = SET_ARRAY(kdf_108_kmac_testresult_entries, &kdf_108_kmac_callbacks);
+
+	/*
+	 * Define one particular test vector that is expected in the JSON
+	 * file.
+	 */
+	const struct json_entry kdf_108_kmac_test_entries[] = {
+		{"keyDerivationKey",	{.data.buf = &kdf_108_kmac_vector.key, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+		{"context",		{.data.buf = &kdf_108_kmac_vector.context, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+		{"label",		{.data.buf = &kdf_108_kmac_vector.label, PARSER_BIN}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC | FLAG_OPTIONAL},
+		{"derivedKeyLength",	{.data.integer = &kdf_108_kmac_vector.derived_key_length, PARSER_UINT}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+	};
+	const struct json_array kdf_108_kmac_test =
+		SET_ARRAY(kdf_108_kmac_test_entries, &kdf_108_kmac_testresult);
+
+	/*
+	 * Define the test group which contains ancillary data and eventually
+	 * the array of individual test vectors.
+	 *
+	 * As this definition does not mark specific individual test vectors,
+	 * the testresult entry is set to NULL.
+	 */
+	const struct json_entry kdf_108_kmac_testgroup_entries[] = {
+		{"macMode",		{.data.largeint = &kdf_108_kmac_vector.mac, PARSER_CIPHER}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+
+		{"tests",		{.data.array = &kdf_108_kmac_test, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
+	};
+	const struct json_array kdf_108_kmac_testgroup = SET_ARRAY(kdf_108_kmac_testgroup_entries, NULL);
 
 	/*
 	 * Define the anchor of the tests in the highest level of the JSON
 	 * input data.
 	 */
 	const struct json_entry kdf_108_testanchor_entries[] = {
-		{"testGroups",	{.data.array = &kdf_108_testgroup, PARSER_ARRAY},	0},
+		{"testGroups",		{.data.array = &kdf_108_testgroup, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108},
+		{"testGroups",		{.data.array = &kdf_108_kmac_testgroup, PARSER_ARRAY}, FLAG_OP_AFT | FLAG_OP_KDF_TYPE_800_108_KMAC},
 	};
 	const struct json_array kdf_108_testanchor = SET_ARRAY(kdf_108_testanchor_entries, NULL);
 

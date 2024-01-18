@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -158,8 +158,8 @@ struct rsa_keygen_prov_prime_data {
  *	 generation is invoked single-threaded because the generated
  *	 RSA key and the n and e parameter are stored in a global variable.
  *
- * @var cipher [in] Hash algorithm to be used for RSA signature generation.
  * @var modulus [in] RSA modulus in bits.
+ * @var cipher [in] Hash algorithm to be used for RSA signature generation.
  * @var saltlen [in] Length of salt for RSA PSS.
  * @var e [in/out] RSA exponent as input. If this buffer is empty (only when
  *		     random e is supported by the module), the module
@@ -174,8 +174,8 @@ struct rsa_keygen_prov_prime_data {
  *		  This variable is only set if rsa_keygen_en callback provided.
  */
 struct rsa_siggen_data {
-	uint64_t cipher;
 	uint32_t modulus;
+	uint64_t cipher;
 	uint32_t saltlen;
 	struct buffer e;
 	struct buffer msg;
@@ -189,24 +189,24 @@ struct rsa_siggen_data {
  *	  signature verification operation. This test is specified in the RSA
  *	  CAVS specification section 6.4.
  *
+ * @var modulus [in] RSA modulus in bits
+ * @var cipher [in] Hash algorithm to be used for RSA signature generation.
+ * @var saltlen [in] Length of salt for RSA PSS.
  * @var n [in] RSA modulus
  * @var e [in] RSA exponent
  * @var msg [in] Plaintext message to be signed.
  * @var sig [in] Signature of message to be verified.
- * @var modulus [in] RSA modulus in bits
- * @var saltlen [in] Length of salt for RSA PSS.
- * @var cipher [in] Hash algorithm to be used for RSA signature generation.
  * @var sig_result [out] Is RSA signature successfully verified (1) or
  *			   whether the verification failed (0).
  */
 struct rsa_sigver_data {
+	uint32_t modulus;
+	uint64_t cipher;
+	uint32_t saltlen;
 	struct buffer n;
 	struct buffer e;
 	struct buffer msg;
 	struct buffer sig;
-	uint32_t modulus;
-	uint32_t saltlen;
-	uint64_t cipher;
 	uint32_t sig_result;
 };
 
@@ -221,28 +221,26 @@ struct rsa_sigver_data {
  *
  * @var msg [in] Message between 0 and n - 1
  * @var n [in] RSA modulus
- * @var d [in] RSA private exponent
- * @var e [in] RSA e
+ * @var e [in] RSA public exponent
+ * @var d [in] RSA private exponent - not present for CRT key format
+ * @var p [in] RSA prime factor 1 - only present for CRT key format
+ * @var q [in] RSA prime factor 2 - only present for CRT key format
+ * @var dmp1 [in] RSA d % (p - 1) - only present for CRT key format
+ * @var dmq1 [in] RSA d % (q - 1) - only present for CRT key format
+ * @var iqmp [in] RSA q^-1 % p - only present for CRT key format
  * @var signature [out] RSA signature of a successful operation
  * @var sig_result [out] Is RSA signature operation successful (1) or not (0).
  */
 struct rsa_signature_primitive_data {
 	struct buffer msg;
 	struct buffer n;
-	struct buffer d;
 	struct buffer e;
-#if 0
-	union {
-		struct rsa_regular {
-			struct buffer d;
-		} rsa_regular;
-		struct rsa_crt {
-			struct buffer dmp1;
-			struct buffer dmq1;
-			struct buffer iqmp;
-		} rsa_crt;
-	} u;
-#endif
+	struct buffer d;
+	struct buffer p;
+	struct buffer q;
+	struct buffer dmp1;
+	struct buffer dmq1;
+	struct buffer iqmp;
 	struct buffer signature;
 	uint32_t sig_result;
 };
@@ -260,16 +258,28 @@ struct rsa_signature_primitive_data {
  * client is responsible for generating RSA key pairs of modulus 'n',
  * private key 'd', and calculates 's'.
  *
- * @var modulus [in] RSA modulus in bits
+ * @var modulus [in] RSA modulus size in bits
  * @var num [in] Number of test cases (used internally by the parser, disregard)
  * @var num_failures [in] Number of failing RSA keys (used internally by the
  *			  parser, disregard)
  * @var tcid [in] (internal usage)
  * @var msg [in] Message (or cipherText) to be decrypted.
- * @var n [out] RSA modulus - if rsa_keygen_en is set, buffer is filled with
- *			      the output of that call
- * @var e [out] RSA exponent - if rsa_keygen_en is set, buffer is filled with
- *			       the output of that call
+ * @var n [in/out] RSA modulus - if rsa_keygen_en is set, buffer is filled with
+ *				 the output of that call
+ * @var e [in/out] RSA public exponent - if rsa_keygen_en is set, buffer is
+ * 					 filled with the output of that call
+ * @var d [in] RSA private exponent - private exponent to use for decryption
+ * 				      (only set for revision SP 800-56Br2 test)
+ * @var p [in] RSA prime 1 - first RSA prime to use for decryption
+ * 			     (only set for revision SP 800-56Br2 test)
+ * @var q [in] RSA prime 2 - second RSA prime to use for decryption
+ * 			     (only set for revision SP 800-56Br2 test)
+ * @var dmp1 [in] CRT exponent 1 - first RSA CRT exponent to use for decryption
+ * 				   (only set for revision SP 800-56Br2 test)
+ * @var dmq1 [in] CRT exponent 2 - second RSA CRT exponent to use for decryption
+ * 				   (only set for revision SP 800-56Br2 test)
+ * @var iqmp [in] CRT coefficient - RSA CRT coefficient to use for decryption
+ * 				    (only set for revision SP 800-56Br2 test)
  * @var s [out] Result of the decryption operation
  * @var dec_result [out] Is RSA decryption operation successful (1) or not (0).
  * @var privkey [in] RSA private key to be used for signature generation.
@@ -284,6 +294,12 @@ struct rsa_decryption_primitive_data {
 	struct buffer msg;
 	struct buffer n;
 	struct buffer e;
+	struct buffer d;
+	struct buffer p;
+	struct buffer q;
+	struct buffer dmp1;
+	struct buffer dmq1;
+	struct buffer iqmp;
 	struct buffer s;
 	uint32_t dec_result;
 	void *privkey;

@@ -1,3 +1,17 @@
+v2.1.7
+- enhancement: leancrypto - add EDDSA
+- enhancement: Support KAS2 in parser
+- enhancement: add support for AES-XTS data unit length
+- enhancement: add support for RSA keyGen according to FIPS 186-4 appendix B.3.6
+- fix: RSA DecryptionPrimitive solving algorithm
+- fix: add dhLength parsing for IKEv2
+- enhancement: Support SP 800-56Br2 decryption primitive
+- enhancement: Support RSA FIPS 186-5
+- enhancement: add Dilithium tester
+- enhancement: add Kyber test backend
+- enhancement: Support KAS2 in OpenSSL 3 backend
+- fix: use mmap to read JSON files
+
 v2.1.6
 - fix: cSHAKE MCT now working
 - enhancement: KDA One/Twostep parser added

@@ -34,22 +34,30 @@ MODULE_POSTFIX="_"
 
 EXEC="C"
 
-if [ $(uname -m) = "aarch64" ]; then
+if [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	EXEC="$EXEC
-	      ARM_NEON"
-elif [ $(uname -m) = "arm" ]; then
+	      ARM_CE ARM_ASM ARM_2X"
+elif [ $(uname -m) = "riscv64" ]; then
+	EXEC="$EXEC
+	      RISCV64"
+elif (uname -m | grep -q armv7 ); then
 	EXEC="$EXEC
 	      ARM_NEON"
 elif [ $(uname -m) = "x86_64" ]; then
 	EXEC="$EXEC
-	      AVX2 AVX512 AVX2_4X"
+	      AVX2 AVX512 AVX2_4X AESNI"
 fi
 
-CIPHER_CALL_C="LC_SHA3=\"C\""
+CIPHER_CALL_C="LC_AES=\"C\" LC_SHA3=\"C\""
 CIPHER_CALL_AVX2="LC_SHA3=\"AVX2\""
 CIPHER_CALL_AVX512="LC_SHA3=\"AVX512\""
+CIPHER_CALL_AESNI="LC_AES=\"AESNI\""
 CIPHER_CALL_ARM_NEON="LC_SHA3=\"ARM_NEON\""
+CIPHER_CALL_ARM_CE="LC_AES=\"ARM_CE\" LC_SHA3=\"ARM_CE\""
+CIPHER_CALL_ARM_ASM="LC_AES=\"ARM_ASM\" LC_SHA3=\"ARM_ASM\""
 CIPHER_CALL_AVX2_4X="LC_SHAKE=\"AVX2-4X\""
+CIPHER_CALL_ARM_2X="LC_SHAKE=\"ARM-2X\""
+CIPHER_CALL_RISCV64="LC_AES=\"RISCV64\""
 
 do_test() {
 	PATH=.:$PATH

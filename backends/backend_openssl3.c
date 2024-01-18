@@ -1,6 +1,6 @@
 /*
  * Copyright 2021 VMware, Inc.
- * Copyright (C) 2022 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2022 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -174,8 +174,7 @@ static int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md,
 		md_ctx = EVP_MD_CTX_new();
 		CKNULL(md_ctx, -EFAULT);
 
-		CKINT_O(EVP_DigestVerifyInit_ex(md_ctx, NULL, EVP_MD_name(md),
-						NULL, NULL, pkey, NULL));
+		CKINT_O(EVP_DigestVerifyInit(md_ctx, NULL, md, NULL, pkey));
 
 		CKINT(openssl_set_rsa_padding(EVP_MD_CTX_get_pkey_ctx(md_ctx),
 					      parsed_flags, saltlen));
@@ -1065,11 +1064,11 @@ static void openssl_ecdh_backend(void)
  * DRBG cipher interface functions
  ************************************************/
 static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
-		char *drbg_name)
+				 char *drbg_name)
 {
 	logger(LOGGER_DEBUG, "cipher: %" PRIu64 "\n", data->cipher);
 	if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA1) {
-		strcpy(cipher, "SHA1");
+		strcpy(cipher,  "SHA1");
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA224) {
@@ -1077,11 +1076,15 @@ static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA256) {
-		strcpy(cipher, "SHA256");
+		strcpy(cipher,  "SHA256");
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA384) {
 		strcpy(cipher,  "SHA384");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512) {
+		strcpy(cipher,  "SHA512");
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
 	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512224) {
@@ -1092,8 +1095,20 @@ static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
 		strcpy(cipher, "SHA512-256");
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
-	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA512) {
-		strcpy(cipher,  "SHA512");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA3_224) {
+		strcpy(cipher,  "SHA3-224");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA3_256) {
+		strcpy(cipher,  "SHA3-256");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA3_384) {
+		strcpy(cipher,  "SHA3-384");
+		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
+				"HMAC-DRBG" : "HASH-DRBG");
+	} else if ((data->cipher & ACVP_HASHMASK) == ACVP_SHA3_512) {
+		strcpy(cipher,  "SHA3-512");
 		strcpy(drbg_name, ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) ?
 				"HMAC-DRBG" : "HASH-DRBG");
 	} else if ((data->cipher & ACVP_AESMASK) == ACVP_AES128) {
@@ -1106,7 +1121,7 @@ static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
 		strcpy(cipher, "AES-256-CTR");
 		strcpy(drbg_name, "CTR-DRBG");
 	} else {
-		logger(LOGGER_WARN, "DRBG with unhandled cipher detected\n");
+		logger(LOGGER_ERR, "DRBG with unhandled cipher detected\n");
 		return -EFAULT;
 	}
 	return 0;
@@ -1302,7 +1317,7 @@ static void openssl_drbg_backend(void)
  ************************************************/
 
 static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
-				    int id, const EVP_MD *md,
+				    char id, const EVP_MD *md,
 				    struct buffer *out)
 {
 	EVP_KDF *kdf = NULL;
@@ -1323,7 +1338,7 @@ static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
 	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SSHKDF_XCGHASH,
 						 data->h.buf, data->h.len);
 	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_SSHKDF_TYPE,
-						(char *) &id, 0);
+						(char *) &id, 1);
 	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SSHKDF_SESSION_ID,
 						 data->session_id.buf,
 						 data->session_id.len);
@@ -1447,22 +1462,21 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 
 	logger(LOGGER_VERBOSE, "data->kdfmode = %" PRIu64 "\n", data->kdfmode);
 	if (!(data->kdfmode & ACVP_CIPHERTYPE_KDF)) {
-		logger(LOGGER_ERR, "The cipher type isn't a KDF");
+		logger(LOGGER_ERR, "The cipher type isn't a KDF\n");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	if (data->kdfmode == ACVP_KDF_108_DOUBLE_PIPELINE) {
-		logger(LOGGER_ERR, "Double pipeline mode is not supported");
+		logger(LOGGER_ERR, "Double pipeline mode is not supported\n");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
-	CKNULL_LOG(kdf, -EFAULT, "Cannot allocate KB KDF\n");
+	CKNULL_LOG(kdf, -EFAULT, "Cannot allocate KBKDF\n");
 	ctx = EVP_KDF_CTX_new(kdf);
-	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate KB PRF\n");
-
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate KBKDF context\n");
 
 	p = params;
 	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MODE,
@@ -1538,13 +1552,13 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 			      data->fixed_data.len, "data->fixed_data");
 	}
 
-	logger_binary(LOGGER_VERBOSE, label.buf, label.len, "label");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, label.buf,
-						 label.len);
-
 	logger_binary(LOGGER_VERBOSE, context.buf, context.len, "context");
 	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
 						 context.buf, context.len);
+
+	logger_binary(LOGGER_VERBOSE, label.buf, label.len, "label");
+	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, label.buf,
+						 label.len);
 
 	if (data->iv.len) {
 		logger_binary(LOGGER_VERBOSE, data->iv.buf, data->iv.len,
@@ -1558,10 +1572,10 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 
 	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
 	CKINT_O_LOG(EVP_KDF_derive(ctx, data->derived_key.buf,
-				   derived_key_bytes, params),
+				   data->derived_key.len, params),
 		    "EVP_KDF_derive failed\n");
 	logger_binary(LOGGER_VERBOSE, data->derived_key.buf,
-                      derived_key_bytes, "data->derived_key");
+                      data->derived_key.len, "data->derived_key");
 
 out:
 	if (kdf)
@@ -1576,9 +1590,76 @@ out:
 	return ret;
 }
 
+static int openssl_kdf108_kmac(struct kdf_108_kmac_data *data,
+			       flags_t parsed_flags)
+{
+#if OPENSSL_VERSION_NUMBER < 0x30100000L
+	(void)data;
+	(void)parsed_flags;
+
+	logger(LOGGER_ERR, "KBKDF KMAC is not supported\n");
+	return -EOPNOTSUPP;
+#else
+	EVP_KDF *kdf = NULL;
+	EVP_KDF_CTX *ctx = NULL;
+	OSSL_PARAM params[5], *p;
+	uint32_t derived_key_bytes = data->derived_key_length / 8;
+	const char *mac_alg;
+	int ret = 0;
+	(void)parsed_flags;
+
+	kdf = EVP_KDF_fetch(NULL, "KBKDF", NULL);
+	CKNULL_LOG(kdf, -EFAULT, "Cannot allocate KBKDF\n");
+	ctx = EVP_KDF_CTX_new(kdf);
+	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate KBKDF context\n");
+
+	p = params;
+
+	CKINT(convert_cipher_algo(data->mac & ACVP_KMACMASK,
+				  ACVP_CIPHERTYPE_KMAC, &mac_alg));
+	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
+						(char *)mac_alg,
+						strlen(mac_alg));
+
+	logger_binary(LOGGER_VERBOSE, data->key.buf, data->key.len, "data->key");
+	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
+						 data->key.buf, data->key.len);
+
+	logger_binary(LOGGER_VERBOSE, data->context.buf, data->context.len,
+		      "context");
+	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+						 data->context.buf,
+						 data->context.len);
+
+	if (data->label.buf && data->label.len) {
+		logger_binary(LOGGER_VERBOSE, data->label.buf, data->label.len,
+			      "label");
+		*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+							 data->label.buf,
+							 data->label.len);
+	}
+
+	*p = OSSL_PARAM_construct_end();
+
+	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
+	CKINT_O_LOG(EVP_KDF_derive(ctx, data->derived_key.buf,
+				   data->derived_key.len, params),
+		    "EVP_KDF_derive failed\n");
+	logger_binary(LOGGER_VERBOSE, data->derived_key.buf,
+                      data->derived_key.len, "data->derived_key");
+out:
+	if (kdf)
+		EVP_KDF_free(kdf);
+	if (ctx)
+		EVP_KDF_CTX_free(ctx);
+	return ret;
+#endif
+}
+
 static struct kdf_108_backend openssl_kdf108_backend =
 {
 	openssl_kdf108,
+	openssl_kdf108_kmac,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_kdf_108_backend)
@@ -1823,7 +1904,8 @@ static int _openssl_dsa_keygen(struct buffer *P, struct buffer *Q,
 	EVP_PKEY_CTX *ctx = NULL;
 
 	CKINT(openssl_ffc_create_pkey(key, 0, 0, P, Q, G, safeprime, NULL, NULL,
-				      NULL, NULL, NULL, 0, NULL, "DSA"));
+				      NULL, NULL, NULL, 0, NULL,
+				      safeprime ? "DH" : "DSA"));
 
 	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, *key, NULL);
 	CKNULL(ctx, -EFAULT);
@@ -1873,7 +1955,8 @@ static int openssl_dsa_keyver(struct dsa_keyver_data *data,
 
 	if (openssl_ffc_create_pkey(&key, 0, 0, NULL, NULL, NULL,
 				    data->pqg.safeprime, &data->X, &data->Y,
-				    NULL, NULL, NULL, 0, NULL, "DSA") <= 0) {
+				    NULL, NULL, NULL, 0, NULL,
+				    data->pqg.safeprime ? "DH" : "DSA") <= 0) {
 		data->keyver_success = 0;
 	}
 
@@ -2038,8 +2121,10 @@ static void openssl_dsa_backend(void)
 static int _openssl_ecdsa_keygen(uint64_t curve, EVP_PKEY **key)
 {
 	EVP_PKEY_CTX *ctx = NULL;
-	int ret = 0, nid = 0;
+	int nid = 0;
 	char *curve_name;
+	int ret = 0;
+
 	CKINT_LOG(_openssl_ecdsa_curves(curve, &nid , &curve_name),
 		  "Conversion of curve failed\n");
 
@@ -2087,13 +2172,13 @@ out:
 static int openssl_ecdsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
 				     struct buffer *Qx, struct buffer *Qy)
 {
-	int ret = 0;
 	int nid = NID_undef;
 	char *curve_name;
 	BUFFER_INIT(pub);
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
+	int ret = 0;
 
 	CKINT(_openssl_ecdsa_curves(cipher, &nid, &curve_name));
 
@@ -2132,9 +2217,9 @@ static int openssl_ecdsa_pkvver(struct ecdsa_pkvver_data *data,
 				flags_t parsed_flags)
 {
 	EVP_PKEY_CTX *ctx = NULL;
-	int ret = 0;
 	EVP_PKEY *key = NULL;
 	(void)parsed_flags;
+	int ret;
 
 	ret = openssl_ecdsa_create_pkey(&key, data->cipher, &data->Qx,
 					&data->Qy);
@@ -2159,12 +2244,12 @@ static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
 				flags_t parsed_flags)
 {
 	EVP_PKEY *key = NULL;
-	int ret = 0;
 	BUFFER_INIT(sig);
 	const EVP_MD *md = NULL;
 	size_t r_len, s_len;
 	const BIGNUM *r, *s;
 	ECDSA_SIG *ecdsa_sig = NULL;
+	int ret = 0;
 
 	if (!data->privkey) {
 		logger(LOGGER_ERR, "Private key missing\n");
@@ -2199,8 +2284,6 @@ static int openssl_ecdsa_siggen(struct ecdsa_siggen_data *data,
 	logger_binary(LOGGER_DEBUG, data->R.buf, data->R.len, "R");
 	logger_binary(LOGGER_DEBUG, data->S.buf, data->S.len, "S");
 
-	ret = 0;
-
 out:
 	free_buf(&sig);
 	if (ecdsa_sig)
@@ -2213,12 +2296,10 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 {
 	EVP_PKEY *key = NULL;
 	BUFFER_INIT(sig);
-	int ret = 0;
 	const EVP_MD *md = NULL;
 	BIGNUM *r, *s;
 	ECDSA_SIG *ecdsa_sig = NULL;
-
-	(void)parsed_flags;
+	int ret = 0;
 
 	// 1024 bytes should be sufficient.
 	CKINT(alloc_buf(1024, &sig));
@@ -2245,8 +2326,6 @@ static int openssl_ecdsa_sigver(struct ecdsa_sigver_data *data,
 		CKINT(openssl_sig_ver(key, md, parsed_flags, 0, &data->msg,
 				      &sig, &data->sigver_success));
 	}
-
-	ret = 0;
 
 out:
 	free_buf(&sig);
@@ -2301,6 +2380,280 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_ecdsa_backend)
 static void openssl_ecdsa_backend(void)
 {
 	register_ecdsa_impl(&openssl_ecdsa);
+}
+
+/************************************************
+ * EdDSA cipher interface functions
+ ************************************************/
+int _openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
+			  char **out_curve_name, char **out_instance_name)
+{
+	char *curve_name;
+	char *instance_name;
+	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
+
+	switch (curve & ACVP_CURVEMASK) {
+		case ACVP_ED25519:
+			curve_name = "ED25519";
+			instance_name = prehash ? "Ed25519ph" : "Ed25519";
+			break;
+		case ACVP_ED448:
+			curve_name = "ED448";
+			instance_name = prehash ? "Ed448ph" : "Ed448";
+			break;
+		default:
+			logger(LOGGER_ERR, "Unknown curve\n");
+			return -EINVAL;
+	}
+
+	if (out_curve_name) {
+		*out_curve_name = curve_name;
+	}
+	if (out_instance_name) {
+		*out_instance_name = instance_name;
+	}
+	return 0;
+}
+
+static int _openssl_eddsa_keygen(uint64_t curve, EVP_PKEY **key)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	char *curve_name;
+	int ret = 0;
+
+	CKINT_LOG(_openssl_eddsa_curves(curve, 0, &curve_name , NULL),
+		  "Conversion of curve failed\n");
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
+	CKNULL(ctx, -ENOMEM);
+	CKINT_O(EVP_PKEY_keygen_init(ctx));
+	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key),
+		   "EC_KEY_generate_key() failed\n");
+
+out:
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_eddsa_keygen(struct eddsa_keygen_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(_openssl_eddsa_keygen(data->cipher, &key));
+
+	CKINT(openssl_pkey_get_octet_bytes(key, OSSL_PKEY_PARAM_PRIV_KEY,
+					   &data->d));
+	CKINT(openssl_pkey_get_octet_bytes(key, OSSL_PKEY_PARAM_PUB_KEY,
+					   &data->q));
+
+	logger_binary(LOGGER_DEBUG, data->d.buf, data->d.len, "d");
+	logger_binary(LOGGER_DEBUG, data->q.buf, data->q.len, "Q");
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	return ret;
+}
+
+static int openssl_eddsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
+				     struct buffer *q)
+{
+	char *curve_name;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	int ret = 0;
+
+	CKINT(_openssl_eddsa_curves(cipher, 0, &curve_name, NULL));
+
+	logger_binary(LOGGER_DEBUG, q->buf, q->len, "Q");
+
+	bld = OSSL_PARAM_BLD_new();
+	OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, q->buf,
+					 q->len);
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
+	EVP_PKEY_fromdata_init(ctx);
+	if (EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_PUBLIC_KEY, params) == 1)
+		ret = 1;
+
+out:
+	if(params)
+		OSSL_PARAM_free(params);
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	EVP_MD_CTX *md_ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	if (!data->privkey) {
+		logger(LOGGER_ERR, "Private key missing\n");
+		return -EINVAL;
+	}
+	key = data->privkey;
+
+	size_t sz = EVP_PKEY_size(key);
+	CKINT(alloc_buf(sz, &data->signature));
+
+	md_ctx = EVP_MD_CTX_new();
+	CKNULL(md_ctx, -EFAULT);
+
+	bld = OSSL_PARAM_BLD_new();
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+	char *instance_name;
+
+	CKINT(_openssl_eddsa_curves(data->cipher, data->prehash, NULL,
+				    &instance_name));
+	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_SIGNATURE_PARAM_INSTANCE,
+					instance_name, 0);
+	OSSL_PARAM_BLD_push_octet_string(bld,
+					 OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
+					 data->context.buf, data->context.len);
+#else
+	if ((data->cipher & ACVP_CURVEMASK) == ACVP_ED448) {
+		logger(LOGGER_ERR, "Ed448 signature generation not supported\n");
+		ret = -EINVAL;
+		goto out;
+	}
+	if (data->prehash) {
+		logger(LOGGER_ERR, "Prehash EdDSA not supported\n");
+		ret = -EINVAL;
+		goto out;
+	}
+#endif
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	// EdDSA is special: it uses DigestSign but md is set to NULL...
+	CKINT_O(EVP_DigestSignInit_ex(md_ctx, NULL, NULL, NULL, NULL, key,
+				      params));
+
+	CKINT_O(EVP_DigestSign(md_ctx, data->signature.buf, &data->signature.len,
+			       data->msg.buf, data->msg.len));
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	return ret;
+}
+
+static int openssl_eddsa_sigver(struct eddsa_sigver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	EVP_MD_CTX *md_ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_eddsa_create_pkey(&key, data->cipher, &data->q));
+
+	md_ctx = EVP_MD_CTX_new();
+	CKNULL(md_ctx, -EFAULT);
+
+	bld = OSSL_PARAM_BLD_new();
+#if OPENSSL_VERSION_NUMBER >= 0x30200000L
+	char *instance_name;
+
+	CKINT(_openssl_eddsa_curves(data->cipher, data->prehash, NULL,
+				    &instance_name));
+	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_SIGNATURE_PARAM_INSTANCE,
+					instance_name, 0);
+#else
+	if (data->prehash) {
+		logger(LOGGER_ERR, "Prehash EdDSA not supported\n");
+		ret = -EINVAL;
+		goto out;
+	}
+#endif
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	// EdDSA is special: it uses DigestVerify but md is set to NULL...
+	CKINT_O(EVP_DigestVerifyInit_ex(md_ctx, NULL, NULL, NULL, NULL, key,
+					params));
+
+	ret = EVP_DigestVerify(md_ctx, data->signature.buf, data->signature.len,
+			       data->msg.buf, data->msg.len);
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		data->sigver_success = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	return ret;
+}
+
+static int openssl_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
+				   void **privkey)
+{
+	EVP_PKEY *key = NULL;
+	int ret;
+
+	CKINT(_openssl_eddsa_keygen(curve, &key));
+
+	CKINT(openssl_pkey_get_octet_bytes(key, OSSL_PKEY_PARAM_PUB_KEY, qbuf));
+
+	logger_binary(LOGGER_DEBUG, qbuf->buf, qbuf->len, "Q");
+
+	*privkey = key;
+
+out:
+	if (ret && key)
+		EVP_PKEY_free(key);
+	return ret;
+}
+
+static void openssl_eddsa_free_key(void *privkey)
+{
+	EVP_PKEY *eddsa = (EVP_PKEY *)privkey;
+	if (eddsa)
+		EVP_PKEY_free(eddsa);
+}
+
+static struct eddsa_backend openssl_eddsa =
+{
+	openssl_eddsa_keygen,   /* eddsa_keygen */
+	NULL,
+	openssl_eddsa_siggen,   /* eddsa_siggen */
+	openssl_eddsa_sigver,   /* eddsa_sigver */
+	openssl_eddsa_keygen_en,
+	openssl_eddsa_free_key,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_eddsa_backend)
+static void openssl_eddsa_backend(void)
+{
+	register_eddsa_impl(&openssl_eddsa);
 }
 
 /************************************************
@@ -2710,301 +3063,549 @@ static void openssl_rsa_backend(void)
 }
 
 /************************************************
- * SP800-56B rev 2 KTS IFC cipher interface functions
+ * SP800-56B rev 2 KAS IFC cipher interface functions
  ************************************************/
 
-static int openssl_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data,
-					      uint32_t *validation_success)
-{
+static int openssl_rsa_encapsulate(struct buffer *n, struct buffer *e,
+				   struct buffer *c, struct buffer *z) {
+	EVP_PKEY *key = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
-	EVP_PKEY *pk = NULL;
-	BUFFER_INIT(label);
-	BUFFER_INIT(new_c);
-	struct buffer *dkm_p, *c_p;
-	size_t outlen, keylen = (data->keylen) ? data->keylen : data->modulus;
+	size_t c_len;
+	size_t z_len;
 	int ret;
 
-	if (keylen > data->modulus)
-		return -EINVAL;
+	CKINT(openssl_rsa_create_pkey(&key, n, e, NULL, NULL, NULL, NULL, NULL,
+				      NULL));
 
-	if (validation_success) {
-		struct kts_ifc_init_validation_data *init_val =
-					&data->u.kts_ifc_init_validation;
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
 
-		CKINT(left_pad_buf(&init_val->n, data->modulus >> 3));
+	CKINT_O_LOG(EVP_PKEY_encapsulate_init(ctx, NULL),
+		    "failed to initialize RSA encapsulation context\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_kem_op(ctx, "RSASVE"),
+		    "failed to set RSA KEM operation\n");
 
-		CKINT(openssl_rsa_create_pkey(&pk, &init_val->n, &init_val->e,
-					      NULL, NULL, NULL, NULL, NULL,
-					      NULL));
+	CKINT_O_LOG(EVP_PKEY_encapsulate(ctx, NULL, &c_len, NULL, &z_len),
+		    "failed to obtain c and z length\n");
 
-		dkm_p = &init_val->dkm;
-		c_p = &new_c;
-	} else {
-		struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
+	CKINT(alloc_buf(c_len, c));
+	CKINT(alloc_buf(z_len, z));
 
-		CKINT(left_pad_buf(&init->n, data->modulus >> 3));
+	CKINT_O_LOG(EVP_PKEY_encapsulate(ctx, c->buf, &c->len, z->buf,
+					 &z->len),
+		    "failed to RSA encapsulate\n");
 
-		CKINT(openssl_rsa_create_pkey(&pk, &init->n, &init->e, NULL,
-					      NULL, NULL, NULL, NULL, NULL));
-
-		if (!init->dkm.len) {
-			CKINT(alloc_buf(keylen >> 3, &init->dkm));
-			RAND_bytes(init->dkm.buf, (int)init->dkm.len);
-
-			/*
-			 * Ensure that in case of raw encryption, the value is
-			 * not too large.
-			 */
-			init->dkm.buf[0] &= ~0x80;
-		}
-
-		dkm_p = &init->dkm;
-		c_p = &init->iut_c;
-	}
-
-	ctx = EVP_PKEY_CTX_new(pk, NULL);
-	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
-
-	CKINT_O_LOG(EVP_PKEY_encrypt_init(ctx), "PKEY encrypt init failed\n");
-
-	if (data->kts_hash) {
-		/* OAEP Padding */
-		const EVP_MD *md = NULL;
-
-		CKINT(openssl_md_convert(data->kts_hash, &md));
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx,
-							 RSA_PKCS1_OAEP_PADDING),
-			    "Setting OAEP padding failed\n");
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
-			   "Setting of OAEP MD failed\n");
-
-		/* Evaluate encoding and concatenate Server and IUT Ids */
-
-		if (convert_cipher_match(data->kts_encoding,
-					 ACVP_KAS_ENCODING_CONCATENATION,
-					 ACVP_CIPHERTYPE_KAS)) {
-			CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
-				    "Setting MFGL MD failed\n");
-			CKINT(alloc_buf(data->server_id.len + data->iut_id.len,
-					&label));
-			memcpy(label.buf, data->iut_id.buf, data->iut_id.len);
-			memcpy(label.buf + data->iut_id.len, data->server_id.buf,
-			data->server_id.len);
-
-
-			CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx,
-								     label.buf,
-								     label.len),
-				    "Setting OAEP label failed\n");
-		}
-	} else {
-		/* Raw encryption */
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
-			    "Setting no padding failed\n");
-	}
-
-	/* Determine buffer length */
-	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &outlen, dkm_p->buf,
-				     dkm_p->len),
-		    "Getting ciphertext length failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
-
-	CKINT(alloc_buf(outlen, c_p));
-
-	ret = EVP_PKEY_encrypt(ctx, c_p->buf, &outlen, dkm_p->buf, dkm_p->len);
-
-	if (validation_success) {
-		struct kts_ifc_init_validation_data *init_val =
-					&data->u.kts_ifc_init_validation;
-
-		/* OpenSSL returns 0 on failure */
-		if (ret != 1) {
-			logger(LOGGER_DEBUG,
-			       "Validation: RSA encryption failed %s\n",
-			       ERR_error_string(ERR_get_error(), NULL));
-			*validation_success = 0;
-		} else if (outlen != init_val->c.len ||
-			   memcmp(init_val->c.buf, c_p->buf, outlen)) {
-			logger(LOGGER_DEBUG, "lens %zu %zu\n", outlen,
-			       init_val->c.len);
-			logger_binary(LOGGER_DEBUG, init_val->c.buf,
-				      init_val->c.len,
-				      "expected encrypted secret");
-			logger_binary(LOGGER_DEBUG, c_p->buf, c_p->len,
-				      "calculated encrypted secret");
-
-			*validation_success = 0;
-		} else {
-			*validation_success = 1;
-		}
-
-		ret = 0;
-	} else if (ret != 1) {
-		logger(LOGGER_ERR, "RSA encryption failed %s\n",
-		       ERR_error_string(ERR_get_error(), NULL));
-		ret = -EFAULT;
-	} else {
-		ret = 0;
-	}
-
+	ret = 0;
 out:
-	if (pk)
-		EVP_PKEY_free(pk);
+	if (key)
+		EVP_PKEY_free(key);
 	if (ctx)
 		EVP_PKEY_CTX_free(ctx);
-	free_buf(&new_c);
+	return ret;
+}
+static int openssl_rsa_decapsulate(struct buffer *n, struct buffer *e,
+				   struct buffer *d, struct buffer *p,
+				   struct buffer *q, struct buffer *dmp1,
+				   struct buffer *dmq1, struct buffer *iqmp,
+				   struct buffer *z,
+				   struct buffer *c) {
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	size_t z_len;
+	int ret;
 
-	/*
-	 * The man page for EVP_PKEY_CTX_set0_rsa_oaep_label reads:
-	 *
-	 * "The library takes ownership of the label so the caller should
-	 * not free the original memory pointed to by label."
-	 *
-	 * So, this call is not needed.
-	 * free_buf(&label);
-	 */
+	CKINT(openssl_rsa_create_pkey(&key, n, e, d, p, q, dmp1, dmq1, iqmp));
 
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
+
+	CKINT_O_LOG(EVP_PKEY_decapsulate_init(ctx, NULL),
+		    "failed to initialize RSA decapsulation context\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_kem_op(ctx, "RSASVE"),
+		    "failed to set RSA KEM operation\n");
+
+	CKINT_O_LOG(EVP_PKEY_decapsulate(ctx, NULL, &z_len, c->buf, c->len),
+		    "failed to obtain z length\n");
+
+	CKINT(alloc_buf(z_len, z));
+
+	CKINT_O_LOG(EVP_PKEY_decapsulate(ctx, z->buf, &z->len, c->buf,
+					 c->len),
+		    "failed to RSA decapsulate\n");
+
+	ret = 0;
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
 	return ret;
 }
 
-static int openssl_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data,
-					      uint32_t *validation_success)
-{
-	BUFFER_INIT(tmp);
-	BUFFER_INIT(label);
+static int openssl_rsa_encrypt(struct buffer *n, struct buffer *e,
+			       unsigned int padding, const EVP_MD *md,
+			       struct buffer *label, struct buffer *ct,
+			       struct buffer *pt) {
+	EVP_PKEY *key = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
-	EVP_PKEY *pk = NULL;
-
-	struct buffer *c_p;
-	size_t outlen, keylen = (data->keylen) ? data->keylen : data->modulus;
+	size_t ct_len;
 	int ret;
 
-	if (keylen > data->modulus)
-		return -EINVAL;
+	CKINT(openssl_rsa_create_pkey(&key, n, e, NULL, NULL, NULL, NULL, NULL,
+				      NULL));
 
-	if (validation_success) {
-		struct kts_ifc_resp_validation_data *resp_val =
-					&data->u.kts_ifc_resp_validation;
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
 
-		CKINT(left_pad_buf(&resp_val->n, data->modulus >> 3));
-
-		CKINT(openssl_rsa_create_pkey(&pk, &resp_val->n, &resp_val->e,
-					      &resp_val->d, &resp_val->p,
-					      &resp_val->q, &resp_val->dmp1,
-					      &resp_val->dmq1, &resp_val->iqmp));
-
-		c_p = &resp_val->c;
-	} else {
-		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
-
-		CKINT(left_pad_buf(&resp->n, data->modulus >> 3));
-
-		CKINT(openssl_rsa_create_pkey(&pk, &resp->n, &resp->e, &resp->d,
-					      &resp->p, &resp->q, &resp->dmp1,
-					      &resp->dmq1, &resp->iqmp));
-
-		c_p = &resp->c;
-	}
-
-	ctx = EVP_PKEY_CTX_new(pk, NULL);
-	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate PKEY context\n");
-
-	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx), "PKEY decrypt init failed\n");
-
-	if (data->kts_hash) {
-		/* OAEP Padding */
-		const EVP_MD *md = NULL;
-
-		CKINT(openssl_md_convert(data->kts_hash, &md));
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx,
-							 RSA_PKCS1_OAEP_PADDING),
-			    "Setting OAEP padding failed\n");
+	CKINT_O_LOG(EVP_PKEY_encrypt_init(ctx),
+		    "failed to initialize RSA encryption context\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, padding),
+		    "failed to set RSA encryption padding\n");
+	if (md) {
 		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
-			    "Setting of OAEP MD failed\n");
-
-		/* Evaluate encoding and concatenate IUT and Server Ids */
-
-		if (convert_cipher_match(data->kts_encoding,
-					 ACVP_KAS_ENCODING_CONCATENATION,
-					 ACVP_CIPHERTYPE_KAS)) {
-			CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
-				    "Setting MFGL MD failed\n");
-			CKINT(alloc_buf(data->server_id.len + data->iut_id.len,
-					&label));
-			memcpy(label.buf, data->server_id.buf, data->server_id.len);
-			memcpy(label.buf + data->server_id.len, data->iut_id.buf,
-			data->iut_id.len);
-
-			CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx,
-								     label.buf,
-								     label.len),
-				    "Setting OAEP label failed\n");
-		}
-	} else {
-		/* Raw encryption */
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_NO_PADDING),
-			    "Setting padding failed\n");
+			    "failed to set RSA OAEP encryption hash\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
+			    "failed to set RSA OAEP encryption MGF hash\n");
+	}
+	if (label && label->len) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx, label->buf,
+							     label->len),
+			    "failed to set RSA OAEP encryption label\n");
 	}
 
-	/* Determine buffer length */
-	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &outlen, c_p->buf, c_p->len),
-		    "Getting plaintext length failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
+	CKINT_O_LOG(EVP_PKEY_encrypt(ctx, NULL, &ct_len, pt->buf, pt->len),
+		    "failed to obtain ciphertext length\n");
 
-	CKINT(alloc_buf(outlen, &tmp));
+	CKINT(alloc_buf(ct_len, ct));
 
-	ret = EVP_PKEY_decrypt(ctx, tmp.buf, &tmp.len, c_p->buf, c_p->len);
+	ret = EVP_PKEY_encrypt(ctx, ct->buf, &ct->len, pt->buf, pt->len);
+	if (ret != 1) {
+		ret = -EBADMSG;
+		goto out;
+	}
 
-	if (validation_success) {
-		struct kts_ifc_resp_validation_data *resp_val =
-					&data->u.kts_ifc_resp_validation;
+	ret = 0;
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
 
-		/* OpenSSL returns 0 on failure */
-		if (ret != 1) {
-			logger(LOGGER_DEBUG,
-			       "Validation: RSA encryption failed %s\n",
-			       ERR_error_string(ERR_get_error(), NULL));
-			*validation_success = 0;
-		} else if (outlen != resp_val->dkm.len ||
-			   memcmp(resp_val->dkm.buf, tmp.buf, outlen)) {
-			logger(LOGGER_DEBUG, "lens %zu %zu\n", outlen,
-			       resp_val->dkm.len);
-			logger_binary(LOGGER_DEBUG, resp_val->dkm.buf,
-				      resp_val->dkm.len,
-				      "expected decrypted secret");
-			logger_binary(LOGGER_DEBUG, tmp.buf, tmp.len,
-				      "calculated decrypted secret");
+static int openssl_rsa_decrypt(struct buffer *n, struct buffer *e,
+			       struct buffer *d, struct buffer *p,
+			       struct buffer *q, struct buffer *dmp1,
+			       struct buffer *dmq1, struct buffer *iqmp,
+			       unsigned int padding, const EVP_MD *md,
+			       struct buffer *label, struct buffer *pt,
+			       struct buffer *ct) {
+	EVP_PKEY *key = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	size_t pt_len;
+	int ret;
 
-			*validation_success = 0;
-		} else {
-			*validation_success = 1;
-		}
+	CKINT(openssl_rsa_create_pkey(&key, n, e, d, p, q, dmp1, dmq1, iqmp));
 
+	ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
+	CKNULL(ctx, -EFAULT);
+
+	CKINT_O_LOG(EVP_PKEY_decrypt_init(ctx),
+		    "failed to initialize RSA decryption context\n");
+	CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(ctx, padding),
+		    "failed to set RSA decryption padding\n");
+	if (md) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_oaep_md(ctx, md),
+			    "failed to set RSA OAEP decryption hash\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx, md),
+			    "failed to set RSA OAEP decryption MGF hash\n");
+	}
+	if (label && label->len) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set0_rsa_oaep_label(ctx, label->buf,
+							     label->len),
+			    "failed to set RSA OAEP decryption label\n");
+	}
+
+	CKINT_O_LOG(EVP_PKEY_decrypt(ctx, NULL, &pt_len, ct->buf, ct->len),
+		    "failed to obtain plaintext length\n");
+
+	CKINT(alloc_buf(pt_len, pt));
+
+	ret = EVP_PKEY_decrypt(ctx, pt->buf, &pt->len, ct->buf, ct->len);
+	if (ret != 1) {
+		ret = -EBADMSG;
+		goto out;
+	}
+
+	ret = 0;
+out:
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_init_aft(struct kts_ifc_init_data *data,
+					struct buffer *iut_z,
+					struct buffer *server_z) {
+	int ret;
+
+	// Careful: the IUT generates iut_c (and iut_z) using the server key!
+	CKINT(openssl_rsa_encapsulate(&data->n, &data->e, &data->iut_c,
+				      iut_z));
+
+	// KAS2
+	if (data->iut_n.len && data->iut_e.len) {
+		// Careful: the IUT decapsulates server_z using the IUT key!
+		CKINT(openssl_rsa_decapsulate(&data->iut_n, &data->iut_e,
+					      &data->iut_d, &data->iut_p,
+					      &data->iut_q, &data->iut_dmp1,
+					      &data->iut_dmq1, &data->iut_iqmp,
+					      server_z, &data->server_c));
+	}
+
+	logger_binary(LOGGER_DEBUG, iut_z->buf, iut_z->len, "IUT z");
+	logger_binary(LOGGER_DEBUG, server_z->buf, server_z->len, "server z");
+
+	CKINT(alloc_buf(iut_z->len + server_z->len, &data->dkm));
+	memcpy(data->dkm.buf, iut_z->buf, iut_z->len);
+	if (server_z->len) {
+		// KAS2: compute Z_initiator || Z_responder
+		memcpy(data->dkm.buf + iut_z->len, server_z->buf,
+		       server_z->len);
+	}
+
+	logger_binary(LOGGER_DEBUG, data->dkm.buf, data->dkm.len,
+		      "DKM");
+
+	ret = 0;
+out:
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_resp_aft(struct kts_ifc_resp_data *data,
+					struct buffer *server_z,
+					struct buffer *iut_z) {
+	int ret;
+
+	// Careful: the IUT decapsulates server_z using the IUT key!
+	CKINT(openssl_rsa_decapsulate(&data->n, &data->e, &data->d, &data->p,
+				      &data->q, &data->dmp1, &data->dmq1,
+				      &data->iqmp, server_z, &data->c));
+
+	// KAS2
+	if (data->server_n.len && data->server_e.len) {
+		// Careful: the IUT generates iut_c (and iut_z) using the server key!
+		CKINT(openssl_rsa_encapsulate(&data->server_n, &data->server_e,
+					      &data->iut_c, iut_z));
+	}
+
+	logger_binary(LOGGER_DEBUG, server_z->buf, server_z->len, "server z");
+	logger_binary(LOGGER_DEBUG, iut_z->buf, iut_z->len, "IUT z");
+
+	CKINT(alloc_buf(server_z->len + iut_z->len, &data->dkm));
+	memcpy(data->dkm.buf, server_z->buf, server_z->len);
+	if (iut_z->len) {
+		// KAS2: compute Z_initiator || Z_responder
+		memcpy(data->dkm.buf + server_z->len, iut_z->buf, iut_z->len);
+	}
+
+	logger_binary(LOGGER_DEBUG, data->dkm.buf, data->dkm.len,
+		      "DKM");
+
+	ret = 0;
+out:
+	return ret;
+}
+
+
+// Our strategy for this VAL test is to encrypt the provided Z value and compare
+// it with the C value provided by the ACVP server. If they match, the
+// validation should pass.
+// Why this way and not the other way around (i.e. decrypt the C values)? We
+// only have the server N, e, p, and q values. Technically it is possible to
+// compute d from these values to perform the decryption, but it's just more
+// work.
+// Unfortunately we can't use RSA_NO_PADDING here because some vendors rightly
+// disable this padding mode. We resort to BN_mod_exp.
+static int openssl_rsa_kas_ifc_val_one(struct buffer *n, struct buffer *e,
+				       struct buffer *z, struct buffer *exp_c,
+				       uint32_t *validation_success) {
+	BN_CTX *bn_ctx = NULL;
+	BIGNUM *n_bn = NULL, *e_bn = NULL, *z_bn = NULL, *exp_c_bn = NULL;
+	BIGNUM *n1_bn = NULL, *c_bn = NULL;
+	int ret;
+
+	bn_ctx = BN_CTX_new();
+	n_bn = BN_bin2bn(n->buf, n->len, NULL);
+	CKNULL(n_bn, -ENOMEM);
+	e_bn = BN_bin2bn(e->buf, e->len, NULL);
+	CKNULL(e_bn, -ENOMEM);
+	z_bn = BN_bin2bn(z->buf, z->len, NULL);
+	CKNULL(n_bn, -ENOMEM);
+	exp_c_bn = BN_bin2bn(exp_c->buf, exp_c->len, NULL);
+	CKNULL(exp_c_bn, -ENOMEM);
+
+	n1_bn = BN_new();
+	CKNULL(BN_sub(n1_bn, n_bn, BN_value_one()), -EFAULT);
+
+	// z <= 1 or z >= (n - 1)
+	if (BN_cmp(z_bn, BN_value_one()) != 1 || BN_cmp(z_bn, n1_bn) != -1) {
+		*validation_success = 0;
 		ret = 0;
-	} else if (ret != 1) {
-		logger(LOGGER_ERR, "RSA decryption failed %s\n",
-		    ERR_error_string(ERR_get_error(), NULL));
-		ret = -EFAULT;
+		goto out;
+	}
+
+	c_bn = BN_new();
+	CKNULL(BN_mod_exp(c_bn, z_bn, e_bn, n_bn, bn_ctx), -EFAULT);
+
+	*validation_success = (BN_cmp(c_bn, exp_c_bn) == 0);
+	ret = 0;
+out:
+	if (bn_ctx)
+		BN_CTX_free(bn_ctx);
+	if (n_bn)
+		BN_free(n_bn);
+	if (e_bn)
+		BN_free(e_bn);
+	if (z_bn)
+		BN_free(z_bn);
+	if (exp_c_bn)
+		BN_free(exp_c_bn);
+	if (n1_bn)
+		BN_free(n1_bn);
+	if (c_bn)
+		BN_free(c_bn);
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_init_val(struct kts_ifc_init_validation_data *data,
+					struct buffer *iut_z,
+					struct buffer *server_z) {
+	int ret;
+
+	data->validation_success = 1;
+
+	if (data->server_c.len) {
+		// KAS2: obtain Z_initiator || Z_responder
+		CKINT(alloc_buf(data->dkm.len / 2, iut_z));
+		memcpy(iut_z->buf, data->dkm.buf, iut_z->len);
+		CKINT(alloc_buf(data->dkm.len / 2, server_z));
+		memcpy(server_z->buf, data->dkm.buf + data->dkm.len / 2,
+		       server_z->len);
 	} else {
-		struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
+		CKINT(alloc_buf(data->dkm.len, iut_z));
+		memcpy(iut_z->buf, data->dkm.buf, iut_z->len);
+	}
 
-		if (tmp.len < (keylen >> 3)) {
-			logger(LOGGER_ERR,
-			       "RSA decrypted data has insufficient size\n");
-			ret = -EFAULT;
-			goto out;
-		}
+	// Careful: the IUT encrypts iut_z using the server key!
+	CKINT(openssl_rsa_kas_ifc_val_one(&data->n, &data->e, iut_z, &data->c,
+					  &data->validation_success));
 
-		CKINT(alloc_buf(keylen >> 3, &resp->dkm));
-		memcpy(resp->dkm.buf, tmp.buf, resp->dkm.len);
+	// KAS2
+	if (data->iut_n.len && data->iut_e.len && data->server_c.len) {
+		// Careful: the server encrypts server_z using the IUT key!
+		CKINT(openssl_rsa_kas_ifc_val_one(&data->iut_n, &data->iut_e,
+						  server_z, &data->server_c,
+						  &data->validation_success));
+	}
+
+	ret = 0;
+out:
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_resp_val(struct kts_ifc_resp_validation_data *data,
+					struct buffer *server_z,
+					struct buffer *iut_z) {
+	int ret;
+
+	data->validation_success = 1;
+
+	if (data->iut_c.len) {
+		// KAS2: obtain Z_initiator || Z_responder
+		CKINT(alloc_buf(data->dkm.len / 2, server_z));
+		memcpy(server_z->buf, data->dkm.buf, server_z->len);
+		CKINT(alloc_buf(data->dkm.len / 2, iut_z));
+		memcpy(iut_z->buf, data->dkm.buf + data->dkm.len / 2,
+		       iut_z->len);
+	} else {
+		CKINT(alloc_buf(data->dkm.len, server_z));
+		memcpy(server_z->buf, data->dkm.buf, server_z->len);
+	}
+
+	// Careful: the server encrypts server_z using the IUT key!
+	CKINT(openssl_rsa_kas_ifc_val_one(&data->n, &data->e, server_z,
+					  &data->c, &data->validation_success));
+
+	// KAS2
+	if (data->server_n.len && data->server_e.len && data->iut_c.len) {
+		// Careful: the IUT encrypts iut_z using the server key!
+		CKINT(openssl_rsa_kas_ifc_val_one(&data->server_n,
+						  &data->server_e, iut_z,
+						  &data->iut_c,
+						  &data->validation_success));
+	}
+
+	ret = 0;
+out:
+	return ret;
+}
+
+static int openssl_rsa_kas_ifc_common(struct kts_ifc_data *data,
+				      flags_t parsed_flags)
+{
+	BUFFER_INIT(iut_z);
+	BUFFER_INIT(server_z);
+	int ret;
+
+	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+	    (parsed_flags & FLAG_OP_AFT)) {
+		CKINT(openssl_rsa_kas_ifc_init_aft(&data->u.kts_ifc_init,
+						   &iut_z, &server_z));
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_AFT)) {
+		CKINT(openssl_rsa_kas_ifc_resp_aft(&data->u.kts_ifc_resp,
+						   &server_z, &iut_z));
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		CKINT(openssl_rsa_kas_ifc_init_val(&data->u.kts_ifc_init_validation,
+						   &iut_z, &server_z));
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		CKINT(openssl_rsa_kas_ifc_resp_val(&data->u.kts_ifc_resp_validation,
+						   &server_z, &iut_z));
+	} else {
+		logger(LOGGER_ERR, "Unknown test\n");
+		ret = -EINVAL;
 	}
 
 out:
-	if (pk)
-		EVP_PKEY_free(pk);
-	if (ctx)
-		EVP_PKEY_CTX_free(ctx);
+	free_buf(&iut_z);
+	free_buf(&server_z);
+	return ret;
+}
 
+/************************************************
+ * SP800-56B rev 2 KTS IFC cipher interface functions
+ ************************************************/
+
+static int openssl_rsa_kts_ifc_common(struct kts_ifc_data *data,
+				      flags_t parsed_flags)
+{
+	const EVP_MD *md;
+	BUFFER_INIT(label);
+	BUFFER_INIT(c);
+	BUFFER_INIT(dkm);
+	int ret;
+
+	CKINT(openssl_md_convert(data->kts_hash, &md));
+
+	// TODO: support other encodings?
+	if (convert_cipher_match(data->kts_encoding,
+				ACVP_KAS_ENCODING_CONCATENATION,
+				ACVP_CIPHERTYPE_KAS)) {
+		CKINT(alloc_buf(data->iut_id.len + data->server_id.len,
+				&label));
+		if (parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) {
+			memcpy(label.buf, data->iut_id.buf, data->iut_id.len);
+			memcpy(label.buf + data->iut_id.len,
+			       data->server_id.buf, data->server_id.len);
+		} else if (parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) {
+			memcpy(label.buf, data->server_id.buf,
+			       data->server_id.len);
+			memcpy(label.buf + data->server_id.len,
+			       data->iut_id.buf, data->iut_id.len);
+		}
+	}
+
+	logger_binary(LOGGER_DEBUG, label.buf, label.len, "label");
+
+	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+	    (parsed_flags & FLAG_OP_AFT)) {
+		struct kts_ifc_init_data *init_data = &data->u.kts_ifc_init;
+
+		CKINT(alloc_buf(data->keylen / 8, &init_data->dkm));
+		RAND_bytes(init_data->dkm.buf, init_data->dkm.len);
+
+		logger_binary(LOGGER_DEBUG, init_data->dkm.buf,
+			      init_data->dkm.len, "DKM");
+
+		CKINT_LOG(openssl_rsa_encrypt(&init_data->n, &init_data->e,
+					      RSA_PKCS1_OAEP_PADDING, md,
+					      &label, &init_data->iut_c,
+					      &init_data->dkm),
+			  "RSA OAEP encryption failed\n");
+
+		logger_binary(LOGGER_DEBUG, init_data->iut_c.buf,
+			      init_data->iut_c.len, "c");
+		ret = 0;
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_AFT)) {
+		struct kts_ifc_resp_data *resp_data = &data->u.kts_ifc_resp;
+
+		logger_binary(LOGGER_DEBUG, resp_data->c.buf, resp_data->c.len,
+			      "c");
+
+		CKINT_LOG(openssl_rsa_decrypt(&resp_data->n, &resp_data->e,
+					      &resp_data->d, &resp_data->p,
+					      &resp_data->q, &resp_data->dmp1,
+					      &resp_data->dmq1,
+					      &resp_data->iqmp,
+					      RSA_PKCS1_OAEP_PADDING, md,
+					      &label, &resp_data->dkm,
+					      &resp_data->c),
+			  "RSA OAEP decryption failed\n");
+
+		logger_binary(LOGGER_DEBUG, resp_data->dkm.buf,
+			      resp_data->dkm.len, "DKM");
+		ret = 0;
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		struct kts_ifc_init_validation_data *init_val_data =
+			&data->u.kts_ifc_init_validation;
+		init_val_data->validation_success = 1;
+
+		ret = openssl_rsa_encrypt(&init_val_data->n, &init_val_data->e,
+					  RSA_PKCS1_OAEP_PADDING, md, &label,
+					  &c, &init_val_data->dkm);
+		if (ret == -EBADMSG || c.len != init_val_data->c.len ||
+		    memcmp(c.buf, init_val_data->c.buf, c.len)) {
+			logger_binary(LOGGER_DEBUG, c.buf, c.len, "Computed c");
+			logger_binary(LOGGER_DEBUG, init_val_data->c.buf,
+				      init_val_data->c.len, "Expected c");
+			init_val_data->validation_success = 0;
+			ret = 0;
+		}
+	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
+		   (parsed_flags & FLAG_OP_VAL)) {
+		struct kts_ifc_resp_validation_data *resp_val_data =
+			&data->u.kts_ifc_resp_validation;
+		resp_val_data->validation_success = 1;
+
+		ret = openssl_rsa_decrypt(&resp_val_data->n, &resp_val_data->e,
+					  &resp_val_data->d, &resp_val_data->p,
+					  &resp_val_data->q,
+					  &resp_val_data->dmp1,
+					  &resp_val_data->dmq1,
+					  &resp_val_data->iqmp,
+					  RSA_PKCS1_OAEP_PADDING, md, &label,
+					  &dkm, &resp_val_data->c);
+
+		if (ret == -EBADMSG || dkm.len != resp_val_data->dkm.len ||
+		    memcmp(dkm.buf, resp_val_data->dkm.buf, dkm.len)) {
+			logger_binary(LOGGER_DEBUG, dkm.buf, dkm.len,
+				      "Computed DKM");
+			logger_binary(LOGGER_DEBUG, resp_val_data->dkm.buf,
+				      resp_val_data->dkm.len, "Expected DKM");
+			resp_val_data->validation_success = 0;
+			ret = 0;
+		}
+	} else {
+		logger(LOGGER_ERR, "Unknown test\n");
+		ret = -EINVAL;
+	}
+
+out:
 	/*
 	 * The man page for EVP_PKEY_CTX_set0_rsa_oaep_label reads:
 	 *
@@ -3014,8 +3615,8 @@ out:
 	 * So, this call is not needed.
 	 * free_buf(&label);
 	 */
-
-	free_buf(&tmp);
+	free_buf(&c);
+	free_buf(&dkm);
 	return ret;
 }
 
@@ -3024,31 +3625,11 @@ static int openssl_kts_ifc_generate(struct kts_ifc_data *data,
 {
 	int ret;
 
-	(void)parsed_flags;
-
-	if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
-	    (parsed_flags & FLAG_OP_AFT)) {
-		CKINT(openssl_rsa_kas_ifc_encrypt_common(data, NULL));
-	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
-		   (parsed_flags & FLAG_OP_AFT)) {
-		CKINT(openssl_rsa_kas_ifc_decrypt_common(data, NULL));
-	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) &&
-		   (parsed_flags & FLAG_OP_VAL)) {
-		struct kts_ifc_init_validation_data *init_val =
-					&data->u.kts_ifc_init_validation;
-
-		CKINT(openssl_rsa_kas_ifc_encrypt_common(data,
-							 &init_val->validation_success));
-	} else if ((parsed_flags & FLAG_OP_KAS_ROLE_RESPONDER) &&
-		   (parsed_flags & FLAG_OP_VAL)) {
-		struct kts_ifc_resp_validation_data *resp_val =
-					&data->u.kts_ifc_resp_validation;
-
-		CKINT(openssl_rsa_kas_ifc_decrypt_common(data,
-							 &resp_val->validation_success));
+	if ((data->schema & ACVP_KTS_KAS_SCHEMA_MASK) ==
+	    ACVP_KTS_SCHEMA_OAEP_BASIC) {
+		CKINT(openssl_rsa_kts_ifc_common(data, parsed_flags));
 	} else {
-		logger(LOGGER_ERR, "Unknown test\n");
-		ret = -EINVAL;
+		CKINT(openssl_rsa_kas_ifc_common(data, parsed_flags));
 	}
 
 out:

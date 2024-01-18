@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2019 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -159,6 +159,7 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"KAS1", ACVP_KAS1_SCHEMA_BASIC},
 	{"KAS1-basic", ACVP_KAS1_SCHEMA_BASIC},
 	{"KAS1-Party_V-confirmation", ACVP_KAS1_SCHEMA_PARTY_V_CONF},
+	{"KAS2", ACVP_KAS2_SCHEMA_BASIC},
 	{"KAS2-basic", ACVP_KAS2_SCHEMA_BASIC},
 	{"KAS2-bilateral-confirmation", ACVP_KAS2_SCHEMA_BILATERAL_CONF},
 	{"KAS2-Party_U-confirmation", ACVP_KAS2_SCHEMA_PARTY_U_CONF},

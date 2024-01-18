@@ -1,7 +1,7 @@
 /*
  * Test module for externalizing the crypto API to use for CAVS testing
  *
- * Copyright (c) 2015 - 2023 Stephan Mueller <smueller@chronox.de>
+ * Copyright (c) 2015 - 2024 Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *

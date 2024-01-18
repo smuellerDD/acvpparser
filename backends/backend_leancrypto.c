@@ -1,6 +1,6 @@
 /* Backend for leancrypto
  *
- * Copyright (C) 2022 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2022 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -18,52 +18,142 @@
  * DAMAGE.
  */
 
+/* required for posix memalign */
+#define _GNU_SOURCE
+#include <getopt.h>
+#include <stdlib.h>
 #include <strings.h>
 
-#include <leancrypto/lc_aes.h>
-#include <leancrypto/lc_cshake.h>
-#include <leancrypto/lc_hash_drbg.h>
-#include <leancrypto/lc_hkdf.h>
-#include <leancrypto/lc_hmac.h>
-#include <leancrypto/lc_hmac_drbg_sha512.h>
-#include <leancrypto/lc_kdf_ctr.h>
-#include <leancrypto/lc_kdf_dpi.h>
-#include <leancrypto/lc_kdf_fb.h>
-#include <leancrypto/lc_kmac.h>
-#include <leancrypto/lc_pbkdf2.h>
-#include <leancrypto/lc_sha256.h>
-#include <leancrypto/lc_sha3.h>
-#include <leancrypto/lc_sha512.h>
+#include <leancrypto.h>
 
 #include "backend_common.h"
 #include "parser_sha_mct_helper.h"
 
-#include "sha3_arm8_neon.h"
+#include "aes_aesni.h"
+#include "aes_armce.h"
+#include "aes_c.h"
+#include "aes_riscv64.h"
+
+#include "dilithium_signature_c.h"
+#include "ed25519.h"
+#include "kyber_kem_c.h"
+#include "sha3_arm_asm.h"
+#include "sha3_arm_ce.h"
+#include "sha3_arm_neon.h"
 #include "sha3_avx2.h"
 #include "sha3_avx512.h"
 #include "sha3_c.h"
+#include "sha3_riscv_asm.h"
+#ifdef __x86_64__
 #include "shake_4x_avx2.h"
+#endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include "shake_2x_armv8.h"
+#endif
 
 /************************************************
  * Symmetric cipher interface functions
  ************************************************/
+static void lc_cipher_check_c(const struct lc_sym *selected,
+			      const struct lc_sym *c,
+			      const char *log)
+{
+	if (selected == c)
+		logger(LOGGER_ERR,
+		       "Cipher selection %s uses C implementation!\n", log);
+}
+
 static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 {
-	switch(data->cipher) {
-	case ACVP_CBC:
-		*impl = lc_aes_cbc;
-		break;
-	case ACVP_CTR:
-		*impl = lc_aes_ctr;
-		break;
-	case ACVP_KW:
-		*impl = lc_aes_kw;
-		break;
-// 	case ACVP_ECB:
-// 		*impl = lc_aes_ecb;
-// 		break;
-	default:
-		return -EINVAL;
+	char *envstr = getenv("LC_AES");
+
+	if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "AES implementation: C\n");
+		switch(data->cipher) {
+		case ACVP_CBC:
+			*impl = lc_aes_cbc_c;
+			break;
+		case ACVP_CTR:
+			*impl = lc_aes_ctr_c;
+			break;
+		case ACVP_KW:
+			*impl = lc_aes_kw_c;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (envstr && !strncasecmp(envstr, "AESNI", 5)) {
+		logger(LOGGER_VERBOSE, "AES implementation: AESNI\n");
+		switch(data->cipher) {
+		case ACVP_CBC:
+			*impl = lc_aes_cbc_aesni;
+			lc_cipher_check_c(*impl, lc_aes_cbc_c, "AESNI CBC");
+			break;
+		case ACVP_CTR:
+			*impl = lc_aes_ctr_aesni;
+			lc_cipher_check_c(*impl, lc_aes_ctr_c, "AESNI CTR");
+			break;
+		case ACVP_KW:
+			*impl = lc_aes_kw_aesni;
+			lc_cipher_check_c(*impl, lc_aes_kw_c, "AESNI KW");
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (envstr && !strncasecmp(envstr, "ARM_CE", 6)) {
+		logger(LOGGER_VERBOSE, "AES implementation: ARM CE\n");
+		switch(data->cipher) {
+		case ACVP_CBC:
+			*impl = lc_aes_cbc_armce;
+			lc_cipher_check_c(*impl, lc_aes_cbc_c, "ARM CE CBC");
+			break;
+		case ACVP_CTR:
+			*impl = lc_aes_ctr_armce;
+			lc_cipher_check_c(*impl, lc_aes_ctr_c, "ARM CE CTR");
+			break;
+		case ACVP_KW:
+			*impl = lc_aes_kw_armce;
+			lc_cipher_check_c(*impl, lc_aes_kw_c, "ARM CE KW");
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (envstr && !strncasecmp(envstr, "RISCV64", 7)) {
+		logger(LOGGER_VERBOSE, "AES implementation: RISC-V 64\n");
+		switch(data->cipher) {
+		case ACVP_CBC:
+			*impl = lc_aes_cbc_riscv64;
+			lc_cipher_check_c(*impl, lc_aes_cbc_c, "RISC-V 64 CBC");
+			break;
+		case ACVP_CTR:
+			*impl = lc_aes_ctr_riscv64;
+			lc_cipher_check_c(*impl, lc_aes_ctr_c, "RISC-V 64 CTR");
+			break;
+		case ACVP_KW:
+			*impl = lc_aes_kw_riscv64;
+			lc_cipher_check_c(*impl, lc_aes_kw_c, "RISC-V 64 KW");
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else {
+		logger(LOGGER_ERR, "AES implementation: default\n");
+		switch(data->cipher) {
+		case ACVP_CBC:
+			*impl = lc_aes_cbc;
+			break;
+		case ACVP_CTR:
+			*impl = lc_aes_ctr;
+			break;
+		case ACVP_KW:
+			*impl = lc_aes_kw;
+			break;
+	// 	case ACVP_ECB:
+	// 		*impl = lc_aes_ecb;
+	// 		break;
+		default:
+			return -EINVAL;
+		}
 	}
 
 	return 0;
@@ -234,6 +324,16 @@ static void lc_sym_backend(void)
 /************************************************
  * SHA cipher interface functions
  ************************************************/
+static void __attribute__((unused))
+lc_hash_check_c(const struct lc_hash *selected, const struct lc_hash *c,
+		const char *log)
+{
+	if (selected == c)
+		logger(LOGGER_ERR,
+		       "Hash selection %s uses C implementation!\n", log);
+}
+
+
 static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 {
 	char *envstr = getenv("LC_SHA3");
@@ -253,6 +353,7 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 	//       envstr ? envstr : "default");
 
 	if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: C\n");
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
@@ -276,9 +377,11 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_c;
 			break;
+		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_c;
 			break;
+		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_c;
 			break;
@@ -287,35 +390,47 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 			cipher);
 			return -EOPNOTSUPP;
 		}
+#ifdef __amd64
 	} else if (envstr && !strncasecmp(envstr, "AVX2", 4)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: AVX2\n");
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_avx2;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "AVX2 SHA3-224");
 			break;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_avx2;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "AVX2 SHA3-256");
 			break;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_avx2;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "AVX2 SHA3-384");
 			break;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_avx2;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "AVX2 SHA3-512");
 			break;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_avx2;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "AVX2 SHAKE-128");
 			break;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_avx2;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "AVX2 SHAKE-256");
 			break;
+		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_avx2;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "AVX2 cSHAKE-128");
 			break;
+		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_avx2;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "AVX2 cSHAKE-256");
 			break;
 		default:
 			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
@@ -323,76 +438,195 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 			return -EOPNOTSUPP;
 		}
 	} else if (envstr && !strncasecmp(envstr, "AVX512", 6)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: AVX-512\n");
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_avx512;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "AVX512 SHA3-224");
 			break;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_avx512;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "AVX512 SHA3-256");
 			break;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_avx512;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "AVX512 SHA3-384");
 			break;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_avx512;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "AVX512 SHA3-512");
 			break;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_avx512;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "AVX512 SHAKE-128");
 			break;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_avx512;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "AVX512 SHAKE-256");
 			break;
+		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_avx512;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "AVX512 cSHAKE-128");
 			break;
+		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_avx512;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "AVX512 cSHAKE-256");
 			break;
 		default:
 			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
 			cipher);
 			return -EOPNOTSUPP;
 		}
-	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 6)) {
+#elif (defined(__arm__) || defined(__aarch64__))
+	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 8)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM NEON\n");
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM NEON SHA3-224");
 			break;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM NEON SHA3-256");
 			break;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM NEON SHA3-384");
 			break;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM NEON SHA3-512");
 			break;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM NEON SHAKE-128");
 			break;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM NEON SHAKE-256");
 			break;
+		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM NEON cSHAKE-128");
 			break;
+		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_arm_neon;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM NEON cSHAKE-256");
 			break;
 		default:
 			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
 			cipher);
 			return -EOPNOTSUPP;
 		}
+#ifdef __aarch64__
+	} else if (envstr && !strncasecmp(envstr, "ARM_ASM", 6)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM assembler\n");
+		switch (cipher) {
+		case ACVP_HMACSHA3_224:
+		case ACVP_SHA3_224:
+			*lc_hash = lc_sha3_224_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM assembler SHA3-224");
+			break;
+		case ACVP_HMACSHA3_256:
+		case ACVP_SHA3_256:
+			*lc_hash = lc_sha3_256_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM assembler SHA3-256");
+			break;
+		case ACVP_HMACSHA3_384:
+		case ACVP_SHA3_384:
+			*lc_hash = lc_sha3_384_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM assembler SHA3-384");
+			break;
+		case ACVP_HMACSHA3_512:
+		case ACVP_SHA3_512:
+			*lc_hash = lc_sha3_512_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM assembler SHA3-512");
+			break;
+		case ACVP_SHAKE128:
+			*lc_hash = lc_shake128_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM assembler SHAKE-128");
+			break;
+		case ACVP_SHAKE256:
+			*lc_hash = lc_shake256_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM assembler SHAKE-256");
+			break;
+		case ACVP_KMAC128:
+		case ACVP_CSHAKE128:
+			*lc_hash = lc_cshake128_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM assembler cSHAKE-128");
+			break;
+		case ACVP_KMAC256:
+		case ACVP_CSHAKE256:
+			*lc_hash = lc_cshake256_arm_asm;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM assembler cSHAKE-256");
+			break;
+		default:
+			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
+			cipher);
+			return -EOPNOTSUPP;
+		}
+	} else if (envstr && !strncasecmp(envstr, "ARM_CE", 6)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM CE\n");
+		switch (cipher) {
+		case ACVP_HMACSHA3_224:
+		case ACVP_SHA3_224:
+			*lc_hash = lc_sha3_224_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM CE SHA3-224");
+			break;
+		case ACVP_HMACSHA3_256:
+		case ACVP_SHA3_256:
+			*lc_hash = lc_sha3_256_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM CE SHA3-256");
+			break;
+		case ACVP_HMACSHA3_384:
+		case ACVP_SHA3_384:
+			*lc_hash = lc_sha3_384_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM CE SHA3-384");
+			break;
+		case ACVP_HMACSHA3_512:
+		case ACVP_SHA3_512:
+			*lc_hash = lc_sha3_512_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM CE SHA3-512");
+			break;
+		case ACVP_SHAKE128:
+			*lc_hash = lc_shake128_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM CE SHAKE-128");
+			break;
+		case ACVP_SHAKE256:
+			*lc_hash = lc_shake256_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM CE SHAKE-256");
+			break;
+		case ACVP_KMAC128:
+		case ACVP_CSHAKE128:
+			*lc_hash = lc_cshake128_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM CE cSHAKE-128");
+			break;
+		case ACVP_KMAC256:
+		case ACVP_CSHAKE256:
+			*lc_hash = lc_cshake256_arm_ce;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM CE cSHAKE-256");
+			break;
+		default:
+			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
+			cipher);
+			return -EOPNOTSUPP;
+		}
+#endif
+#endif
 	} else {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: default\n");
 		switch (cipher) {
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
@@ -416,9 +650,11 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256;
 			break;
+		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128;
 			break;
+		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256;
 			break;
@@ -505,10 +741,64 @@ out:
 	if (outbuf3)
 		free(outbuf3);
 	return ret;
-
 }
 #else
 static int lc_shake4x_generate(struct sha_data *data)
+{
+	(void)data;
+	return -EOPNOTSUPP;
+}
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+static int lc_shake_armv8_2x_generate(struct sha_data *data)
+{
+	int ret;
+	size_t outbytes = data->outlen / 8;
+	uint8_t *outbuf0, *outbuf1 = NULL;
+
+	if (!(data->cipher & ACVP_SHAKE128) &&
+	    !(data->cipher & ACVP_SHAKE256)) {
+		printf("SHAKE4X requires SHAKE test vector\n");
+		return -EOPNOTSUPP;
+	}
+
+	ret = -posix_memalign((void *)&outbuf0, 32, outbytes);
+	if (ret)
+		goto out;
+	memset(outbuf0, 0, outbytes);
+	data->mac.buf = outbuf0;
+	data->mac.len = outbytes;
+
+	ret = -posix_memalign((void *)&outbuf1, 32, outbytes);
+	if (ret)
+		goto out;
+
+	uint8_t *out0 = outbuf0;
+	uint8_t *out1 = outbuf1;
+
+	const uint8_t *in0 = data->msg.buf;
+	const uint8_t *in1 = data->msg.buf;
+	if (data->cipher == ACVP_SHAKE128) {
+		shake128x2_armv8(out0, out1, outbytes, in0, in1, data->msg.len);
+	} else {
+		shake256x2_armv8(out0, out1, outbytes, in0, in1, data->msg.len);
+	}
+
+	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "data read");
+
+	if (memcmp(outbuf0, outbuf1, outbytes)) {
+		logger(LOGGER_ERR, "SHAKE lane 1 mismatch with lane 0\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (outbuf1)
+		free(outbuf1);
+	return ret;
+}
+#else
+static int lc_shake_armv8_2x_generate(struct sha_data *data)
 {
 	(void)data;
 	return -EOPNOTSUPP;
@@ -527,6 +817,8 @@ static int lc_hash_generate(struct sha_data *data, flags_t parsed_flags)
 	/* Special handling */
 	if (envstr && !strncasecmp(envstr, "AVX2-4X", 7))
 		return lc_shake4x_generate(data);
+	else if (envstr && !strncasecmp(envstr, "ARM-2X", 6))
+		return lc_shake_armv8_2x_generate(data);
 
 	ret = lc_get_hash(data->cipher, &lc_hash);
 	if (ret)
@@ -662,12 +954,16 @@ static void lc_hmac_backend_c(void)
 
 static int lc_kmac_internal(struct kmac_data *data, int verify)
 {
-	LC_KMAC_CTX_ON_STACK(kmac256, lc_cshake256);
-	LC_KMAC_CTX_ON_STACK(kmac128, lc_cshake128);
-	struct lc_kmac_ctx *kmac = (data->cipher == ACVP_KMAC256) ? kmac256 :
-								    kmac128;
+	const struct lc_hash *lc_hash;
 	BUFFER_INIT(mac);
 	int ret;
+
+	ret = lc_get_hash(data->cipher, &lc_hash);
+	if (ret)
+		return ret;
+
+	LC_KMAC_CTX_ON_STACK(kmac, lc_hash);
+
 
 	if (!verify) {
 		CKINT_LOG(alloc_buf(data->maclen >> 3, &data->mac),
@@ -901,6 +1197,7 @@ out:
 static struct kdf_108_backend lc_108 =
 {
 	lc_kdf_108_generate,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(lc_108_backend)
@@ -1024,4 +1321,541 @@ ACVP_DEFINE_CONSTRUCTOR(lc_hkdf_backend)
 static void lc_hkdf_backend(void)
 {
 	register_hkdf_impl(&lc_hkdf_back);
+}
+
+/************************************************
+ * Dilithium
+ ************************************************/
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
+static int lc_compare(const uint8_t *act, const uint8_t *exp,
+		      const size_t len, const char *info)
+{
+	if (memcmp(act, exp, len)) {
+		unsigned int i;
+
+		printf("Expected %s ", info);
+		for (i = 0; i < len; i++)
+			printf("0x%.2x ", *(exp + i));
+
+		printf("\n");
+
+		printf("Actual %s ", info);
+		for (i = 0; i < len; i++)
+			printf("0x%.2x ", *(act + i));
+
+		printf("\n");
+
+		return 1;
+	}
+
+	return 0;
+}
+
+
+struct static_rng {
+	const uint8_t *seed;
+	size_t seedlen;
+};
+
+static int lc_static_rng_gen(void *_state, const uint8_t *addtl_input,
+			     size_t addtl_input_len, uint8_t *out,
+			     size_t outlen)
+{
+	struct static_rng *state = _state;
+
+	(void)addtl_input;
+	(void)addtl_input_len;
+
+	if (outlen != state->seedlen)
+		return -EINVAL;
+
+	memcpy(out, state->seed, outlen);
+
+	return 0;
+}
+
+static int lc_static_rng_seed(void *_state, const uint8_t *seed, size_t seedlen,
+			      const uint8_t *persbuf, size_t perslen)
+{
+	(void)_state;
+	(void)seed;
+	(void)seedlen;
+	(void)persbuf;
+	(void)perslen;
+	return 0;
+}
+
+static void lc_static_rng_zero(void *_state)
+{
+	(void)_state;
+}
+
+static const struct lc_rng lc_static_drng = {
+	.generate = lc_static_rng_gen,
+	.seed = lc_static_rng_seed,
+	.zero = lc_static_rng_zero,
+};
+
+#include "dilithium_tester_vectors_level2_hex.h"
+static int lc_dilithium_one(const struct dilithium_testvector_hex *vector)
+{
+	struct lc_dilithium_pk d_pk;
+	struct lc_dilithium_sk d_sk;
+	struct lc_dilithium_sig d_sig;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret = 0;
+
+	s_rng_state.seed = vector->seed;
+	s_rng_state.seedlen = sizeof(vector->seed);
+
+	CKINT(lc_dilithium_keypair_c(&d_pk, &d_sk, &s_drng));
+	CKINT(lc_dilithium_sign_c(&d_sig, vector->msg, 8, &d_sk, NULL));
+
+	ret += lc_compare(d_pk.pk, vector->pk, LC_DILITHIUM_PUBLICKEYBYTES,
+			  "Dilithium PK");
+	ret += lc_compare(d_sk.sk, vector->sk, LC_DILITHIUM_SECRETKEYBYTES,
+			  "Dilithium SK");
+	ret += lc_compare(d_sig.sig, vector->sig, LC_DILITHIUM_CRYPTO_BYTES,
+			  "Dilithium Sig");
+
+	if (lc_dilithium_verify_c(&d_sig, vector->msg, 8, &d_pk))
+			printf("Signature verification failed!\n");
+
+out:
+	return ret;
+}
+
+static int lc_dilithium_gen_one(unsigned int err)
+{
+	struct lc_dilithium_pk d_pk;
+	struct lc_dilithium_sk d_sk;
+	struct lc_dilithium_sig d_sig;
+	struct static_rng s_rng_state;
+	uint8_t msg[4096] = { 0 };
+	size_t msg_len;
+	uint8_t seed[32];
+	uint32_t errorlocation = 0;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret = 0;
+
+	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, msg, sizeof(msg)));
+
+	/* msg_len is defined by the first 12 bits of the msg buf */
+	msg_len = (size_t)msg[0];
+	msg_len |= (((size_t)msg[1]) & 7) << 8;
+
+	if (msg_len > sizeof(msg)) {
+		printf("msg_len generation failure %zu %zu\n", msg_len,
+		       sizeof(msg));
+		return -EFAULT;
+	}
+
+	memcpy(&errorlocation, msg, sizeof(errorlocation));
+
+	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, seed, sizeof(seed)));
+	s_rng_state.seed = seed;
+	s_rng_state.seedlen = sizeof(seed);
+
+	CKINT(lc_dilithium_keypair_c(&d_pk, &d_sk, &s_drng));
+	CKINT(lc_dilithium_sign_c(&d_sig, msg, msg_len, &d_sk, NULL));
+
+	switch (err) {
+	case 1:
+		printf("error added: in signature\n");
+		errorlocation &= (sizeof(d_sig.sig) - 1);
+		d_sig.sig[errorlocation] = (d_sig.sig[errorlocation] + 1) & 0xff;
+		break;
+	case 2:
+		printf("error added: in pk\n");
+		errorlocation &= (sizeof(d_pk.pk) - 1);
+		d_pk.pk[errorlocation] = (d_pk.pk[errorlocation] + 1) & 0xff;
+		break;
+	case 3:
+		printf("error added: in sk\n");
+		errorlocation &= (sizeof(d_sk.sk) - 1);
+		d_sk.sk[errorlocation] = (d_sk.sk[errorlocation] + 1) & 0xff;
+		break;
+	default:
+		break;
+	}
+
+#if LC_DILITHIUM_MODE == 2
+	printf("parameter set: ML-DSA-44\n");
+#elif LC_DILITHIUM_MODE == 3
+	printf("parameter set: ML-DSA-65\n");
+#else
+	printf("parameter set: ML-DSA-87\n");
+#endif
+
+	bin2print(seed, sizeof(seed), stdout, "seed");
+	bin2print(d_pk.pk, sizeof(d_pk.pk), stdout, "pk");
+	bin2print(d_sk.sk, sizeof(d_sk.sk), stdout, "sk");
+	printf("deterministic signature: true\n");
+	bin2print(msg, msg_len, stdout, "message");
+	bin2print(d_sig.sig, sizeof(d_sig.sig), stdout, "sig");
+
+	printf("\n");
+
+out:
+	return ret;
+}
+
+static int lc_dilithium_gen_all(void)
+{
+	unsigned int i;
+	int ret = 0;
+
+	for (i = 0; i < 10; i++) {
+		ret += lc_dilithium_gen_one(0);
+	}
+
+	ret += lc_dilithium_gen_one(1);
+	ret += lc_dilithium_gen_one(2);
+	ret += lc_dilithium_gen_one(3);
+
+	return ret;
+}
+
+static int lc_dilithium_all(void)
+{
+	unsigned int i;
+	int ret = 0;
+
+	for (i = 0; i < ARRAY_SIZE(dilithium_testvectors_cavp_data); i++) {
+		ret += lc_dilithium_one(&dilithium_testvectors_cavp_data[i]);
+	}
+
+	return ret;
+}
+
+/************************************************
+ * Kyber
+ ************************************************/
+
+static int lc_kyber_gen_one(unsigned int err)
+{
+	struct lc_kyber_pk d_pk;
+	struct lc_kyber_sk d_sk;
+	struct lc_kyber_ss d_ss;
+	struct lc_kyber_ct d_ct;
+	struct static_rng s_rng_state;
+	uint8_t seed[32];
+	uint32_t errorlocation = 0;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret = 0;
+
+	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, (void *)&errorlocation,
+			      sizeof(errorlocation)));
+
+	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, seed, sizeof(seed)));
+	s_rng_state.seed = seed;
+	s_rng_state.seedlen = sizeof(seed);
+
+	CKINT(lc_kyber_keypair_c(&d_pk, &d_sk, &s_drng));
+	CKINT(lc_kyber_enc_c(&d_ct, &d_ss, &d_pk, &s_drng));
+
+	switch (err) {
+	case 1:
+		printf("error added: in shared secret\n");
+		errorlocation &= (sizeof(d_ss.ss) - 1);
+		d_ss.ss[errorlocation] = (d_ss.ss[errorlocation] + 1) & 0xff;
+		break;
+	case 2:
+		printf("error added: in pk\n");
+		errorlocation &= (sizeof(d_pk.pk) - 1);
+		d_pk.pk[errorlocation] = (d_pk.pk[errorlocation] + 1) & 0xff;
+		break;
+	case 3:
+		printf("error added: in sk\n");
+		errorlocation &= (sizeof(d_sk.sk) - 1);
+		d_sk.sk[errorlocation] = (d_sk.sk[errorlocation] + 1) & 0xff;
+		break;
+	case 4:
+		printf("error added: in ciphertext\n");
+		errorlocation &= (sizeof(d_ct.ct) - 1);
+		d_ct.ct[errorlocation] = (d_ct.ct[errorlocation] + 1) & 0xff;
+		break;
+	default:
+		break;
+	}
+
+#if LC_KYBER_K == 2
+	printf("parameter set: ML-KEM-512\n");
+#elif LC_KYBER_K == 3
+	printf("parameter set: ML-KEM-768\n");
+#else
+	printf("parameter set: ML-KEM-1024\n");
+#endif
+
+	bin2print(seed, sizeof(seed), stdout, "seed");
+	bin2print(d_pk.pk, sizeof(d_pk.pk), stdout, "pk");
+	bin2print(d_sk.sk, sizeof(d_sk.sk), stdout, "sk");
+	bin2print(d_ct.ct, sizeof(d_ct.ct), stdout, "ct");
+	bin2print(d_ss.ss, sizeof(d_ss.ss), stdout, "ss");
+
+	printf("\n");
+
+out:
+	return ret;
+}
+
+static int lc_kyber_gen_all(void)
+{
+	unsigned int i;
+	int ret = 0;
+
+	for (i = 0; i < 10; i++) {
+		ret += lc_kyber_gen_one(0);
+	}
+
+	ret += lc_kyber_gen_one(1);
+	ret += lc_kyber_gen_one(2);
+	ret += lc_kyber_gen_one(3);
+	ret += lc_kyber_gen_one(4);
+
+	return ret;
+}
+
+/************************************************
+ * Specific calls
+ ************************************************/
+static void lc_fips_usage(void)
+{
+	fprintf(stderr, "Additional options:\n");
+	fprintf(stderr, "\t-t --dilithium_test\tPerform testing\n");
+	fprintf(stderr, "\t-g --dilithium_generate\tGenerate vectors\n");
+}
+
+static int lc_main(int argc, char *argv[])
+{
+	int ret = 0, c = 0;
+
+	optind = 0;
+
+	while (1) {
+		int opt_index = 0;
+		static struct option options[] = {
+			{"dilithium_test",	no_argument,  0, 'd'},
+			{"dilithium_generate",	no_argument,  0, 'g'},
+			{"kyber_test",		no_argument,  0, 'k'},
+			{"kyber_generate",	no_argument,  0, 'i'},
+
+			{0, 0, 0, 0}
+		};
+
+		c = getopt_long(argc, argv, "dgki", options, &opt_index);
+		if (-1 == c)
+			break;
+		switch (c) {
+		case 0:
+			switch (opt_index) {
+			case 0:
+				return lc_dilithium_all();
+			case 1:
+				return lc_dilithium_gen_all();
+
+			case 2:
+				/* TODO */
+				return lc_kyber_gen_all();
+			case 3:
+				return lc_kyber_gen_all();
+
+			default:
+				return -EINVAL;
+			}
+			break;
+
+		case 'd':
+			return lc_dilithium_all();
+		case 'g':
+			return lc_dilithium_gen_all();
+
+		case 'k':
+			/* TODO */
+			return lc_kyber_gen_all();
+		case 'i':
+			return lc_kyber_gen_all();
+
+		default:
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+struct main_extension lc_main_extension_def = {
+	lc_main,
+	lc_fips_usage,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_main_extension)
+static void lc_main_extension(void)
+{
+	register_main_extension(&lc_main_extension_def);
+}
+
+/************************************************
+ * EDDSA interface functions
+ ************************************************/
+static int lc_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_flags)
+{
+	struct lc_ed25519_pk pk;
+	struct lc_ed25519_sk sk;
+	int ret = 0;
+
+	/*
+	 * The secret key buffer holds d || q and thus is twice the size of
+	 * q. As we only want the private key in data->d, set the length
+	 * appropriately.
+	 */
+#define LC_ED25519_PURE_SECRETKEYBYTES (LC_ED25519_SECRETKEYBYTES - 32)
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_ED25519)) {
+		logger(LOGGER_ERR, "Curve 25519 only supported\n");
+		return -EINVAL;
+	}
+
+	CKINT(alloc_buf(LC_ED25519_PUBLICKEYBYTES, &data->q));
+	CKINT(alloc_buf(LC_ED25519_PURE_SECRETKEYBYTES, &data->d));
+
+	CKINT(lc_ed25519_keypair(&pk, &sk, lc_seeded_rng));
+
+	memcpy(data->q.buf, pk.pk, LC_ED25519_PUBLICKEYBYTES);
+	memcpy(data->d.buf, sk.sk, LC_ED25519_PURE_SECRETKEYBYTES);
+
+out:
+	return ret;
+}
+
+static int lc_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
+			      void **privkey)
+{
+	struct lc_ed25519_pk pk;
+	struct lc_ed25519_sk *sk = NULL;
+	int ret;
+
+	if (!(curve & ACVP_ED25519)) {
+		logger(LOGGER_ERR, "Curve 25519 only supported\n");
+		return -EINVAL;
+	}
+
+	CKINT(alloc_buf(LC_ED25519_PUBLICKEYBYTES, qbuf));
+
+	sk = calloc(1, sizeof(struct lc_ed25519_sk));
+	CKNULL(sk, -ENOMEM);
+
+	CKINT(lc_ed25519_keypair(&pk, sk, lc_seeded_rng));
+	memcpy(qbuf->buf, pk.pk, LC_ED25519_PUBLICKEYBYTES);
+
+	*privkey = sk;
+
+out:
+	if (ret && sk)
+		free(sk);
+	return ret;
+}
+
+static void lc_eddsa_free_key(void *privkey)
+{
+	if (privkey)
+		free(privkey);
+}
+
+static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
+{
+	struct lc_ed25519_sig sig;
+	struct lc_ed25519_sk *sk = (struct lc_ed25519_sk *)data->privkey;
+	int ret;
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_ED25519)) {
+		logger(LOGGER_ERR, "Curve 25519 only supported\n");
+		return -EINVAL;
+	}
+
+	CKNULL(sk, -EINVAL);
+
+	CKINT(alloc_buf(LC_ED25519_SIGBYTES, &data->signature));
+	CKINT(lc_ed25519_sign(&sig, data->msg.buf, data->msg.len, sk,
+			      lc_seeded_rng));
+
+	/* extract signature */
+
+	memcpy(data->signature.buf, sig.sig, data->signature.len);
+
+out:
+	return ret;
+}
+
+static int lc_eddsa_sigver(struct eddsa_sigver_data *data,
+				  flags_t parsed_flags)
+{
+	struct lc_ed25519_sig sig;
+	struct lc_ed25519_pk pk;
+	int ret;
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_ED25519)) {
+		logger(LOGGER_ERR, "Curve 25519 only supported\n");
+		return -EINVAL;
+	}
+
+	if (data->signature.len > LC_ED25519_SIGBYTES) {
+		logger(LOGGER_ERR, "Signature unexpected size %zu\n",
+		       data->signature.len);
+		return -EINVAL;
+	}
+
+	if (data->q.len != LC_ED25519_PUBLICKEYBYTES) {
+		logger(LOGGER_ERR, "Wrong key size\n");
+		return -EINVAL;
+	}
+
+	memcpy(sig.sig, data->signature.buf, data->signature.len);
+	memcpy(pk.pk, data->q.buf, data->q.len);
+
+	ret = lc_ed25519_verify(&sig, data->msg.buf, data->msg.len, &pk);
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "EDDSA signature successfully verified\n");
+		data->sigver_success = 1;
+	} else if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG,
+		       "EDDSA signature verification with bad signature\n");
+		data->sigver_success = 0;
+	} else {
+		logger(LOGGER_DEBUG, "Signature verification failed");
+		data->sigver_success = 0;
+		/* do not fail here, because that is an expected error */
+	}
+
+	return 0;
+}
+
+static struct eddsa_backend lc_eddsa =
+{
+	lc_eddsa_keygen,
+	NULL,
+	lc_eddsa_siggen,
+	lc_eddsa_sigver,
+	lc_eddsa_keygen_en,
+	lc_eddsa_free_key
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_eddsa_backend)
+static void lc_eddsa_backend(void)
+{
+	register_eddsa_impl(&lc_eddsa);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -235,6 +235,8 @@ extern "C"
 				(ACVP_CIPHERTYPE_KAS | 0x0000000000000400ULL)
 #define ACVP_KAS2_SCHEMA_PARTY_V_CONF					\
 				(ACVP_CIPHERTYPE_KAS | 0x0000000000000800ULL)
+#define ACVP_KTS_KAS_SCHEMA_MASK					\
+				(ACVP_CIPHERTYPE_KAS | 0x0000000000000ff0ULL)
 
 #define ACVP_KAS_KEYGEN_RSAKPG1_BASIC					\
 				(ACVP_CIPHERTYPE_KAS | 0x0000000000001000ULL)

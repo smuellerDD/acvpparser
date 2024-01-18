@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 - 2023, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2017 - 2024, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file
  *
@@ -94,16 +94,21 @@ typedef uint64_t	flags_t;
 /* RSA signatures: JSON field is expected for RSA PKCS1 PSS operation */
 #define FLAG_OP_RSA_SIG_PKCS1PSS			(0x0000000000400000ULL)
 #define FLAG_OP_RSA_SIG_MASK				(0x0000000000f00000ULL)
-/* RSA primes: provable primes (Appendix B.3.2) */
-#define FLAG_OP_RSA_PQ_B32_PRIMES			(0x0000000001000000ULL)
-/* RSA primes: probable primes (Appendix B.3.3) */
-#define FLAG_OP_RSA_PQ_B33_PRIMES			(0x0000000002000000ULL)
-/* RSA primes: provable primes (Appendix B.3.4) */
-#define FLAG_OP_RSA_PQ_B34_PRIMES			(0x0000000004000000ULL)
-/* RSA primes: provable/probable primes (Appendix B.3.5) */
-#define FLAG_OP_RSA_PQ_B35_PRIMES			(0x0000000008000000ULL)
-/* RSA primes: probable primes (Appendix B.3.6) */
-#define FLAG_OP_RSA_PQ_B36_PRIMES			(0x0000000010000000ULL)
+/* RSA primes: provable primes (FIPS 186-4 Appendix B.3.2) */
+#define FLAG_OP_RSA_PROVABLE_PRIMES			(0x0000000001000000ULL)
+#define FLAG_OP_RSA_PQ_B32_PRIMES			FLAG_OP_RSA_PROVABLE_PRIMES
+/* RSA primes: probable primes (FIPS 186-4 Appendix B.3.3) */
+#define FLAG_OP_RSA_PROBABLE_PRIMES			(0x0000000002000000ULL)
+#define FLAG_OP_RSA_PQ_B33_PRIMES			FLAG_OP_RSA_PROBABLE_PRIMES
+/* RSA primes: provable with provable aux primes (FIPS 186-4 Appendix B.3.4) */
+#define FLAG_OP_RSA_PROVABLE_WITH_PROVABLE_AUX		(0x0000000004000000ULL)
+#define FLAG_OP_RSA_PQ_B34_PRIMES			FLAG_OP_RSA_PROVABLE_WITH_PROVABLE_AUX
+/* RSA primes: probable with provable aux primes (FIPS 186-4 Appendix B.3.5) */
+#define FLAG_OP_RSA_PROBABLE_WITH_PROVABLE_AUX		(0x0000000008000000ULL)
+#define FLAG_OP_RSA_PQ_B35_PRIMES			FLAG_OP_RSA_PROBABLE_WITH_PROVABLE_AUX
+/* RSA primes: probable with probable aux primes (FIPS 186-4 Appendix B.3.6) */
+#define FLAG_OP_RSA_PROBABLE_WITH_PROBABLE_AUX		(0x0000000010000000ULL)
+#define FLAG_OP_RSA_PQ_B36_PRIMES			FLAG_OP_RSA_PROBABLE_WITH_PROBABLE_AUX
 /* RSA prime test: Miller Rabin (Table C.2) */
 #define FLAG_OP_RSA_PRIME_TEST_C2			(0x0000000020000000ULL)
 /* RSA prime test: Miller Rabin (Table C.3) */
@@ -176,6 +181,7 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_KDF_TYPE_ANSI_X963			(0x2000000000000000ULL)
 #define FLAG_OP_KDF_TYPE_SRTP				(0x4000000000000000ULL)
 #define FLAG_OP_KDF_TYPE_ANSI_X942			(0x0000000000000100ULL)
+#define FLAG_OP_KDF_TYPE_800_108_KMAC			(0x0000000000000200ULL)
 
 /* DRBG other input flag */
 #define FLAG_OP_DRBG_RESEED				(0x2000000000000000ULL)
