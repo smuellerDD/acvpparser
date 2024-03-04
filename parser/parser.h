@@ -46,7 +46,7 @@ extern "C"
 			* functional enhancements only, consumer
 			* can be left unchanged if enhancements are
 			* not considered. */
-#define PATCHLEVEL 7   /* API / ABI compatible, no functional
+#define PATCHLEVEL 8   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
 

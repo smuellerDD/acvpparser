@@ -54,6 +54,7 @@
 #include "parser_kdf_srtp.h"
 #include "parser_cshake.h"
 #include "parser_ansi_x942.h"
+#include "parser_lms.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -249,6 +250,7 @@ DEF_CALLBACK_TYPE(cshake)
 DEF_CALLBACK_TYPE(ansi_x942)
 DEF_CALLBACK_TYPE(kda_onestep)
 DEF_CALLBACK_TYPE(kda_twostep)
+DEF_CALLBACK_TYPE(lms_sigver)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -315,6 +317,7 @@ enum {
 	CB_TYPE_ansi_x942,
 	CB_TYPE_kda_onestep,
 	CB_TYPE_kda_twostep,
+	CB_TYPE_lms_sigver,
 };
 struct json_callback {
 	union {
@@ -370,6 +373,7 @@ struct json_callback {
 		struct ansi_x942_callback ansi_x942;
 		struct kda_onestep_callback kda_onestep;
 		struct kda_twostep_callback kda_twostep;
+		struct lms_sigver_callback lms_sigver;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

@@ -1,3 +1,6 @@
+v2.1,8
+- enhancement: add LMS sigver tester
+
 v2.1.7
 - enhancement: leancrypto - add EDDSA
 - enhancement: Support KAS2 in parser

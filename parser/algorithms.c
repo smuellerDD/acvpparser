@@ -209,6 +209,8 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ffdhe8192", ACVP_DH_FFDHE_8192},
 	{"FB", ACVP_DH_FB},
 	{"FC", ACVP_DH_FC},
+
+	{"LMS", ACVP_LMS},
 };
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)
