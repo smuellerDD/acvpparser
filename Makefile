@@ -335,10 +335,71 @@ ifeq (leancrypto,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_leancrypto.c
 	INCLUDE_DIRS += backend_interfaces/leancrypto/
 	ifeq ($(uname -m),x86_64)
-		CFLAGS += -mavx2 -mbmi2 -mpopcnt
+		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
 	LIBRARIES += leancrypto
 endif
+
+################## CONFIGURE BACKEND ippcrypto ################
+
+ifeq (ippcrypto,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_ippcrypto.c
+	INCLUDE_DIRS += $(IPPCRYPTOROOT)/include
+	INCLUDE_DIRS += $(OPENSSL_ROOT_DIR)/include/
+
+	ifeq ($(uname -m),x86_64)
+		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
+	endif
+	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
+	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
+
+	LIBRARIES += crypto ssl
+
+endif
+
+################## CONFIGURE BACKEND cryptomb ################
+
+ifeq (cryptomb,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_cryptomb.c
+	INCLUDE_DIRS += $(IPPCRYPTOROOT)/include
+	INCLUDE_DIRS += $(OPENSSL_ROOT_DIR)/include/
+
+	ifeq ($(uname -m),x86_64)
+		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
+	endif
+	CFLAGS += -Wno-unused-variable -Wno-incompatible-pointer-types
+	LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
+	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
+
+	LIBRARIES += crypto ssl
+
+endif
+
+################## CONFIGURE BACKEND cryptombssl ################
+
+ifeq (cryptombssl,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_cryptombssl.c
+	INCLUDE_DIRS += $(IPPCRYPTOROOT)/include
+	INCLUDE_DIRS += $(OPENSSL_ROOT_DIR)/include/
+
+	ifeq ($(uname -m),x86_64)
+		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
+	endif
+	CFLAGS += -Wno-unused-variable -Wno-incompatible-pointer-types
+	LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
+	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+
+	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
+
+	LIBRARIES += crypto ssl
+
+endif
+######################################################
+
 
 ######################################################
 
@@ -359,10 +420,10 @@ LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
 analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 
-.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent leancrypto shlib shlib_static default files
+.PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent leancrypto ippcrypto cryptomb cryptombssl shlib shlib_static default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|leancrypto|shlib|shlib_static>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|leancrypto|ippcrypto|cryptomb|cryptombssl|shlib|shlib_static>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -391,6 +452,9 @@ cpacf: $(NAME)
 lrng: $(NAME)
 jent: $(NAME)
 leancrypto: $(NAME)
+ippcrypto: $(NAME)
+cryptomb: $(NAME)
+cryptombssl: $(NAME)
 shlib: $(SHLIB_NAME)
 shlib_static: $(SHLIB_NAME_STATIC)
 bouncycastle: $(NAME)
