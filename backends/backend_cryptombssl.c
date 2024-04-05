@@ -23,7 +23,7 @@
 /************************************************
  * ECDSA interface functions - SSL API
  ************************************************/
-static int len64, len8, msglen;
+static int len8, msglen;
 
 // globals (group)
 static EC_GROUP* EC = NULL;
@@ -141,7 +141,6 @@ static int cryptomb_ssl_ecdsa_keygen_en(uint64_t curve, struct buffer *Qx_buf,
     memset(Qy_buf->buf, 0, len8);
     BN_bn2binpad(data_pub_y, Qy_buf->buf, Qy_buf->len);
 
-out:
 	return ret;
 }
 
@@ -338,7 +337,6 @@ static int cryptomb_ssl_ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t par
         data->sigver_success = 0;
     }
 
-out:
     return ret;
 }
 
@@ -386,6 +384,7 @@ cryptomb_ssl_ecdh_ss_common(uint64_t cipher, struct buffer *Qxrem, struct buffer
 		default:
 			logger(LOGGER_ERR, "Unknown curve\n");
 	}
+    (void)add;
     set_ec_ssl_params(ec);
 
     // A - remote
@@ -421,6 +420,8 @@ cryptomb_ssl_ecdh_ss_common(uint64_t cipher, struct buffer *Qxrem, struct buffer
         // generate local keys - private with OpenSSL and public with crypto_mb
         EVP_PKEY* ecKeyPair = 0;
         ecKeyPair = openssl_generate_keys_bn(pa_prvB[0], NULL, NULL, NULL, EC, curvename, len8, 0);
+        (void)ecKeyPair;
+
         for(int i = 1; i < MBX_NUM_BUFFERS; i++) {
             BN_copy(pa_prvB[i], pa_prvB[0]);
         }
@@ -534,7 +535,6 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
 
     int keyBitlen = data->keylen;
-    int modBytelen = data->modulus >> 3;
 
     struct buffer *dkm_p, *c_p;
 
@@ -558,11 +558,6 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
         out_ciphertext[0], out_ciphertext[1], out_ciphertext[2], out_ciphertext[3],
         out_ciphertext[4], out_ciphertext[5], out_ciphertext[6], out_ciphertext[7]};
 
-    // plaintext
-    const int8u *pa_plaintext[MBX_NUM_BUFFERS] = {
-        dkm_p->buf, dkm_p->buf, dkm_p->buf, dkm_p->buf,
-        dkm_p->buf, dkm_p->buf, dkm_p->buf, dkm_p->buf};
-
     // e
     BIGNUM* BN_e = BN_new();
     BN_bin2bn(init->e.buf, init->e.len, BN_e);
@@ -576,7 +571,6 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
         (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli,
         (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli, (const BIGNUM *)BN_moduli};
 
-    const mbx_RSA_Method* method = mbx_RSA_pub65537_Method(data->modulus);
     int rsaBitLen = init->n.len * 8;
     int rsaByteLen = init->n.len;
 
@@ -620,60 +614,6 @@ out:
     BN_free(BN_e);
 
     return ret;
-}
-
-static int cryptomb_rsa_kas_ifc_decrypt_common(struct kts_ifc_data *data, int validation)
-{
-    (void)validation;
-    mbx_status sts = MBX_STATUS_OK;
-	int ret = 0;
-
-    struct kts_ifc_resp_data *resp = &data->u.kts_ifc_resp;
-	struct buffer *c_p=&resp->c;
-
-    left_pad_buf(&resp->n, data->modulus >> 3);
-    size_t keylen = (data->keylen) ? data->keylen : data->modulus;
-
-    // ciphertext
-    const int8u *pa_ciphertext[MBX_NUM_BUFFERS] = {
-        c_p->buf, c_p->buf, c_p->buf, c_p->buf,
-        c_p->buf, c_p->buf, c_p->buf, c_p->buf};
-
-    // plaintext
-    int8u out_plaintext[MBX_NUM_BUFFERS][MBX_RSA2K_DATA_BYTE_LEN];
-    int8u *pa_plaintext[MBX_NUM_BUFFERS] = {
-        out_plaintext[0], out_plaintext[1], out_plaintext[2], out_plaintext[3],
-        out_plaintext[4], out_plaintext[5], out_plaintext[6], out_plaintext[7]};
-
-    // private exponent
-    const int64u *pa_d[MBX_NUM_BUFFERS]= {
-        (int64u *)resp->d.buf, (int64u *)resp->d.buf, (int64u *)resp->d.buf, (int64u *)resp->d.buf,
-        (int64u *)resp->d.buf, (int64u *)resp->d.buf, (int64u *)resp->d.buf, (int64u *)resp->d.buf };
-
-    // moduli
-    const int64u *pa_moduli[MBX_NUM_BUFFERS] = {
-        (int64u *)resp->n.buf, (int64u *)resp->n.buf, (int64u *)resp->n.buf, (int64u *)resp->n.buf,
-        (int64u *)resp->n.buf, (int64u *)resp->n.buf, (int64u *)resp->n.buf, (int64u *)resp->n.buf};
-
-    /* key operation */
-    const mbx_RSA_Method* method = mbx_RSA2K_private_Method();
-
-    sts = mbx_rsa_private_mb8(pa_ciphertext, pa_plaintext, pa_d, pa_moduli, MBX_RSA2K_DATA_BIT_LEN, method, NULL);
-    CKNULL_LOG((sts == MBX_STATUS_OK), sts, "Error in mbx_rsa_private_mb8\n")
-
-    BUFFER_INIT(tmp);
-	alloc_buf(MBX_RSA2K_DATA_BYTE_LEN, &tmp);
-    memcpy(tmp.buf, pa_plaintext[0], MBX_RSA2K_DATA_BYTE_LEN);
-
-    if (tmp.len < (keylen >> 3)) {
-        logger(LOGGER_ERR, "RSA decrypted data has insufficient size\n");
-    }
-
-    alloc_buf(keylen >> 3, &resp->dkm);
-    memcpy(resp->dkm.buf, tmp.buf, resp->dkm.len);
-
-out:
-	return ret;
 }
 
 static int cryptomb_kts_ifc_generate(struct kts_ifc_data *data,

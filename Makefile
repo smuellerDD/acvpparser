@@ -350,11 +350,18 @@ ifeq (ippcrypto,$(firstword $(MAKECMDGOALS)))
 	ifeq ($(uname -m),x86_64)
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
-	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+	CFLAGS += -Wno-uninitialized
+
+	# Static link for lnx
+	ifeq ($(UNAME_S),Linux)
+		LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+		LIBRARIES += crypto ssl
+	else
+		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+		LIBRARIES += crypto ssl ippcp
+	endif
 	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
-
-	LIBRARIES += crypto ssl
 
 endif
 
@@ -368,14 +375,18 @@ ifeq (cryptomb,$(firstword $(MAKECMDGOALS)))
 	ifeq ($(uname -m),x86_64)
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
-	CFLAGS += -Wno-unused-variable -Wno-incompatible-pointer-types
-	LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a
-	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
-	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+	CFLAGS += -Wno-incompatible-pointer-types
+
+	ifeq ($(UNAME_S),Linux)
+		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a
+		LIBRARIES += crypto ssl
+	else
+		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+		LIBRARIES += crypto ssl ippcp crypto_mb
+	endif
+
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/ -L $(OPENSSL_ROOT_DIR)/bin/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
-
-	LIBRARIES += crypto ssl
-
 endif
 
 ################## CONFIGURE BACKEND cryptombssl ################
@@ -388,16 +399,20 @@ ifeq (cryptombssl,$(firstword $(MAKECMDGOALS)))
 	ifeq ($(uname -m),x86_64)
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
-	CFLAGS += -Wno-unused-variable -Wno-incompatible-pointer-types
-	LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a
-	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
-	LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
+	CFLAGS += -Wno-unused-function -Wno-incompatible-pointer-types
 
+	ifeq ($(UNAME_S),Linux)
+		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a
+		LIBRARIES += crypto ssl
+	else
+	    LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+		LIBRARIES += crypto ssl ippcp crypto_mb
+	endif
+
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/ -L $(OPENSSL_ROOT_DIR)/bin/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
-
-	LIBRARIES += crypto ssl
-
 endif
+
 ######################################################
 
 

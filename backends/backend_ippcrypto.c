@@ -848,7 +848,7 @@ out:
     free_buf(&buffN);
     free_buf(&buffE);
     free_buf(&pLocSignBuffer);
-    if(data->saltlen) {
+    if(salt) {
         free(salt);
     }
 
