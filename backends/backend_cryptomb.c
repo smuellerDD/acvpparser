@@ -148,7 +148,6 @@ static int cryptomb_ecdsa_keygen_en(uint64_t curve, struct buffer *Qx_buf,
     memset(Qy_buf->buf, 0, len8);
     reverse_bytes(Qy_buf->buf, data_pub_y, Qy_buf->len);
 
-out:
 	return ret;
 }
 
@@ -193,6 +192,7 @@ static int cryptomb_ecdsa_keygen(struct ecdsa_keygen_data *data, flags_t parsed_
 
     EVP_PKEY* ecKeyPair = 0;
     ecKeyPair = openssl_generate_keys(pa_prvB[0], NULL, NULL, NULL, EC, curvename, len8, len64, 0);
+    (void)ecKeyPair;
 
     for(int i = 1; i < MBX_NUM_BUFFERS; i++) {
             memcpy(pa_prvB[i], pa_prvB[0], len8);
@@ -405,7 +405,6 @@ static int cryptomb_ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t parsed_
         data->sigver_success = 0;
     }
 
-out:
     return ret;
 }
 
@@ -453,6 +452,7 @@ static int cryptomb_ecdh_common(uint64_t cipher, struct buffer *Qxrem, struct bu
 		default:
 			logger(LOGGER_ERR, "Unknown curve\n");
 	}
+    (void)add;
     set_ec_params(ec);
 
     // A - remote
@@ -480,6 +480,8 @@ static int cryptomb_ecdh_common(uint64_t cipher, struct buffer *Qxrem, struct bu
         // generate local keys
         EVP_PKEY* ecKeyPair = 0;
         ecKeyPair = openssl_generate_keys(pa_prvB[0], NULL, NULL, NULL, EC, curvename, len8, len64, 0);
+        (void)ecKeyPair;
+
         for(int i = 1; i < MBX_NUM_BUFFERS; i++) {
             memcpy(pa_prvB[i], pa_prvB[0], len8);
         }
@@ -664,7 +666,7 @@ static int cryptomb_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_
     }
 
     // extract private and public kyes considered as "known"
-    size_t privale_len = 32, public_len = 32;
+    size_t privale_len = 32;
     if(1 != EVP_PKEY_get_raw_private_key(key, priv_key, &privale_len)) {
         logger(LOGGER_ERR, "Error in EVP_PKEY_get_raw_private_key\n");
     }
@@ -791,7 +793,6 @@ static int cryptomb_eddsa_sigver(struct eddsa_sigver_data *data, flags_t parsed_
         data->sigver_success = 0;
     }
 
-out:
     free(msg);
     free(public_key);
 
@@ -850,11 +851,6 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     int8u *pa_ciphertext[MBX_NUM_BUFFERS] = {
         out_ciphertext[0], out_ciphertext[1], out_ciphertext[2], out_ciphertext[3],
         out_ciphertext[4], out_ciphertext[5], out_ciphertext[6], out_ciphertext[7]};
-
-    // plaintext
-    const int8u *pa_plaintext[MBX_NUM_BUFFERS] = {
-        dkm_p->buf, dkm_p->buf, dkm_p->buf, dkm_p->buf,
-        dkm_p->buf, dkm_p->buf, dkm_p->buf, dkm_p->buf};
 
     // moduli
     int8u* pN = malloc(init->n.len);
