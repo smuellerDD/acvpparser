@@ -920,7 +920,7 @@ openssl_ecdh_ss_common(uint64_t cipher,
 	CKINT_O_LOG(EVP_PKEY_fromdata_init(kactx),
 		    "EVP_PKEY_fromdata_init failed with status=%d\n", ret);
 
-	if(!(privloc->len && Qxloc->len && Qyloc->len)) {
+	if(!privloc->len && !Qxloc->len && !Qyloc->len) {
 		pkey = EVP_PKEY_Q_keygen(NULL, NULL, "EC", curve_name);
 		CKNULL_LOG(pkey, -EFAULT, "EVP_PKEY_Q_keygen failed\n");
 
