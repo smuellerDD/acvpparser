@@ -2963,6 +2963,10 @@ static int openssl_rsa_keygen(struct rsa_keygen_data *data,
 					&data->p));
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_FACTOR2,
 					&data->q));
+	// add test result fields that is required by keyFormat "crt"
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT1, &data->dmp1));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT2, &data->dmq1));
+	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, &data->iqmp));
 
 out:
 	if (key)
