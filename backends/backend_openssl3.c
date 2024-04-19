@@ -2958,15 +2958,18 @@ static int openssl_rsa_keygen(struct rsa_keygen_data *data,
 					  &key));
 
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_N, &data->n));
-	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_D, &data->d));
+	if (parsed_flags & FLAG_OP_RSA_CRT) {
+		// add test result fields that is required by keyFormat "crt"
+		CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT1, &data->dmp1));
+		CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT2, &data->dmq1));
+		CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, &data->iqmp));
+	} else {
+		CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_D, &data->d));
+	}
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_FACTOR1,
 					&data->p));
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_FACTOR2,
 					&data->q));
-	// add test result fields that is required by keyFormat "crt"
-	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT1, &data->dmp1));
-	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_EXPONENT2, &data->dmq1));
-	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, &data->iqmp));
 
 out:
 	if (key)
