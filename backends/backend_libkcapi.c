@@ -18,6 +18,9 @@
 #define ECDH_CURVE_NUM_P192 192
 #define ECDH_CURVE_NUM_P256 256
 #define ECDH_CURVE_NUM_P384 384
+#define ECDH_SS_KEYLEN_P192 24
+#define ECDH_SS_KEYLEN_P256 32
+#define ECDH_SS_KEYLEN_P384 48
 #define GCM_IV_SIZE 12
 #define CCM_IV_SIZE 16
 
@@ -1989,4 +1992,273 @@ ACVP_DEFINE_CONSTRUCTOR(kcapi_aead_backend)
 static void kcapi_aead_backend(void)
 {
         register_aead_impl(&kcapi_aead);
+}
+
+static int ecdh_ss_ver(struct ecdh_ss_ver_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        int ret = 0;
+        struct buffer key;       //IUT Public Key
+        struct buffer rkey;      //Remote Public Key
+        struct buffer secret;    //Shared Secret
+        char *curve;
+        int curve_id, ss_key_len;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "ecdh: ecdh_ss_ver_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        key.len = 0;
+        key.buf = NULL;
+        rkey.len = 0;
+        rkey.buf = NULL;
+        secret.len = 0;
+        secret.buf = NULL;
+
+        if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP384)
+        {
+                curve = ECDH_CURVE_STR_P384;
+                curve_id = ECDH_CURVE_ID_P384;
+                ss_key_len = ECDH_SS_KEYLEN_P384;
+        }
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP256)
+        {
+                curve = ECDH_CURVE_STR_P256;
+                curve_id = ECDH_CURVE_ID_P256;
+                ss_key_len = ECDH_SS_KEYLEN_P256;
+        }
+        else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP192)
+        {
+                curve = ECDH_CURVE_STR_P192;
+                curve_id = ECDH_CURVE_ID_P192;
+                ss_key_len = ECDH_SS_KEYLEN_P192;
+        }
+        else
+        {
+                logger(LOGGER_ERR, "ecdh: curve not supported\n");
+                return -EINVAL;
+        }
+
+        if (kcapi_kpp_init(&handle, curve, 0))
+        {
+                ret = -EINVAL;
+                logger(LOGGER_ERR, "ecdh: allocation of cipher failed\n");
+                goto out1;
+        }
+
+        ret = kcapi_kpp_ecdh_setcurve(handle, curve_id);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: setting ecdh curve failed with error: %d\n", ret);
+                goto out1;
+        }
+
+        ret = kcapi_kpp_setkey(handle, data->privloc.buf, data->privloc.len);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: kernel keys generation failed with error: %d\n", ret);
+                goto out;
+        }
+
+        CKINT_LOG(alloc_buf(data->Qxrem.len + data->Qyrem.len, &key), "ecdh: local pub Key buffer could not be allocated\n");
+        ret = kcapi_kpp_keygen(handle, key.buf, key.len, 0);
+        if(ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: public keygen failed\n");
+		goto out;
+        }
+        if(memcmp(data->Qxloc.buf, key.buf, data->Qxrem.len))
+        {
+                logger(LOGGER_ERR, "ecdh: key not matching\n");
+                data->validity_success=0;
+                goto out;
+        }
+        if(memcmp(data->Qyloc.buf, key.buf + data->Qxrem.len, data->Qyrem.len))
+        {
+                logger(LOGGER_ERR, "ecdh: key not matching\n");
+                data->validity_success=0;
+                goto out;
+        }
+
+        CKINT_LOG(alloc_buf(data->Qxrem.len + data->Qyrem.len, &rkey), "ecdh: remote key buffer could not be allocated\n");
+
+        if(data->Qxrem.buf)
+                memcpy(rkey.buf, data->Qxrem.buf, data->Qxrem.len);
+
+        if(data->Qyrem.buf)
+                memcpy(rkey.buf + data->Qxrem.len, data->Qyrem.buf, data->Qyrem.len);
+
+        CKINT_LOG(alloc_buf(ss_key_len * 2, &secret), "ecdh: shared secret buffer could not be allocated\n");
+        ret = kcapi_kpp_ssgen(handle, rkey.buf, rkey.len, secret.buf, ss_key_len * 2, 0);
+        if(ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: ssgen failed\n");
+                goto out;
+        }
+
+        if(memcmp(data->hashzz.buf, secret.buf, ss_key_len))
+        {
+                logger(LOGGER_ERR, "ecdh: ssver failed\n");
+                data->validity_success=0;
+        }
+        else
+        {
+                data->validity_success=1;
+        }
+out:
+        if(key.buf)
+                free_buf(&key);
+        if(rkey.buf)
+                free_buf(&rkey);
+        if(secret.buf)
+                free_buf(&secret);
+out1:
+        kcapi_kpp_destroy(handle);
+        return ret;
+}
+
+static int ecdh_ss(struct ecdh_ss_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        int ret = 0;
+        char *curve;
+        int curve_id, ss_key_len;
+        struct buffer key;       //IUT Pub Key
+        struct buffer rkey;      //Remote Pub Key
+        struct buffer pkey;      //Private Key
+        struct buffer secret;    //Shared Secret
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "ecdh: ecdh_ss_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        key.len = 0;
+        key.buf = NULL;
+        pkey.len = 0;
+        pkey.buf = NULL;
+        rkey.len = 0;
+        rkey.buf = NULL;
+        secret.len = 0;
+        secret.buf = NULL;
+
+	if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP384)
+        {
+                curve = ECDH_CURVE_STR_P384;
+                curve_id = ECDH_CURVE_ID_P384;
+                ss_key_len = ECDH_SS_KEYLEN_P384;
+        }
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP256)
+        {
+                curve = ECDH_CURVE_STR_P256;
+                curve_id = ECDH_CURVE_ID_P256;
+                ss_key_len = ECDH_SS_KEYLEN_P256;
+        }
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP192)
+        {
+                curve = ECDH_CURVE_STR_P192;
+                curve_id = ECDH_CURVE_ID_P192;
+                ss_key_len = ECDH_SS_KEYLEN_P192;
+        }
+        else
+        {
+                logger(LOGGER_ERR, "ecdh: curve not supported\n");
+                return -EINVAL;
+        }
+
+        if (kcapi_kpp_init(&handle, curve, 0))
+        {
+                ret = -EINVAL;
+                logger(LOGGER_ERR, "ecdh: allocation of cipher failed\n");
+                goto out1;
+        }
+
+        ret = kcapi_kpp_ecdh_setcurve(handle, curve_id);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: setting ecdh curve failed: %d\n", ret);
+                goto out1;
+        }
+
+        CKINT_LOG(alloc_buf(ss_key_len, &pkey), "ecdh: private key buffer could not be allocated\n");
+        ret = kcapi_rng_get_bytes(pkey.buf, ss_key_len);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: get RNG failed with error: %d\n", ret);
+                goto out;
+        }
+
+        ret = kcapi_kpp_setkey(handle, pkey.buf, ss_key_len);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: private key setting failed with error: %d\n", ret);
+                goto out;
+        }
+
+        CKINT_LOG(alloc_buf(data->Qxrem.len + data->Qyrem.len, &key), "ecdh: local public key buffer could not be allocated\n");
+        ret = kcapi_kpp_keygen(handle, key.buf, key.len, 0);
+        if(ret<0)
+        {
+                logger(LOGGER_ERR, "ecdh: public keygen failed\n");
+		goto out;
+        }
+
+        CKINT_LOG(alloc_buf(data->Qxrem.len , &data->Qxloc), "ecdh: local x key buffer could not be allocated\n");
+        CKINT_LOG(alloc_buf(data->Qyrem.len , &data->Qyloc), "ecdh: local y key buffer could not be allocated\n");
+
+        if(key.buf)
+                memcpy(data->Qxloc.buf, key.buf, data->Qxrem.len);
+
+        if(key.buf)
+                memcpy(data->Qyloc.buf, key.buf + data->Qxrem.len, data->Qyrem.len);
+
+        CKINT_LOG(alloc_buf(data->Qxrem.len + data->Qyrem.len, &rkey), "ecdh: remote key buffer could not be allocated\n");
+
+        if(data->Qxrem.buf)
+                memcpy(rkey.buf, data->Qxrem.buf, data->Qxrem.len);
+
+        if(data->Qyrem.buf)
+                memcpy(rkey.buf + data->Qxrem.len, data->Qyrem.buf, data->Qyrem.len);
+
+        CKINT_LOG(alloc_buf(ss_key_len * 2, &secret), "ecdh: shared secret buffer could not be allocated\n");
+        ret = kcapi_kpp_ssgen(handle, rkey.buf, rkey.len, secret.buf, ss_key_len * 2, 0);
+        if(ret < 0)
+        {
+                logger(LOGGER_ERR, "ecdh: siggen failed\n");
+                goto out;
+        }
+
+        CKINT_LOG(alloc_buf(ss_key_len, &data->hashzz), "ecdh: shared secret buffer could not be allocated\n");
+
+        if(secret.buf)
+                memcpy(data->hashzz.buf, secret.buf, ss_key_len);
+out:
+        if(key.buf)
+                free_buf(&key);
+        if(pkey.buf)
+                free_buf(&pkey);
+        if(rkey.buf)
+                free_buf(&rkey);
+        if(secret.buf)
+                free_buf(&secret);
+out1:
+        kcapi_kpp_destroy(handle);
+        return ret;
+}
+
+static struct ecdh_backend kcapi_ecdh =
+{
+        ecdh_ss,
+        ecdh_ss_ver,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(kcapi_ecdh_backend)
+static void kcapi_ecdh_backend(void)
+{
+        register_ecdh_impl(&kcapi_ecdh);
 }
