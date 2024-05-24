@@ -96,6 +96,7 @@ endif
 
 ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_libkcapi.c
+	C_SRCS += backends/rsakeys.c
 	LIBRARIES += kcapi
 endif
 
