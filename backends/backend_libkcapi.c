@@ -831,3 +831,228 @@ static void kcapi_sym_backend(void)
 {
         register_sym_impl(&kcapi_sym);
 }
+
+int sha_mac_cipher(char *cipher, uint64_t acvp_cipher, size_t *len)
+{
+        switch(acvp_cipher)
+        {
+
+                case ACVP_HMACSHA1:
+                        strcpy(cipher, "hmac(sha1)");
+                        *len = 20;
+                        break;
+                case ACVP_HMACSHA2_224:
+                        strcpy(cipher, "hmac(sha224)");
+                        *len = 28;
+                        break;
+                case ACVP_HMACSHA2_256:
+                        strcpy(cipher, "hmac(sha256)");
+                        *len = 32;
+                        break;
+                case ACVP_HMACSHA2_384:
+                        strcpy(cipher, "hmac(sha384)");
+                        *len = 48;
+                        break;
+                case ACVP_HMACSHA2_512:
+                        strcpy(cipher, "hmac(sha512)");
+                        *len = 64;
+                        break;
+                case ACVP_HMACSHA3_224:
+                        strcpy(cipher, "hmac(sha3-224)");
+                        *len = 28;
+                        break;
+                case ACVP_HMACSHA3_256:
+                        strcpy(cipher, "hmac(sha3-256)");
+                        *len = 32;
+                        break;
+                case ACVP_HMACSHA3_384:
+                        strcpy(cipher, "hmac(sha3-384)");
+                        *len = 48;
+                        break;
+                case ACVP_HMACSHA3_512:
+                        strcpy(cipher, "hmac(sha3-512)");
+                        *len = 64;
+                        break;
+                case ACVP_AESCMAC:
+                        strcpy(cipher, "cmac(aes)");
+                        *len=128;
+                        break;
+                case ACVP_SHA1:
+                        strcpy(cipher, "sha1");
+                        *len = 20;
+                        break;
+                case ACVP_SHA224:
+                        strcpy(cipher, "sha224");
+                        *len = 28;
+                        break;
+                case ACVP_SHA256:
+                        strcpy(cipher, "sha256");
+                        *len = 32;
+                        break;
+                case ACVP_SHA384:
+                        strcpy(cipher, "sha384");
+                        *len = 48;
+                        break;
+                case ACVP_SHA512:
+                        strcpy(cipher, "sha512");
+                        *len = 64;
+                        break;
+                case ACVP_SHA3_224:
+                        strcpy(cipher, "sha3-224");
+                        *len = 28;
+                        break;
+                case ACVP_SHA3_256:
+                        strcpy(cipher, "sha3-256");
+                        *len = 32;
+                        break;
+                case ACVP_SHA3_384:
+                        strcpy(cipher, "sha3-384");
+                        *len = 48;
+                        break;
+                case ACVP_SHA3_512:
+                        strcpy(cipher, "sha3-512");
+                        *len = 64;
+                        break;
+                default:
+                        return -EINVAL;
+        }
+        return 0;
+}
+
+static int sha_generate(struct sha_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        int ret = 0;
+        BUFFER_INIT(msg_p);
+        size_t len = 0;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "sha: sha_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        char cipher[CIPHERMAXNAME];
+        int rc = 0;
+
+        if(sha_mac_cipher(cipher, data->cipher, &len))
+        {
+                return -EINVAL;
+        }
+
+        CKINT(sha_ldt_helper(data, &msg_p));
+        if (kcapi_md_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "sha: allocation of hash %s failed\n", cipher);
+                return 1;
+        }
+
+        CKINT_LOG(alloc_buf(len, &data->mac), "sha: mac buffer could not be allocated\n");
+        rc = kcapi_md_digest(handle, msg_p.buf, msg_p.len, data->mac.buf, data->mac.len);
+
+        if (rc < 0)
+        {
+                logger(LOGGER_ERR, "sha: message digest generation failed: %d\n", rc);
+                sha_ldt_clear_buf(data, &msg_p);
+                kcapi_md_destroy(handle);
+                return 1;
+        }
+
+out:
+        sha_ldt_clear_buf(data, &msg_p);
+        kcapi_md_destroy(handle);
+        return 0;
+}
+
+static struct sha_backend kcapi_sha =
+{
+        sha_generate,
+        NULL
+};
+ACVP_DEFINE_CONSTRUCTOR(kcapi_sha_backend)
+static void kcapi_sha_backend(void)
+{
+        register_sha_impl(&kcapi_sha);
+}
+
+static int mac_generate(struct hmac_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        int ret = 0;
+        size_t len = 0;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR,"mac: hmac_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        switch(data->cipher) {
+                case ACVP_AESCMAC:
+                case ACVP_TDESCMAC:
+                        break;
+                default:
+                        break;
+        }
+
+#define MAXMD 64
+        uint8_t md[MAXMD];
+#define MAXMDHEX (MAXMD * 2 + 1)
+        char mdhex[MAXMDHEX];
+        char cipher[CIPHERMAXNAME];
+        int rc = 0;
+
+        if(sha_mac_cipher(cipher, data->cipher, &len))
+        {
+                return -EINVAL;
+        }
+
+        memset(md, 0, MAXMD);
+        memset(mdhex, 0, MAXMDHEX);
+
+        if (kcapi_md_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "mac: allocation of hash %s failed\n", cipher);
+                return 1;
+        }
+
+        CKINT_LOG(alloc_buf(len, &data->mac), "mac: mac buffer could not be allocated\n");
+
+        if (data->key.len)
+        {
+                if ((ret = kcapi_md_setkey(handle, data->key.buf, data->key.len)))
+                {
+                        logger(LOGGER_ERR, "mac: setting key failed with error = %d\n", ret);
+                        kcapi_md_destroy(handle);
+                        return -EINVAL;
+                }
+        }
+
+        rc = kcapi_md_digest(handle, data->msg.buf, data->msg.len, md, MAXMD);
+        if (rc < 0)
+        {
+                logger(LOGGER_ERR, "mac: message digest generation failed\n");
+                kcapi_md_destroy(handle);
+                return 1;
+        }
+
+        bin2hex(md, rc, mdhex, data->mac.len, 0);
+        memcpy(data->mac.buf, md, data->mac.len);
+        data->mac.len = (data->maclen)/8;
+
+out:
+        kcapi_md_destroy(handle);
+        return 0;
+}
+
+static struct hmac_backend kcapi_mac =
+{
+        mac_generate,
+};
+ACVP_DEFINE_CONSTRUCTOR(kcapi_mac_backend)
+static void kcapi_mac_backend(void)
+{
+        register_hmac_impl(&kcapi_mac);
+}
