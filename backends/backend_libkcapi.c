@@ -2262,3 +2262,167 @@ static void kcapi_ecdh_backend(void)
 {
         register_ecdh_impl(&kcapi_ecdh);
 }
+
+static int drbg_cipher(uint64_t acvp_cipher, uint64_t type, uint32_t pr, char* cipher)
+{
+        if(pr)
+                strcpy(cipher, "drbg_pr");
+        else
+                strcpy(cipher, "drbg_nopr");
+
+        switch(acvp_cipher & ACVP_HASHMASK)
+        {
+                case ACVP_SHA1:
+                        if((type & ACVP_DRBGMASK) == ACVP_DRBGHMAC)
+                                strcat(cipher, "_hmac");
+                        strcat(cipher, "_sha1");
+                        break;
+                case ACVP_SHA224:
+                        if((type & ACVP_DRBGMASK) == ACVP_DRBGHMAC)
+                                strcat(cipher, "_hmac");
+                        strcat(cipher, "_sha224");
+                        break;
+                case ACVP_SHA256:
+                        if((type & ACVP_DRBGMASK) == ACVP_DRBGHMAC)
+                                strcat(cipher, "_hmac");
+                        strcat(cipher, "_sha256");
+                        break;
+                case ACVP_SHA384:
+                        if((type & ACVP_DRBGMASK) == ACVP_DRBGHMAC)
+                                strcat(cipher, "_hmac");
+                        strcat(cipher, "_sha384");
+                        break;
+                case ACVP_SHA512:
+                        if((type & ACVP_DRBGMASK) == ACVP_DRBGHMAC)
+                                strcat(cipher, "_hmac");
+                        strcat(cipher, "_sha512");
+                        break;
+        }
+
+        switch(acvp_cipher & ACVP_AESMASK)
+        {
+                case ACVP_AES128:
+                        strcat(cipher, "_ctr_aes128");
+                        break;
+                case ACVP_AES192:
+                        strcat(cipher, "_ctr_aes192");
+                        break;
+                case ACVP_AES256:
+                        strcat(cipher, "_ctr_aes256");
+                        break;
+        }
+        return 0;
+}
+
+static int drbg_generate(struct drbg_data *data, flags_t parsed_flags)
+{
+        char cipher[CIPHERMAXNAME];
+        int ret = 0;
+        unsigned int i;
+        static struct kcapi_handle *rng = NULL;
+        struct buffer ent = {NULL, 0};
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "drbg: drbg_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        drbg_cipher(data->cipher, data->type, data->pr, cipher);
+
+        ret = kcapi_rng_init(&rng, cipher, 0);
+        if (ret)
+                return ret;
+
+        CKINT_LOG(alloc_buf(data->entropy.len + data->nonce.len, &ent), "drbg: entropy buffer could not be allocated\n");
+
+        if(data->entropy.buf)
+                memcpy(ent.buf, data->entropy.buf, data->entropy.len);
+
+        if(data->nonce.buf)
+                memcpy(ent.buf + data->entropy.len, data->nonce.buf, data->nonce.len);
+
+        ret = kcapi_rng_set_entropy(rng, ent.buf, ent.len);
+        if(ret)
+                logger(LOGGER_ERR, "drbg: setting entropy failed with error = %d\n", ret);
+
+        ret = kcapi_rng_seed(rng, data->pers.buf, data->pers.len);
+        if (ret)
+                goto out;
+        CKINT_LOG(alloc_buf(data->rnd_data_bits_len/8, &data->random), "drbg: data->random buffer could not be allocated\n");
+
+        for(i = 1; i <= data->entropy_reseed.arraysize; i++)
+        {
+                unsigned char *addn =  data->addtl_reseed.buffers[i-1].buf;
+                int len = data->addtl_reseed.buffers[i-1].len;
+                struct buffer ent1;
+                ent1.buf = data->entropy_reseed.buffers[i-1].buf;
+                ent1.len = data->entropy_reseed.buffers[i-1].len;
+                ret = kcapi_rng_set_entropy(rng, ent1.buf, ent1.len);
+
+                if(ret < 0)
+                {
+                        logger(LOGGER_ERR, "drbg: entropy setting failed with error = %d \n", ret);
+                        goto out;
+                }
+
+                ret = kcapi_rng_seed(rng, addn, len);
+                if (ret)
+                {
+                        logger(LOGGER_ERR, "drbg: reseed failed with error = %d\n",ret);
+                        goto out;
+                }
+        }
+
+        for(i = 1; i <= data->addtl_generate.arraysize; i++)
+        {
+                // calling generate twice is not the same as calling it with 2 * num_bytes
+                unsigned char *addn =  data->addtl_generate.buffers[i-1].buf;
+                int len = data->addtl_generate.buffers[i-1].len;
+
+                if(data->pr)
+                {
+                        struct buffer ent1;
+                        ent1.buf = data->entropy_generate.buffers[i-1].buf;
+                        ent1.len = data->entropy_generate.buffers[i-1].len;
+                        ret = kcapi_rng_set_entropy(rng, ent1.buf, ent1.len);
+                        if(ret < 0)
+                        {
+                                logger(LOGGER_ERR, "drbg: entropy set failed with error = %d\n", ret);
+                                goto out;
+                        }
+                }
+
+                ret = kcapi_rng_send_addtl(rng, addn, len);
+                if (ret < 0)
+                {
+                        logger(LOGGER_ERR, "drbg: setting additional data failed with error = %d\n", ret);
+                        goto out;
+                }
+
+                ret = kcapi_rng_generate(rng, data->random.buf, data->random.len);
+                if (ret < 0)
+                {
+                        logger(LOGGER_ERR, "drbg: generation failed with error = %d\n", ret);
+                        goto out;
+                }
+        }
+out:
+        if (rng)
+                kcapi_rng_destroy(rng);
+        if(ent.buf)
+                free_buf(&ent);
+        return ret;
+}
+
+static struct drbg_backend kcapi_drbg =
+{
+        drbg_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(kcapi_drbg_backend)
+static void kcapi_drbg_backend(void)
+{
+        register_drbg_impl(&kcapi_drbg);
+}
