@@ -18,6 +18,8 @@
 #define ECDH_CURVE_NUM_P192 192
 #define ECDH_CURVE_NUM_P256 256
 #define ECDH_CURVE_NUM_P384 384
+#define GCM_IV_SIZE 12
+#define CCM_IV_SIZE 16
 
 extern char n1[];
 extern char e1[];
@@ -561,6 +563,12 @@ static int sym_cipher(uint64_t acvp_cipher, char* cipher)
                         break;
                 case ACVP_XTS:
                         strcpy(cipher, "xts(aes)");
+                        break;
+                case ACVP_GCM:
+                        strcpy(cipher, "gcm(aes)");
+                        break;
+                case ACVP_CCM:
+                        strcpy(cipher, "ccm(aes)");
                         break;
                 case ACVP_TDESECB:
                         strcpy(cipher, "ecb(des3_ede)");
@@ -1456,4 +1464,529 @@ static void kcapi_ecdsa_backend(void)
         register_ecdsa_impl(&kcapi_ecdsa);
 }
 
+static int gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        char cipher[CIPHERMAXNAME];
+        uint8_t *buf = NULL, *newiv = NULL;
+        uint32_t outbuflen = 0, inbuflen = 0;
+        uint32_t newivlen = GCM_IV_SIZE;
+        uint8_t *assoc = NULL, *o_data = NULL, *tag = NULL;
+        size_t assoclen = 0, datalen = 0, taglen = 0;
+        int ret = -EINVAL;
 
+        if(!data)
+        {
+                logger(LOGGER_ERR, "aead_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        if(sym_cipher(data->cipher,cipher))
+        {
+                logger(LOGGER_ERR, "sym: invalid cipher\n");
+                return -EINVAL;
+        }
+
+        taglen = data->taglen/8;
+        datalen = data->data.len;
+        assoclen = data->assoc.len;
+
+        /* Allocation of aead cipher handle */
+        if (kcapi_aead_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "gcm: allocation of cipher failed\n");
+                return -EFAULT;
+        }
+
+        /* Setting tag value */
+        if (kcapi_aead_settaglen(handle, taglen))
+        {
+                logger(LOGGER_ERR, "gcm: setting of authentication tag length failed\n");
+                goto out;
+        }
+
+        /* Setting length of associated data */
+        kcapi_aead_setassoclen(handle, assoclen);
+
+        /* Padding IV to a size of 12 bytes */
+        ret = kcapi_pad_iv(handle, data->iv.buf, data->iv.len, &newiv, &newivlen);
+        if (ret)
+        {
+                logger(LOGGER_ERR, "gcm: iv padding failed\n");
+                goto out;
+        }
+
+        ret = -ENOMEM;
+        outbuflen = kcapi_aead_outbuflen_enc(handle, datalen, assoclen, taglen);
+        inbuflen = kcapi_aead_inbuflen_enc(handle, datalen, assoclen, taglen);
+        buf = calloc(1, outbuflen);
+        if (!buf)
+        {
+                logger(LOGGER_ERR, "gcm: allocation of buf failed\n");
+                goto out;
+        }
+
+        kcapi_aead_getdata_output(handle, buf, outbuflen, 1,
+                                        &assoc, &assoclen,
+                                        &o_data, &datalen,
+                                        &tag, &taglen);
+
+        /* Seting key */
+        if (!data->key.len || !data->key.buf || kcapi_aead_setkey(handle, data->key.buf, data->key.len))
+        {
+                logger(LOGGER_ERR, "gcm: key setting failed\n");
+                goto out;
+        }
+
+        if(data->assoc.buf)
+                memcpy(assoc, data->assoc.buf, assoclen);
+
+        if(data->data.buf)
+                memcpy(o_data, data->data.buf, datalen);
+
+        /* Performing encryption */
+        ret = kcapi_aead_encrypt(handle, buf, inbuflen,
+                                        newiv,
+                                        buf, outbuflen,
+                                        KCAPI_ACCESS_SENDMSG);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "gcm: cipher operation of buffer failed: %d %d\n", errno, ret);
+                goto out;
+        }
+        else if ((uint32_t)ret != outbuflen)
+        {
+                logger(LOGGER_ERR, "gcm: received data length %d does not match expected length %u\n", ret, outbuflen);
+                goto out;
+        }
+
+        free_buf(&(data->iv));
+
+        if(data->data.buf)
+                free_buf(&(data->data));
+        if(data->tag.buf)
+                free_buf(&(data->tag));
+
+        CKINT_LOG(alloc_buf(datalen, &data->data), "gcm: ct buffer could not be allocated\n");
+
+        if(o_data)
+                memcpy(data->data.buf, o_data, datalen);
+
+        CKINT_LOG(alloc_buf(taglen, &data->tag), "gcm: tag buffer could not be allocated\n");
+
+        if(tag)
+                memcpy(data->tag.buf, tag, taglen);
+out:
+        kcapi_aead_destroy(handle);
+        if (newiv)
+                free(newiv);
+        if (buf)
+                free(buf);
+        return ret;
+}
+
+static int gcm_decrypt(struct aead_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+        char cipher[CIPHERMAXNAME];
+        uint8_t *buf = NULL, *newiv = NULL;;
+        uint32_t outbuflen = 0, inbuflen = 0;
+        /* Only IV size of 12 bytes is supported by the kernel */
+        uint32_t newivlen = GCM_IV_SIZE;
+        uint8_t *assoc = NULL, *o_data = NULL, *tag = NULL;
+        size_t assoclen = 0, datalen = 0, taglen = 0;
+        int ret = -EINVAL;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "gcm: aead_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        if(sym_cipher(data->cipher,cipher))
+        {
+                logger(LOGGER_ERR, "sym: invalid cipher\n");
+                return -EINVAL;
+        }
+
+        assoclen = data->assoc.len;
+        datalen = data->data.len;
+        taglen = data->tag.len;
+        data->integrity_error = 0;
+
+        if (!data->ivlen || !data->iv.buf)
+                return -EINVAL;
+
+        /* Allocation of aead cipher handle */
+        if (kcapi_aead_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "gcm: allocation of cipher failed\n");
+                return -EFAULT;
+        }
+
+        /* Setting tag value */
+        if (kcapi_aead_settaglen(handle, taglen))
+        {
+                logger(LOGGER_ERR, "gcm: setting of authentication tag length failed\n");
+                goto out;
+        }
+
+        /* Setting length of associated data */
+        kcapi_aead_setassoclen(handle, assoclen);
+
+        /* Padding IV to a size of 12 bytes */
+        ret = kcapi_pad_iv(handle, data->iv.buf, data->iv.len, &newiv, &newivlen);
+        if (ret)
+        {
+                logger(LOGGER_ERR, "gcm: iv padding failed\n");
+                goto out;
+        }
+
+        ret = -ENOMEM;
+        outbuflen = kcapi_aead_outbuflen_dec(handle, datalen, assoclen, taglen);
+        inbuflen = kcapi_aead_inbuflen_dec(handle, datalen, assoclen, taglen);
+
+        buf = calloc(1, inbuflen);
+        if (!buf)
+        {
+                logger(LOGGER_ERR, "gcm: allocation of buf failed\n");
+                goto out;
+        }
+
+        kcapi_aead_getdata_input(handle, buf, inbuflen, 0,
+                                        &assoc, &assoclen, &o_data, &datalen,
+                                        &tag, &taglen);
+
+        /* Set key */
+        if (!data->key.len ||
+                        !data->key.buf ||
+                        kcapi_aead_setkey(handle, data->key.buf, data->key.len))
+        {
+                logger(LOGGER_ERR, "gcm: symmetric cipher setkey failed\n");
+                goto out;
+        }
+
+        if(data->assoc.buf)
+                memcpy(assoc, data->assoc.buf, assoclen);
+        if(data->data.buf)
+                memcpy(o_data, data->data.buf, datalen);
+        if (data->tag.buf)
+                memcpy(tag, data->tag.buf, taglen);
+
+        /* Performing decryption */
+        ret = kcapi_aead_decrypt(handle, buf, inbuflen,
+                                                newiv,
+                                                buf, outbuflen,
+                                                KCAPI_ACCESS_SENDMSG);
+
+        if (ret < 0 && ret != -EBADMSG)
+        {
+                logger(LOGGER_ERR, "gcm: cipher operation of buffer failed: %d %d\n", errno, ret);
+                goto out;
+        }
+        else if (ret == -EBADMSG)
+        {
+                logger(LOGGER_DEBUG, "gcm: EBADMSG\n");
+                data->integrity_error = 1;
+                ret = 0;
+                goto out;
+        }
+        else if ((uint32_t)ret != outbuflen)
+        {
+                logger(LOGGER_ERR, "gcm: received data length %d does not match expected length %u\n", ret, outbuflen);
+                goto out;
+        }
+
+        if(data->iv.buf)
+                free_buf(&(data->iv));
+        if(data->data.buf)
+                free_buf(&(data->data));
+        if(data->tag.buf)
+                free_buf(&(data->tag));
+
+        CKINT_LOG(alloc_buf(datalen, &data->data), "gcm: pt buffer could not be allocated\n");
+        if(o_data)
+                memcpy(data->data.buf, o_data, datalen);
+
+out:
+        kcapi_aead_destroy(handle);
+        if (newiv)
+                free(newiv);
+        if (buf)
+                free(buf);
+        return ret;
+}
+
+static int ccm_encrypt(struct aead_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+	char cipher[CIPHERMAXNAME];
+        uint8_t *outbuf = NULL, *newiv = NULL;
+        uint32_t outbuflen = 0, inbuflen = 0;
+        /* Only IV size of 16 bytes is supported by the kernel */
+        uint32_t newivlen = CCM_IV_SIZE;
+        uint8_t *assoc = NULL, *o_data = NULL, *tag = NULL;
+        size_t assoclen = 0, datalen = 0, taglen = 0;
+        int ret = -EINVAL;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "ccm: aead_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        if(sym_cipher(data->cipher,cipher))
+        {
+                logger(LOGGER_ERR, "sym: invalid cipher\n");
+                return -EINVAL;
+        }
+
+        taglen = data->taglen/8;
+        datalen = data->data.len;
+        assoclen = data->assoc.len;
+
+        if (!data->ivlen || !data->iv.buf)
+                return -EINVAL;
+
+        /* Allocation of aead cipher handle */
+        if (kcapi_aead_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "ccm: allocation of cipher failed\n");
+                return -EFAULT;
+        }
+
+        /* Setting tag value */
+        if (kcapi_aead_settaglen(handle, taglen))
+        {
+                logger(LOGGER_ERR, "ccm: setting of authentication tag length failed\n");
+                goto out;
+        }
+
+        /* Setting length of associated data */
+        kcapi_aead_setassoclen(handle, assoclen);
+
+        /* Convert CCM nonce into IV of size of 16 bytes */
+        ret = kcapi_aead_ccm_nonce_to_iv(data->iv.buf, data->iv.len, &newiv, &newivlen);
+        if (ret)
+        {
+                logger(LOGGER_ERR, "ccm: nonce conversion to IV failed\n");
+                goto out;
+        }
+
+        ret = -ENOMEM;
+        outbuflen = kcapi_aead_outbuflen_enc(handle, datalen, assoclen, taglen);
+        inbuflen = kcapi_aead_inbuflen_enc(handle, datalen, assoclen, taglen);
+        outbuf = calloc(1, outbuflen);
+        if (!outbuf)
+        {
+                logger(LOGGER_ERR, "ccm: allocation of buf failed\n");
+                goto out;
+        }
+
+        kcapi_aead_getdata_output(handle, outbuf, outbuflen, 1,
+                                        &assoc, &assoclen, &o_data, &datalen,
+                                        &tag, &taglen);
+
+        /* Seting key */
+        if (!data->key.len ||
+                !data->key.buf ||
+                kcapi_aead_setkey(handle, data->key.buf, data->key.len))
+        {
+                logger(LOGGER_ERR, "ccm: symmetric cipher setkey failed\n");
+                goto out;
+        }
+
+        if(data->assoc.buf)
+                memcpy(assoc, data->assoc.buf, assoclen);
+        if(data->data.buf)
+                memcpy(o_data, data->data.buf, datalen);
+
+        /* Performing encryption */
+        ret = kcapi_aead_encrypt(handle, outbuf, inbuflen,
+                                                newiv,
+                                                outbuf, outbuflen,
+                                                KCAPI_ACCESS_SENDMSG);
+        if (ret < 0)
+        {
+                logger(LOGGER_ERR, "ccm: cipher operation of buffer failed: %d %d\n", errno, ret);
+                goto out;
+        }
+        else if ((uint32_t)ret != outbuflen)
+        {
+                logger(LOGGER_ERR, "ccm: received data length %d does not match expected length %u\n", ret, outbuflen);
+                goto out;
+        }
+
+        if(data->iv.buf)
+                free_buf(&(data->iv));
+        if(data->data.buf)
+                free_buf(&(data->data));
+        if(data->tag.buf)
+                free_buf(&(data->tag));
+
+        CKINT_LOG(alloc_buf(datalen, &data->data), "ccm: ct buffer could not be allocated\n");
+
+        if(o_data)
+                memcpy(data->data.buf, o_data, datalen);
+
+        CKINT_LOG(alloc_buf(taglen, &data->tag), "ccm: tag buffer could not be allocated\n");
+
+        if(tag)
+                memcpy(data->tag.buf, tag, taglen);
+out:
+        kcapi_aead_destroy(handle);
+        if (newiv)
+                free(newiv);
+        if (outbuf)
+                free(outbuf);
+        return ret;
+}
+
+
+static int ccm_decrypt(struct aead_data *data, flags_t parsed_flags)
+{
+        struct kcapi_handle *handle = NULL;
+	char cipher[CIPHERMAXNAME];
+        uint8_t *buf = NULL, *newiv = NULL;
+        uint32_t outbuflen = 0, inbuflen = 0;
+        /* Only IV size of 16 bytes is supported by the kernel */
+        uint32_t newivlen = CCM_IV_SIZE;
+        uint8_t *assoc = NULL, *o_data = NULL, *tag = NULL;
+        size_t assoclen = 0, datalen = 0, taglen = 0;
+        int ret = -EINVAL;
+
+        if(!data)
+        {
+                logger(LOGGER_ERR, "ccm: aead_data is empty, returning -EINVAL...\n");
+                return -EINVAL;
+        }
+        (void)parsed_flags;
+
+        if(sym_cipher(data->cipher,cipher))
+        {
+                logger(LOGGER_ERR, "sym: invalid cipher\n");
+                return -EINVAL;
+        }
+
+        assoclen = data->assoc.len;
+        datalen = data->data.len;
+        taglen = data->tag.len;
+
+        data->integrity_error = 0;
+
+        if (!data->ivlen || !data->iv.buf)
+                return -EINVAL;
+
+        /* Allocation of aead cipher handle */
+        if (kcapi_aead_init(&handle, cipher, 0))
+        {
+                logger(LOGGER_ERR, "ccm: allocation of cipher failed\n");
+                return -EFAULT;
+        }
+
+        /* Setting tag value */
+        if (kcapi_aead_settaglen(handle, taglen))
+        {
+                logger(LOGGER_ERR, "ccm: Setting of authentication tag length failed\n");
+                goto out;
+        }
+
+        /* Setting length of associated data */
+        kcapi_aead_setassoclen(handle, assoclen);
+
+        /* Converting CCM nonce into an IV of size 16 bytes */
+        ret = kcapi_aead_ccm_nonce_to_iv(data->iv.buf, data->iv.len, &newiv, &newivlen);
+        if (ret)
+        {
+                logger(LOGGER_ERR, "ccm: nonce conversion to IV failed\n");
+                goto out;
+        }
+
+        ret = -ENOMEM;
+        outbuflen = kcapi_aead_outbuflen_dec(handle, datalen, assoclen, taglen);
+        inbuflen = kcapi_aead_inbuflen_dec(handle, datalen, assoclen, taglen);
+        buf = calloc(1, inbuflen);
+        if (!buf)
+        {
+                logger(LOGGER_ERR, "ccm: allocation of buf failed\n");
+                goto out;
+        }
+
+        kcapi_aead_getdata_input(handle, buf, inbuflen, 0,
+                                        &assoc, &assoclen, &o_data, &datalen,
+                                        &tag, &taglen);
+
+        /* Set key */
+        if (!data->key.len ||
+                !data->key.buf ||
+                kcapi_aead_setkey(handle, data->key.buf, data->key.len))
+        {
+                logger(LOGGER_ERR, "ccm: symmetric cipher setkey failed\n");
+                goto out;
+        }
+
+        if(data->assoc.buf)
+                memcpy(assoc, data->assoc.buf, assoclen);
+        if(data->data.buf)
+                memcpy(o_data, data->data.buf, datalen);
+        if(data->tag.buf)
+                memcpy(tag, data->tag.buf, taglen);
+
+        /* Performing decryption */
+        ret = kcapi_aead_decrypt(handle, buf, inbuflen,
+                                                newiv,
+                                                buf, outbuflen,
+                                                KCAPI_ACCESS_SENDMSG);
+        if (ret < 0 && ret != -EBADMSG)
+        {
+                logger(LOGGER_ERR, "ccm: cipher operation of buffer failed: %d %d\n", errno, ret);
+                goto out;
+        }
+
+        if (ret == -EBADMSG)
+        {
+                logger(LOGGER_DEBUG, "ccm: EBADMSG\n");
+                data->integrity_error = 1;
+                ret = 0;
+                goto out;
+        }
+        else if ((uint32_t)ret != outbuflen)
+        {
+                logger(LOGGER_ERR, "ccm: received data length %d does not match expected length %u\n", ret, outbuflen);
+                goto out;
+        }
+
+        if(data->iv.buf)
+                free_buf(&(data->iv));
+        if(data->data.buf)
+                free_buf(&(data->data));
+
+        CKINT_LOG(alloc_buf(datalen, &data->data), "ccm: pt buffer could not be allocated\n");
+
+        if(o_data)
+                memcpy(data->data.buf, o_data, datalen);
+
+out:
+        kcapi_aead_destroy(handle);
+        if (newiv)
+                free(newiv);
+        if (buf)
+                free(buf);
+        return ret;
+}
+
+static struct aead_backend kcapi_aead =
+{
+        gcm_encrypt,
+        gcm_decrypt,
+        ccm_encrypt,
+        ccm_decrypt
+};
+ACVP_DEFINE_CONSTRUCTOR(kcapi_aead_backend)
+static void kcapi_aead_backend(void)
+{
+        register_aead_impl(&kcapi_aead);
+}
