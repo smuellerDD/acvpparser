@@ -28,8 +28,9 @@
 
 #include "binhexbin.h"
 #include "cipher_definitions.h"
-#include "constructor.h"
 #include "algorithms.h"
+
+#include "common.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -49,33 +50,6 @@ extern "C"
 #define PATCHLEVEL 8   /* API / ABI compatible, no functional
 			* changes, no enhancements, bug fixes
 			* only. */
-
-#define CIPHER_DECRYPTION_FAILED	"\xde\xad\xbe\xef"
-#define CIPHER_DECRYPTION_FAILED_LEN	(sizeof(CIPHER_DECRYPTION_FAILED) - 1)
-
-struct buffer {
-	unsigned char *buf;
-	size_t len;
-};
-#define BUFFER_INIT(buf)						\
-	struct buffer buf = { NULL, 0 };
-
-struct buffer_array {
-#define MAX_BUFFER_ARRAY	5
-	unsigned int arraysize;
-	struct buffer buffers[MAX_BUFFER_ARRAY];
-};
-
-struct cipher_array {
-#define MAX_CIPHER_ARRAY	16
-	unsigned int arraysize;
-	uint64_t cipher[MAX_CIPHER_ARRAY];
-};
-
-struct mpint {
-	const char len[8];
-	const char value[];
-};
 
 /**
  * Data structure used to register a new parser
@@ -112,6 +86,7 @@ void register_main_extension(struct main_extension *extension);
 void register_tester(struct cavs_tester *curr_tester, const char *log);
 
 extern int generate_testvector;
+
 
 #ifdef __cplusplus
 }

@@ -17,8 +17,6 @@
  * DAMAGE.
  */
 
-#include <stdint.h>
-
 #ifndef _CONVERSION_BE_LE_H
 #define _CONVERSION_BE_LE_H
 

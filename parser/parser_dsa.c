@@ -17,7 +17,10 @@
  * DAMAGE.
  */
 
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "stringhelper.h"
+#include "parser.h"
 #include "binhexbin.h"
 #include "logger.h"
 

@@ -18,6 +18,8 @@
  */
 
 #include "bool.h"
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "stringhelper.h"
 #include "binhexbin.h"
 #include "logger.h"

@@ -20,8 +20,6 @@
 #ifndef _PARSER_FLAGS_H
 #define _PARSER_FLAGS_H
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -85,7 +83,19 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_RSA_TYPE_COMPONENT_SIG_PRIMITIVE	(0x0000000000020000ULL)
 /* RSA: JSON field is expected for RSA component dec primitive */
 #define FLAG_OP_RSA_TYPE_COMPONENT_DEC_PRIMITIVE	(0x0000000000040000ULL)
+/* ML-KEM: JSON field is expected for ML-KEM operation */
+#define FLAG_OP_ASYM_TYPE_ENCAPDECAP			(0x0000000000010000ULL)
+/* ML-KEM: JSON field is expected for ML-KEM encapsulation */
+#define FLAG_OP_ML_KEM_TYPE_ENCAPSULATION		(0x0000000000020000ULL)
+/* ML-KEM: JSON field is expected for ML-KEM decapsulation */
+#define FLAG_OP_ML_KEM_TYPE_DECAPSULATION		(0x0000000000040000ULL)
 #define FLAG_OP_ASYM_TYPE_MASK				(0x00000000000ff000ULL)
+
+/* ML-DSA: JSON field is expected for ML-DSA deterministic siggen */
+#define FLAG_OP_ML_DSA_TYPE_DETERMINISTIC		(0x0000000000100000ULL)
+/* ML-DSA: JSON field is expected for ML-DSA nondeterministis siggen */
+#define FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC		(0x0000000000200000ULL)
+#define FLAG_OP_ML_DSA_TYPE_MASK			(0x0000000000300000ULL)
 
 /* RSA signatures: JSON field is expected for RSA PKCS15 operation */
 #define FLAG_OP_RSA_SIG_PKCS15				(0x0000000000100000ULL)

@@ -1391,6 +1391,9 @@ static int openssl_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 	case ACVP_SHA1:
 		maclen = 20;
 		break;
+	case ACVP_SHA224:
+		maclen = 28;
+		break;
 	case ACVP_SHA256:
 		maclen = 32;
 		break;
@@ -2216,10 +2219,10 @@ out:
 static int openssl_ecdsa_pkvver(struct ecdsa_pkvver_data *data,
 				flags_t parsed_flags)
 {
-	EVP_PKEY_CTX *ctx = NULL;
 	EVP_PKEY *key = NULL;
-	(void)parsed_flags;
 	int ret;
+
+	(void)parsed_flags;
 
 	ret = openssl_ecdsa_create_pkey(&key, data->cipher, &data->Qx,
 					&data->Qy);
@@ -2235,8 +2238,6 @@ static int openssl_ecdsa_pkvver(struct ecdsa_pkvver_data *data,
 
 	if (key)
 		EVP_PKEY_free(key);
-	if (ctx)
-		EVP_PKEY_CTX_free(ctx);
 	return ret;
 }
 
@@ -2528,8 +2529,8 @@ static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
 					 OSSL_SIGNATURE_PARAM_CONTEXT_STRING,
 					 data->context.buf, data->context.len);
 #else
-	if ((data->cipher & ACVP_CURVEMASK) == ACVP_ED448) {
-		logger(LOGGER_ERR, "Ed448 signature generation not supported\n");
+	if (data->context.len > 0) {
+		logger(LOGGER_ERR, "Non-zero context length not supported\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -2659,76 +2660,12 @@ static void openssl_eddsa_backend(void)
 /************************************************
  * RSA cipher interface functions
  ************************************************/
-// 1 / sqrt(2) * 2^256, rounded up
-const char *ossl_bn_inv_sqrt_2_hex = "b504f333f9de6484597d89b3754abe9f1d6f60ba893ba84ced17ac8583339916";
-BIGNUM *ossl_bn_inv_sqrt_2;
-
-// Copied from crypto/bn/bn_rsa_fips186_4.c.
-static int openssl_rsa_fips186_5_aux_prime_min_size(int nbits)
-{
-	if (nbits >= 4096)
-		return 201;
-	if (nbits >= 3072)
-		return 171;
-	if (nbits >= 2048)
-		return 141;
-	return 0;
-}
-
-static int openssl_generate_xps(uint32_t modulus, BIGNUM *xp, BIGNUM *xp1,
-				BIGNUM *xp2, unsigned int *bitlen)
-{
-	BIGNUM *base = NULL, *range = NULL;
-	int bits = modulus >> 1;
-	int ret = 0;
-
-	if (!ossl_bn_inv_sqrt_2) {
-		CKNULL(BN_hex2bn(&ossl_bn_inv_sqrt_2, ossl_bn_inv_sqrt_2_hex),
-		       -EFAULT);
-	}
-
-	base = BN_new();
-	CKNULL(base, -ENOMEM);
-	range = BN_new();
-	CKNULL(range, -ENOMEM);
-
-	// See ossl_bn_rsa_fips186_4_derive_prime in
-	// crypto/bn/bn_rsa_fips186_4.c for why this works.
-	if (bits < BN_num_bits(ossl_bn_inv_sqrt_2)) {
-		ret = -EFAULT;
-		goto out;
-	}
-	CKNULL(BN_lshift(base, ossl_bn_inv_sqrt_2,
-			 bits - BN_num_bits(ossl_bn_inv_sqrt_2)), -EFAULT);
-	CKNULL(BN_lshift(range, BN_value_one(), bits), -EFAULT);
-	CKNULL(BN_sub(range, range, base), -EFAULT);
-	CKNULL(BN_priv_rand_range_ex(xp, range, 0, NULL), -EFAULT);
-	CKNULL(BN_add(xp, xp, base), -EFAULT);
-
-	// See ossl_bn_rsa_fips186_4_gen_prob_primes in
-	// crypto/bn/bn_rsa_fips186_4.c.
-	bitlen[0] = openssl_rsa_fips186_5_aux_prime_min_size(modulus);
-	CKNULL(BN_priv_rand_ex(xp1, bitlen[0], BN_RAND_TOP_ONE,
-			       BN_RAND_BOTTOM_ODD, 0, NULL), -EFAULT);
-	bitlen[1] = openssl_rsa_fips186_5_aux_prime_min_size(modulus);
-	CKNULL(BN_priv_rand_ex(xp2, bitlen[1], BN_RAND_TOP_ONE,
-			       BN_RAND_BOTTOM_ODD, 0, NULL), -EFAULT);
-
-out:
-	if (base)
-		BN_free(base);
-	if (range)
-		BN_free(range);
-	return ret;
-}
-
 static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 				   struct buffer *e, struct buffer *d,
 				   struct buffer *p, struct buffer *q,
 				   struct buffer *dmp1, struct buffer *dmq1,
 				   struct buffer *iqmp)
 {
-	int ret = 0;
 	BN_CTX *bn_ctx = NULL;
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
@@ -2737,6 +2674,7 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 	BIGNUM *p_bn = NULL, *q_bn = NULL;
 	BIGNUM *dmp1_bn = NULL, *dmq1_bn = NULL, *iqmp_bn = NULL;
 	int selection = EVP_PKEY_PUBLIC_KEY;
+	int ret = 0;
 
 	bld = OSSL_PARAM_BLD_new();
 
@@ -2748,7 +2686,7 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 	BN_bin2bn(e->buf, e->len, e_bn);
 	CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, e_bn));
 
-	if (d) {
+	if (d && d->len) {
 		d_bn = BN_new();
 		BN_bin2bn(d->buf, d->len, d_bn);
 		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_D,
@@ -2756,7 +2694,8 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 		selection = EVP_PKEY_KEYPAIR;
 	}
 
-	if (p && q && dmp1 && dmq1 && iqmp) {
+	if (p && q && dmp1 && dmq1 && iqmp &&
+	    p->len && q->len && dmp1->len && dmq1->len && iqmp->len) {
 		p_bn = BN_new();
 		BN_bin2bn(p->buf, p->len, p_bn);
 		CKINT_O(OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_FACTOR1,
@@ -2781,7 +2720,7 @@ static int openssl_rsa_create_pkey(EVP_PKEY **key, struct buffer *n,
 					       OSSL_PKEY_PARAM_RSA_COEFFICIENT1,
 					       iqmp_bn));
 
-		if (!d) {
+		if (!(d && d->len)) {
 			/*
 			 * OpenSSL *requires* that RSA-CRT key pairs also
 			 * contain the d value, but the ACVP server doesn't
@@ -2842,8 +2781,7 @@ static int openssl_rsa_keygen_internal(uint32_t modulus, struct buffer *ebuf,
 				       struct buffer *xp2buf,
 				       struct buffer *xqbuf,
 				       struct buffer *xq1buf,
-				       struct buffer *xq2buf,
-				       unsigned int bitlen[4], EVP_PKEY **key)
+				       struct buffer *xq2buf, EVP_PKEY **key)
 {
 	BIGNUM *e = NULL;
 	BIGNUM *xp = NULL, *xp1 = NULL, *xp2 = NULL;
@@ -2877,35 +2815,45 @@ static int openssl_rsa_keygen_internal(uint32_t modulus, struct buffer *ebuf,
 	CKNULL(e, -ENOMEM);
 
 	bld = OSSL_PARAM_BLD_new();
-	if (xpbuf && xp1buf && xp2buf && bitlen) {
+	if (xpbuf && xp1buf && xp2buf) {
+		CKNULL_LOG(xpbuf->len, -EFAULT,
+			   "xP must be provided by ACVP server\n");
+		CKNULL_LOG(xp1buf->len, -EFAULT,
+			   "xP1 must be provided by ACVP server\n");
+		CKNULL_LOG(xp2buf->len, -EFAULT,
+			   "xP2 must be provided by ACVP server\n");
 		xp = BN_new();
 		CKNULL(xp, -ENOMEM);
 		xp1 = BN_new();
 		CKNULL(xp1, -ENOMEM);
 		xp2 = BN_new();
 		CKNULL(xp2, -ENOMEM);
-		CKINT(openssl_generate_xps(modulus, xp, xp1, xp2, &bitlen[0]));
+		BN_bin2bn(xpbuf->buf, xpbuf->len, xp);
+		BN_bin2bn(xp1buf->buf, xp1buf->len, xp1);
+		BN_bin2bn(xp2buf->buf, xp2buf->len, xp2);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XP, xp);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XP1, xp1);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XP2, xp2);
-		CKINT(openssl_bn2buffer(xp, xpbuf));
-		CKINT(openssl_bn2buffer(xp1, xp1buf));
-		CKINT(openssl_bn2buffer(xp2, xp2buf));
 	}
-	if (xqbuf && xq1buf && xq2buf && bitlen) {
+	if (xqbuf && xq1buf && xq2buf) {
+		CKNULL_LOG(xqbuf->len, -EFAULT,
+			   "xQ must be provided by ACVP server\n");
+		CKNULL_LOG(xq1buf->len, -EFAULT,
+			   "xQ1 must be provided by ACVP server\n");
+		CKNULL_LOG(xq2buf->len, -EFAULT,
+			   "xQ2 must be provided by ACVP server\n");
 		xq = BN_new();
 		CKNULL(xq, -ENOMEM);
 		xq1 = BN_new();
 		CKNULL(xq1, -ENOMEM);
 		xq2 = BN_new();
 		CKNULL(xq2, -ENOMEM);
-		CKINT(openssl_generate_xps(modulus, xq, xq1, xq2, &bitlen[2]));
+		BN_bin2bn(xqbuf->buf, xqbuf->len, xq);
+		BN_bin2bn(xq1buf->buf, xq1buf->len, xq1);
+		BN_bin2bn(xq2buf->buf, xq2buf->len, xq2);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XQ, xq);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XQ1, xq1);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XQ2, xq2);
-		CKINT(openssl_bn2buffer(xq, xqbuf));
-		CKINT(openssl_bn2buffer(xq1, xq1buf));
-		CKINT(openssl_bn2buffer(xq2, xq2buf));
 	}
 	params = OSSL_PARAM_BLD_to_param(bld);
 
@@ -2954,8 +2902,7 @@ static int openssl_rsa_keygen(struct rsa_keygen_data *data,
 
 	CKINT(openssl_rsa_keygen_internal(data->modulus, &data->e, &data->xp,
 					  &data->xp1, &data->xp2, &data->xq,
-					  &data->xq1, &data->xq2, data->bitlen,
-					  &key));
+					  &data->xq1, &data->xq2, &key));
 
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_N, &data->n));
 	if (parsed_flags & FLAG_OP_RSA_CRT) {
@@ -3006,8 +2953,8 @@ static int openssl_rsa_sigver(struct rsa_sigver_data *data,
 			      flags_t parsed_flags)
 {
 	EVP_PKEY *key = NULL;
-	int ret = 0;
 	const EVP_MD *md = NULL;
+	int ret = 0;
 
 	CKINT(openssl_rsa_create_pkey(&key, &data->n, &data->e, NULL, NULL,
 				      NULL, NULL, NULL, NULL));
@@ -3029,7 +2976,7 @@ static int openssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus,
 	int ret;
 
 	CKINT(openssl_rsa_keygen_internal(modulus, ebuf, NULL, NULL, NULL, NULL,
-					  NULL, NULL, NULL, &key));
+					  NULL, NULL, &key));
 
 	CKINT(openssl_pkey_get_bn_bytes(key, OSSL_PKEY_PARAM_RSA_N, nbuf));
 
@@ -3511,8 +3458,10 @@ static int openssl_rsa_kts_ifc_common(struct kts_ifc_data *data,
 	if (convert_cipher_match(data->kts_encoding,
 				ACVP_KAS_ENCODING_CONCATENATION,
 				ACVP_CIPHERTYPE_KAS)) {
-		CKINT(alloc_buf(data->iut_id.len + data->server_id.len,
-				&label));
+		// We can't use alloc_buf here because OpenSSL takes ownership of label.
+		label.len = data->iut_id.len + data->server_id.len;
+		label.buf = OPENSSL_malloc(label.len);
+		CKNULL(label.buf, -ENOMEM);
 		if (parsed_flags & FLAG_OP_KAS_ROLE_INITIATOR) {
 			memcpy(label.buf, data->iut_id.buf, data->iut_id.len);
 			memcpy(label.buf + data->iut_id.len,

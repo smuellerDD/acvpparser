@@ -20,10 +20,24 @@
 #ifndef CONSTRUCTOR_H
 #define CONSTRUCTOR_H
 
+#include "frontend_headers.h"
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+#ifdef __KERNEL__
+
+#define ACVP_DEFINE_CONSTRUCTOR(_func)					\
+	static void _func(void);					\
+	void __init _init_ ## _func(void);				\
+	void __init _init_ ## _func(void)				\
+	{								\
+		_func();						\
+	}
+
+#else /* __KERNEL__ */
 
 #if  __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
 
@@ -35,6 +49,8 @@ extern "C"
 #else
 
 #error "Constructor / destructor not defined for compiler"
+
+#endif
 
 #endif
 

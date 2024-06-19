@@ -1,0 +1,62 @@
+/* Protobuf protocol for the export and import of ECDSA
+ *
+ * Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+ *
+ * License: see LICENSE file in root directory
+ *
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
+ * WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ */
+
+syntax = "proto3";
+
+message EddsaKeygenDataMsg {
+	bytes d = 1;
+	bytes q = 2;
+	uint64 cipher = 3;
+}
+
+message EddsaKeyverDataMsg {
+	bytes q = 1;
+	uint64 cipher = 2;
+	uint32 keyver_success = 3;
+}
+
+message EddsaSiggenDataMsg {
+	bytes msg = 1;
+	bytes context = 2;
+	bytes q = 3;
+	bytes signature = 4;
+	uint64 cipher = 5;
+	uint32 prehash = 6;
+	uint32 privkey = 7;
+}
+
+message EddsaSigverDataMsg {
+	bytes msg = 1;
+	bytes q = 2;
+	bytes signature = 3;
+	uint64 cipher = 4;
+	uint32 prehash = 5;
+	uint32 sigver_success = 6;
+}
+
+message EddsaKeygenEnMsg {
+	uint64 curve = 1;
+	bytes qbuf = 2;
+	uint32 privkey = 3;
+}
+
+message EddsaFreeKeyMsg {
+	uint32 privkey = 1;
+}

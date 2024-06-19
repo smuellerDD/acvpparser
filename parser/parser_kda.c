@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "bool.h"
 #include "stringhelper.h"
 #include "logger.h"

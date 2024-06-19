@@ -1,0 +1,41 @@
+/* Protobuf protocol for the export and import of DRBG
+ *
+ * Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+ *
+ * License: see LICENSE file in root directory
+ *
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
+ * WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ */
+
+syntax = "proto3";
+
+message DrbgDataMsg {
+	bytes entropy = 1;
+	bytes nonce = 2;
+	bytes pers = 3;
+	bytes addtl_reseed1 = 4;
+	bytes addtl_reseed2 = 5;
+	bytes entropy_reseed1 = 6;
+	bytes entropy_reseed2 = 7;
+	bytes addtl_generate1 = 8;
+	bytes addtl_generate2 = 9;
+	bytes entropy_generate1 = 10;
+	bytes entropy_generate2 = 11;
+	bytes random = 12;
+	uint64 type = 13;
+	uint64 cipher = 14;
+	uint32 rnd_data_bits_len = 15;
+	uint32 pr = 16;
+	uint32 df = 17;
+}

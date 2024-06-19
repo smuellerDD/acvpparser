@@ -20,8 +20,8 @@
 #ifndef _PARSER_ECDSA_H
 #define _PARSER_ECDSA_H
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -188,7 +188,7 @@ struct ecdsa_sigver_data {
  *			the following parameters:
  *			@var curve [in] Curve of the ECDSA key to generate.
  *			@var qx [out] Qx affine parameter of ECDSA key
- *			@var qx [out] Qy affine parameter of ECDSA key
+ *			@var qy [out] Qy affine parameter of ECDSA key
  *			@var privkey [out] Provide the pointer to the ECDSA
  *				        private key.
  * @var ecdsa_free_key This function is required if ecdsa_keygen_en is

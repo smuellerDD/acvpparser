@@ -1,0 +1,184 @@
+#
+# Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+#
+############## Configuration settings ###############
+
+# Change as necessary
+PREFIX := /usr/local
+# library target directory (either lib or lib64)
+LIBDIR := lib
+
+PROTODIR := proto
+PARSERDIR := parser
+
+CC ?= cc
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -std=c11 -Wno-variadic-macros
+
+# Debugging Support
+#CLFAGS += -g
+
+# Dead code stripping support
+CLFAGS += -ffunction-sections -fdata-sections
+
+ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
+OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)
+endif
+
+ifneq '' '$(findstring clang,$(CC))'
+CFLAGS          += -Wno-gnu-zero-variadic-macro-arguments
+endif
+
+ifeq ($(OS),Ubuntu)
+CFLAGS +=-DUBUNTU
+endif
+
+#Hardening
+CFLAGS +=-D_FORTIFY_SOURCE=2 -fstack-protector-strong -fwrapv --param ssp-buffer-size=4
+# Set all symbols to hidden -- increases load time performance, forces
+# entry points and ensure that the entry points are marked with visibility.h
+#CFLAGS += -fvisibility=hidden -DDSO
+
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+LDFLAGS +=-Wl,-z,relro,-z,now -pie -g
+LDFLAGS +=-Wl,--gc-sections
+endif
+ifeq ($(UNAME_S),Darwin)
+LDFLAGS +=-Wl,-dead_strip
+endif
+
+NAME := acvp-proto
+SHLIB_NAME := libacvpproto
+SHLIB_NAME_STATIC := libacvpproto_static
+
+# Example if version information is kept in a C file
+LIBMAJOR=$(shell cat $(PROTODIR)/proto.h | grep define | grep MAJVERSION | awk '{print $$3}')
+LIBMINOR=$(shell cat $(PROTODIR)/proto.h | grep define | grep MINVERSION | awk '{print $$3}')
+LIBPATCH=$(shell cat $(PROTODIR)/proto.h | grep define | grep PATCHLEVEL | awk '{print $$3}')
+
+################### Heavy Lifting ###################
+
+LIBVERSION := $(LIBMAJOR).$(LIBMINOR).$(LIBPATCH)
+
+#
+# ACVP-Proto code to interface with backends
+#
+# It is possible to remove all files except the handler code that is truly
+# required to reduce the size of the resulting binary.
+#
+C_SRCS := $(wildcard $(PROTODIR)/*.c)
+C_SRCS := $(filter-out $(wildcard proto_frontend_*.c), $(C_SRCS))
+
+# Example of only symmetric algo support:
+#C_SRCS := $(PROTODIR)/proto.c $(PROTODIR)/proto_sym.c
+
+# Protobuf handler code
+C_SRCS += $(wildcard backend_interfaces/protobuf/src/*.c)
+
+# REQUIRED: Well-selected files from parser
+C_SRCS += $(PARSERDIR)/algorithms.c
+
+# OPTIONAL code which is not required by ACVP-Proto. This code is only required
+# when the backend uses the "logger*" symbols. When these symbols are removed
+# or otherwise turned into a noop, these files can be dropped.
+C_SRCS += $(PARSERDIR)/logger.c $(PARSERDIR)/binhexbin.c
+
+# OPTIONAL code which is not required by ACVP-Proto. This code is required by
+# proto_frontend_app_stdio.c to read data from the IPC interface of STDIO.
+# If a different IPC interface is used, this file may be dropped.
+C_SRCS += $(PARSERDIR)/stringhelper.c
+
+C_SRCS := $(filter-out $(wildcard backend*.c), $(C_SRCS))
+
+INCLUDE_DIRS := $(PROTODIR) $(PARSERDIR)
+LIBRARY_DIRS :=
+LIBRARIES :=
+REQUIED_FILES :=
+
+################### Include definitions ###################
+
+include backends.mk
+
+INCLUDE_DIRS += ./ backend_interfaces/protobuf $(PROTODEFDIR)
+
+#
+# ACVP-Proto code for parsing the protobuf definitions
+#
+# It is possible to remove all files except the handler code that is truly
+# required to reduce the size of the resulting binary.
+#
+PROTOFILE_C_FILES += $(PROTOFILE_C)
+
+# Example of only symmetric algo support:
+#PROTOFILE_C_FILES += $(PROTODEFDIR)/sym.pb-c.c
+
+OBJS += $(PROTOFILE_C_FILES:.c=.o)
+
+################### ACVP Proto Frontend ###################
+
+# User space STDIN/STDOUT
+C_SRCS += $(wildcard $(PROTODIR)/proto_frontend_app_stdio.c)
+
+################### Compile ###################
+
+C_ASM := ${C_SRCS:.c=.s}
+ASM := $(C_ASM)
+
+CFLAGS += $(foreach includedir,$(INCLUDE_DIRS),-I$(includedir))
+CXXFLAGS += ${CFLAGS} -Wno-pedantic
+LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir))
+LDFLAGS += $(foreach library,$(LIBRARIES),-l$(library))
+
+analyze_srcs = $(filter %.c, $(sort $(C_SRCS)))
+analyze_plists = $(analyze_srcs:%.c=%.plist)
+
+$(NAME): $(PROTOFILE_C) $(OBJS)
+	$(CC) $(OBJS) -o $(NAME) $(LDFLAGS)
+
+$(analyze_plists): %.plist: %.c
+	@echo "  CCSA  " $@
+	clang --analyze $(CFLAGS) $< -o $@
+
+scan: $(analyze_plists)
+
+asm:
+	$(foreach b, $(C_SRCS), $(CC) $(CFLAGS) -S -fverbose-asm -o ${b:.c=.s} $(b);)
+
+clean:
+	@- $(RM) $(NAME)
+	@- $(RM) $(SHLIB_NAME).so
+	@- $(RM) $(SHLIB_NAME_STATIC).a
+	@- $(RM) $(wildcard $(PROTODIR)/*.o)
+	@- $(RM) $(wildcard $(PROTODIR)/json-c/*.o)
+	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.o)
+	@- $(RM) $(wildcard backend_interfaces/protobuf/src/*.o)
+	@- $(RM) $(wildcard backend_interfaces/protobuf/pb/*.o)
+	@- $(RM) $(wildcard backends/*.o)
+	@- $(RM) $(ASM)
+	@- $(RM) $(wildcard *.plist)
+	@- $(RM) $(wildcard *$(PROTODIR)/*.plist)
+	@- $(RM) $(wildcard *$(PROTODIR)/json-c/*.plist)
+	@- $(RM) $(wildcard backend_interfaces/pkcs11/*.plist)
+	@- $(RM) $(wildcard backend_interfaces/protobuf/src/*.plist)
+	@- $(RM) $(wildcard backends/*.plist)
+	@- $(RM) backend_interfaces/bouncycastle//*.class
+	@- $(RM) acvpcert9.db acvpkey4.db
+
+distclean: clean
+
+files: $(REQUIED_FILES)
+
+###############################################################################
+#
+# Build debugging
+#
+###############################################################################
+show_vars:
+	@echo C_SRCS=$(C_SRCS)
+	@echo OBJS=$(OBJS)
+	@echo PROTODIR=$(PROTODIR)
+	@echo LIBDIR=$(LIBDIR)
+	@echo USRLIBDIR=$(USRLIBDIR)
+	@echo BUILDFOR=$(BUILDFOR)
+	@echo LDFLAGS=$(LDFLAGS)
+	@echo CFLAGS=$(CFLAGS)

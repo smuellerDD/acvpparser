@@ -19,7 +19,10 @@
 
 #include <string.h>
 
+#include "constructor.h"
+#include "cipher_definitions.h"
 #include "stringhelper.h"
+#include "parser.h"
 #include "logger.h"
 
 #include "parser_common.h"

@@ -17,9 +17,7 @@
  * DAMAGE.
  */
 
-#include <errno.h>
-#include <string.h>
-#include <strings.h>
+#include "frontend_headers.h"
 
 #include "cipher_definitions.h"
 #include "logger.h"
@@ -211,6 +209,14 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"FC", ACVP_DH_FC},
 
 	{"LMS", ACVP_LMS},
+	{"ML-DSA", ACVP_ML_DSA},
+	{"ML-DSA-44", ACVP_ML_DSA_44},
+	{"ML-DSA-65", ACVP_ML_DSA_65},
+	{"ML-DSA-87", ACVP_ML_DSA_87},
+	{"ML-KEM", ACVP_ML_KEM},
+	{"ML-KEM-512", ACVP_ML_KEM_512},
+	{"ML-KEM-768", ACVP_ML_KEM_768},
+	{"ML-KEM-1024", ACVP_ML_KEM_1024},
 };
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)

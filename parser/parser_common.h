@@ -21,6 +21,7 @@
 #define _PARSER_COMMON_H
 
 #include <stdint.h>
+#include <json-c/json.h>
 
 #include "ret_checkers.h"
 
@@ -55,6 +56,8 @@
 #include "parser_cshake.h"
 #include "parser_ansi_x942.h"
 #include "parser_lms.h"
+#include "parser_ml_dsa.h"
+#include "parser_ml_kem.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -251,6 +254,12 @@ DEF_CALLBACK_TYPE(ansi_x942)
 DEF_CALLBACK_TYPE(kda_onestep)
 DEF_CALLBACK_TYPE(kda_twostep)
 DEF_CALLBACK_TYPE(lms_sigver)
+DEF_CALLBACK_TYPE(ml_dsa_keygen)
+DEF_CALLBACK_TYPE(ml_dsa_siggen)
+DEF_CALLBACK_TYPE(ml_dsa_sigver)
+DEF_CALLBACK_TYPE(ml_kem_keygen)
+DEF_CALLBACK_TYPE(ml_kem_encapsulation)
+DEF_CALLBACK_TYPE(ml_kem_decapsulation)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -318,6 +327,12 @@ enum {
 	CB_TYPE_kda_onestep,
 	CB_TYPE_kda_twostep,
 	CB_TYPE_lms_sigver,
+	CB_TYPE_ml_dsa_keygen,
+	CB_TYPE_ml_dsa_siggen,
+	CB_TYPE_ml_dsa_sigver,
+	CB_TYPE_ml_kem_keygen,
+	CB_TYPE_ml_kem_encapsulation,
+	CB_TYPE_ml_kem_decapsulation,
 };
 struct json_callback {
 	union {
@@ -374,6 +389,12 @@ struct json_callback {
 		struct kda_onestep_callback kda_onestep;
 		struct kda_twostep_callback kda_twostep;
 		struct lms_sigver_callback lms_sigver;
+		struct ml_dsa_keygen_callback ml_dsa_keygen;
+		struct ml_dsa_siggen_callback ml_dsa_siggen;
+		struct ml_dsa_sigver_callback ml_dsa_sigver;
+		struct ml_kem_keygen_callback ml_kem_keygen;
+		struct ml_kem_encapsulation_callback ml_kem_encapsulation;
+		struct ml_kem_decapsulation_callback ml_kem_decapsulation;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;
@@ -486,15 +507,6 @@ int process_json(const struct json_array *processdata, const char *exp_version,
 int write_one_entry(const struct json_entry *entry,
 		    struct json_object *testresult,
 		    flags_t parsed_flags);
-
-#define register_backend(backend, definition, log)			\
-	if (backend) {							\
-		logger(LOGGER_ERR,					\
-		       "Backend %s already registered\n", log);		\
-		exit(-EFAULT);						\
-	}								\
-	backend = definition;						\
-	logger(LOGGER_VERBOSE, "Backend %s registered\n", log);
 
 #define DEF_CALLBACK_HELPER(type, name, flags, helper)			\
 	struct name ## _data name ## _vector ;				\

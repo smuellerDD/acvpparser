@@ -1,0 +1,75 @@
+/* Protobuf protocol for the export and import of ECDSA
+ *
+ * Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+ *
+ * License: see LICENSE file in root directory
+ *
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
+ * WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ */
+
+syntax = "proto3";
+
+message EcdsaKeygenDataMsg {
+	bytes d = 1;
+	bytes Qx = 2;
+	bytes Qy = 3;
+	uint64 cipher = 4;
+}
+
+message EcdsaKeygenExtraDataMsg {
+	bytes d = 1;
+	bytes Qx = 2;
+	bytes Qy = 3;
+	uint64 cipher = 4;
+}
+
+message EcdsaPkvverDataMsg {
+	bytes Qx = 1;
+	bytes Qy = 2;
+	uint64 cipher = 3;
+	uint32 keyver_success = 4;
+}
+
+message EcdsaSiggenDataMsg {
+	bytes msg = 1;
+	bytes Qx = 2;
+	bytes Qy = 3;
+	bytes R = 4;
+	bytes S = 5;
+	uint32 component = 6;
+	uint64 cipher = 7;
+	uint32 privkey = 8;
+}
+
+message EcdsaSigverDataMsg {
+	bytes msg = 1;
+	bytes Qx = 2;
+	bytes Qy = 3;
+	bytes R = 4;
+	bytes S = 5;
+	uint32 component = 6;
+	uint64 cipher = 7;
+	uint32 sigver_success = 8;
+}
+
+message EcdsaKeygenEnMsg {
+	uint64 curve = 1;
+	bytes qx = 2;
+	bytes qy = 3;
+	uint32 privkey = 4;
+}
+
+message EcdsaFreeKeyMsg {
+	uint32 privkey = 1;
+}

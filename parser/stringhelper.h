@@ -20,10 +20,10 @@
 #ifndef _STRINGHELPER_H
 #define _STRINGHELPER_H
 
-#include <string.h>
-#include <stdint.h>
+#include "frontend_headers.h"
 
-#include "parser.h"
+#include "common.h"
+#include "logger.h"
 #include "ret_checkers.h"
 
 #ifdef __cplusplus
@@ -31,12 +31,46 @@ extern "C"
 {
 #endif
 
+static inline void free_buf(struct buffer *buf)
+{
+	if (!buf)
+		return;
+	if (buf->buf) {
+		free(buf->buf);
+		buf->buf = NULL;
+	}
+	if (buf->len)
+		buf->len = 0;
+}
+
+static inline int alloc_buf(size_t size, struct buffer *buf)
+{
+	if (buf->buf) {
+		logger(LOGGER_WARN, "Allocate an already allocated buffer!\n");
+		return -EFAULT;
+	}
+	if (!size)
+		return 0;
+
+	buf->buf = calloc(1, size);
+	if (!buf->buf)
+		return -ENOMEM;
+
+	buf->len = size;
+
+	return 0;
+}
+
+static inline void copy_ptr_buf(struct buffer *dst, struct buffer *src)
+{
+	dst->buf = src->buf;
+	dst->len = src->len;
+}
+
+int read_complete(int fd, uint8_t *buf, size_t buflen);
 char* get_val(char *str, const char *delim);
 int get_intval(char *str, const char *delim, uint32_t *val);
 int get_hexval(char *str, const char *delim, uint32_t *val);
-int get_binval(char *str, const char *delim, struct buffer *buf);
-void free_buf(struct buffer *buf);
-int alloc_buf(size_t size, struct buffer *buf);
 void copy_ptr_buf(struct buffer *dst, struct buffer *src);
 int left_pad_buf(struct buffer *buf, size_t required_len);
 int remove_leading_zeroes(struct buffer *buf);

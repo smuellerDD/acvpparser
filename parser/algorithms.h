@@ -20,14 +20,14 @@
 #ifndef ALGORITHMS_H
 #define ALGORITHMS_H
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
+#ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
+#endif
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher);
 int convert_cipher_algo(uint64_t cipher, uint64_t cipher_type_mask,

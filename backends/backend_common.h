@@ -23,7 +23,9 @@
 #include "constructor.h"
 #include "logger.h"
 #include "stringhelper.h"
+#ifndef __KERNEL__
 #include "binhexbin.h"
+#endif
 
 #include "parser_flags.h"
 
@@ -55,6 +57,9 @@
 #include "parser_tls12.h"
 #include "parser_tls13.h"
 #include "parser_kmac.h"
+#include "parser_lms.h"
+#include "parser_ml_dsa.h"
+#include "parser_ml_kem.h"
 
 #include "safeprimes.h"
 

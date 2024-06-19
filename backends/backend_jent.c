@@ -46,11 +46,11 @@ static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 	if (data->cipher != ACVP_SHA3_256)
 		return -EOPNOTSUPP;
 
-	CKINT(alloc_buf(SHA3_256_SIZE_DIGEST, &data->mac));
+	CKINT(alloc_buf(JENT_SHA3_256_SIZE_DIGEST, &data->mac));
 
-	sha3_256_init(&ctx);
-	sha3_update(&ctx, data->msg.buf, data->msg.len);
-	sha3_final(&ctx, data->mac.buf);
+	jent_sha3_256_init(&ctx);
+	jent_sha3_update(&ctx, data->msg.buf, data->msg.len);
+	jent_sha3_final(&ctx, data->mac.buf);
 
 out:
 	return ret;

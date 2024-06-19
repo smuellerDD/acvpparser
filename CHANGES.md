@@ -1,5 +1,8 @@
 v2.1,8
 - enhancement: add LMS sigver tester
+- enhancement: add ACVP-Proto, incl. leancrypto kernel tester
+- enhancement: add ML-DSA, ML-KEM parser
+- enhancement: leancrypto - add ML-KEM, ML-DSA
 
 v2.1.7
 - enhancement: leancrypto - add EDDSA

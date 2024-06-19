@@ -20,8 +20,8 @@
 #ifndef _PARSER_DSA_H
 #define _PARSER_DSA_H
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"

@@ -20,8 +20,8 @@
 #ifndef _PARSER_RSA_H
 #define _PARSER_RSA_H
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -123,7 +123,7 @@ struct rsa_keygen_data {
  *		  released by parser.
  * @var q [out] RSA Q parameter. Buffer must be allocated by module and is
  *		  released by parser.
- * @var seed [out] RSA random seed parameter used to generate the RSA key.
+ * @var seed [in/out] RSA random seed parameter used to generate the RSA key.
  *		     Buffer must be allocated by module and is released by
  *		     parser.
  * @var e [in/out] RSA exponent as input. If this buffer is empty (only when

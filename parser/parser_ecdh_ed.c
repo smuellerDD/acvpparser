@@ -19,6 +19,9 @@
 
 #include <string.h>
 
+#include "cipher_definitions.h"
+#include "constructor.h"
+#include "parser.h"
 #include "stringhelper.h"
 #include "logger.h"
 

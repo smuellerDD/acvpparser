@@ -20,8 +20,8 @@
 #ifndef _PARSER_EDDSA_H
 #define _PARSER_EDDSA_H
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -78,7 +78,9 @@ struct eddsa_keyver_data {
  * @var context [in] The context string defined in FIPS 186-5 sections 7.6 and
  *		     7.8.
  * @var q [out] EDDSA coordinate of public point Q that was used to sign the
- *		message.
+ *		message. If eddsa_keygen_en and eddsa_free_key are registered,
+ *		it is managed by common code invoking those functions. In this
+ *		case the backend does not need to manage it.
  * @var signature [out] generated EDDSA signature
  * @var cipher [in] Curve and hash algorithm to be used for EDDSA signature
  *		    generation.

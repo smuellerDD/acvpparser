@@ -20,8 +20,8 @@
 #ifndef _PARSER_ECDH_H
 #define _PARSER_ECDH_H
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -58,7 +58,7 @@ struct ecdh_ss_data {
  * 		      CURVEMASK, one hash out of HASHMASK, one MAC out
  * 		      of HMACMASK
  * @var Qxrem [in] affine X coordinate of remote pubkey
- * @var Qzrem [in] affine Y coordinate of remote pubkey
+ * @var Qyrem [in] affine Y coordinate of remote pubkey
  * @var privloc [in] private local key
  * @var Qxloc [in] affine X coordinate of local pubkey
  * @var Qyloc [in] affine Y coordinate of local pubkey

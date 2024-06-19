@@ -20,6 +20,8 @@
 #include <limits.h>
 #include <string.h>
 
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "parser.h"
 #include "logger.h"
 
@@ -568,7 +570,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry rsa_keygen_prov_prime_testresult_entries[] = {
 		{"e",	{.data.buf = &rsa_keygen_prov_prime_vector.e, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
-		{"seed",	{.data.buf = &rsa_keygen_prov_prime_vector.seed, WRITER_BIN},
+		{"seed",{.data.buf = &rsa_keygen_prov_prime_vector.seed, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"p",	{.data.buf = &rsa_keygen_prov_prime_vector.p, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
@@ -579,12 +581,15 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 		{"d",	{.data.buf = &rsa_keygen_prov_prime_vector.d, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 	};
-	const struct json_testresult rsa_keygen_prov_prime_testresult =
-		SET_ARRAY(rsa_keygen_prov_prime_testresult_entries,
-			  &rsa_keygen_prov_prime_callbacks);
+	const struct json_testresult rsa_keygen_prov_prime_testresult = SET_ARRAY(rsa_keygen_prov_prime_testresult_entries, &rsa_keygen_prov_prime_callbacks);
 
-	/* search for empty arrays */
-	const struct json_array rsa_keygen_prov_prime_test = {NULL, 0 , &rsa_keygen_prov_prime_testresult};
+	const struct json_entry rsa_keygen_prov_prime_test_entries[] = {
+		{"seed",{.data.buf = &rsa_keygen_prov_prime_vector.seed, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL },
+		{"e",	{.data.buf = &rsa_keygen_prov_prime_vector.e, PARSER_BIN},
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL },
+	};
+	const struct json_array rsa_keygen_prov_prime_test = SET_ARRAY(rsa_keygen_prov_prime_test_entries, &rsa_keygen_prov_prime_testresult);
 
 	/**********************************************************************
 	 * RSA B.3.3 KeyGen KAT

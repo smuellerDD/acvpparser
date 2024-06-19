@@ -19,12 +19,36 @@
 
 #define _DEFAULT_SOURCE
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
 
+#include "binhexbin.h"
 #include "logger.h"
 #include "stringhelper.h"
 
+int read_complete(int fd, uint8_t *buf, size_t buflen)
+{
+	ssize_t ret;
+
+	do {
+		ret = read(fd, buf, buflen);
+		if (ret > 0) {
+			buflen -= (size_t)ret;
+			buf += ret;
+			logger(LOGGER_DEBUG,
+			       "Read %zd bytes, remaining bytes: %zu\n", ret,
+			       buflen);
+		}
+		if (ret == 0) {
+			logger(LOGGER_DEBUG, "Received EOF\n");
+			return -ESPIPE;
+		}
+	} while ((0 < ret || EINTR == errno) && buflen);
+
+	return (buflen == 0) ? 0 : -EOVERFLOW;
+}
 
 char* get_val(char *str, const char *delim)
 {
@@ -100,7 +124,8 @@ int get_binval(char *str, const char *delim, struct buffer *buf)
 	char *hex = NULL;
 
 	if (buf->buf || buf->len) {
-		printf("Buffer not empty, refusing to allocate new!\n");
+		logger(LOGGER_ERR,
+		       "Buffer not empty, refusing to allocate new!\n");
 		return -EINVAL;
 	}
 
@@ -112,42 +137,6 @@ int get_binval(char *str, const char *delim, struct buffer *buf)
 		return hex2bin_alloc(hex, (uint32_t)strlen(hex), &buf->buf,
 				     &buf->len);
 	return 0;
-}
-
-void free_buf(struct buffer *buf)
-{
-	if (!buf)
-		return;
-	if (buf->buf) {
-		free(buf->buf);
-		buf->buf = NULL;
-	}
-	if (buf->len)
-		buf->len = 0;
-}
-
-int alloc_buf(size_t size, struct buffer *buf)
-{
-	if (buf->buf) {
-		logger(LOGGER_WARN, "Allocate an already allocated buffer!\n");
-		return -EFAULT;
-	}
-	if (!size)
-		return 0;
-
-	buf->buf = calloc(1, size);
-	if (!buf->buf)
-		return -ENOMEM;
-
-	buf->len = size;
-
-	return 0;
-}
-
-void copy_ptr_buf(struct buffer *dst, struct buffer *src)
-{
-	dst->buf = src->buf;
-	dst->len = src->len;
 }
 
 int left_pad_buf(struct buffer *buf, size_t required_len)

@@ -25,8 +25,8 @@
 #define OID_AES_192_KW	"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x01\x19"
 #define OID_AES_256_KW	"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x01\x2D"
 
-#include "parser.h"
 #include "parser_flags.h"
+#include "stringhelper.h"
 
 #ifdef __cplusplus
 extern "C"

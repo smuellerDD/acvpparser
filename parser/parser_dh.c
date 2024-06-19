@@ -19,6 +19,7 @@
 
 #include <string.h>
 
+#include "constructor.h"
 #include "stringhelper.h"
 #include "logger.h"
 #include "read_json.h"

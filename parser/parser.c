@@ -31,7 +31,7 @@
 #include "term_colors.h"
 
 /* no locking -> single threaded */
-struct cavs_tester *tester = NULL;
+static struct cavs_tester *tester = NULL;
 
 int generate_testvector = 0;
 
@@ -87,8 +87,9 @@ static int test_algo(struct json_object *in, struct json_object *out,
 		if ((curr_tester->testid && (cipher == curr_tester->testid)) ||
 		    (curr_tester->mask && (convert_cipher_contain(cipher,
 						curr_tester->mask, 0)))) {
-			logger(LOGGER_DEBUG, "Found test executor for %s\n",
-			       algo);
+			logger(LOGGER_DEBUG,
+			       "Found test executor for %s %" PRIu64 "\n",
+			       algo, curr_tester->mask);
 			return curr_tester->process_req(in, out, cipher);
 		}
 	}

@@ -25,6 +25,11 @@
 
 #include "parser_common.h"
 
+#ifdef _WIN32
+# include <shlwapi.h>
+# define strcasestr(haystack, needle) StrStrIA(haystack, needle)
+#endif
+
 /*
  * Match parsed entry with a search criteria
  * return 0 if match not found, 1 match found
@@ -423,6 +428,12 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(kda_onestep)
 			CB_HANDLER(kda_twostep)
 			CB_HANDLER(lms_sigver)
+			CB_HANDLER(ml_dsa_keygen)
+			CB_HANDLER(ml_dsa_siggen)
+			CB_HANDLER(ml_dsa_sigver)
+			CB_HANDLER(ml_kem_keygen)
+			CB_HANDLER(ml_kem_encapsulation)
+			CB_HANDLER(ml_kem_decapsulation)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -601,6 +612,8 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_KDF_TYPE_ANSI_X942, {.string = "ansix9.42"}, "ANSI X9.42 KDF"},
 	{FLAG_OP_KDF_TYPE_800_108_KMAC, {.string = "KMAC"}, "KBKDF KMAC"},
 
+	{FLAG_OP_ASYM_TYPE_ENCAPDECAP, {.string = "encapDecap"}, "ML-KEM encapsulation / decapsulation"},
+
 	{0, {NULL}, NULL}
 };
 
@@ -727,6 +740,20 @@ static const struct parser_flagsconv flagsconv_kdf_mode[] = {
 	{0, {NULL}, NULL}
 };
 
+/* Flags conversion for ML-KEM function type */
+static const struct parser_flagsconv flagsconv_mlkem_type[] = {
+	{FLAG_OP_ML_KEM_TYPE_ENCAPSULATION, {.string = "encapsulation"}, "ML-KEM encapsulation function"},
+	{FLAG_OP_ML_KEM_TYPE_DECAPSULATION, {.string = "decapsulation"}, "ML-KEM decapsulation function"},
+	{0, {NULL}, NULL}
+};
+
+/* Flags conversion for ML-KEM function type */
+static const struct parser_flagsconv flagsconv_mldsa_type[] = {
+	{FLAG_OP_ML_DSA_TYPE_DETERMINISTIC, {.boolean = true}, "ML-DSA deterministic function"},
+	{FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC, {.boolean = false}, "ML-DSA non-deterministic function"},
+	{0, {NULL}, NULL}
+};
+
 /**
  * @brief For each JSON hierarchy level, the flags are parsed and accumulated
  *	  in the parsed_flags variable.
@@ -798,6 +825,14 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 	/* KBKDF */
 	parse_flagblock(obj, parsed_flags, "kdfMode", json_type_string,
 			flagsconv_kdf_mode);
+
+	/* ML-KEM */
+	parse_flagblock(obj, parsed_flags, "function", json_type_string,
+			flagsconv_mlkem_type);
+
+	/* ML-KEM */
+	parse_flagblock(obj, parsed_flags, "deterministic", json_type_boolean,
+			flagsconv_mldsa_type);
 
 	return 0;
 }

@@ -20,6 +20,8 @@
 #include <string.h>
 
 #include "conversion_be_le.h"
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "parser.h"
 #include "stringhelper.h"
 #include "read_json.h"
@@ -108,6 +110,7 @@ static int shake_mct_helper(const struct json_array *processdata,
 		/* hash becomes new message */
 		memcpy(vector->msg.buf, vector->mac.buf,
 		       min(vector->mac.len, vector->msg.len));
+		free_buf(&vector->mac);
 	}
 
 	CKINT(json_object_object_add(testresult, "resultsArray", resultsarray));
@@ -164,7 +167,7 @@ static int sha3_mct_helper(const struct json_array *processdata,
 
 		if (sha_backend->hash_mct_inner_loop) {
 			ret = sha_backend->hash_mct_inner_loop(vector,
-							parsed_flags);
+							       parsed_flags);
 
 			/*
 			 * If the execution failed, we fall back
@@ -188,6 +191,7 @@ static int sha3_mct_helper(const struct json_array *processdata,
 
 		/* hash becomes new message */
 		memcpy(vector->msg.buf, vector->mac.buf, vector->mac.len);
+		free_buf(&vector->mac);
 	}
 
 	CKINT(json_object_object_add(testresult, "resultsArray", resultsarray));
@@ -256,7 +260,7 @@ static int sha2_mct_helper(const struct json_array *processdata,
 
 		if (sha_backend->hash_mct_inner_loop) {
 			ret = sha_backend->hash_mct_inner_loop(vector,
-							parsed_flags);
+							       parsed_flags);
 
 			/*
 			 * If the execution failed, we fall back
@@ -284,6 +288,7 @@ static int sha2_mct_helper(const struct json_array *processdata,
 			vector->mac.len);
 		memcpy(calc.buf + vector->mac.len * 2, vector->mac.buf,
 			vector->mac.len);
+		free_buf(&vector->mac);
 	}
 
 	CKINT(json_object_object_add(testresult, "resultsArray", resultsarray));

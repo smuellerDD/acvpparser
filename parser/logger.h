@@ -20,8 +20,7 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "frontend_headers.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -40,16 +39,21 @@ enum logger_verbosity {
 	LOGGER_MAX_LEVEL	/* This must be last entry */
 };
 
-
+#ifndef __KERNEL__
 /* Helper that is not intended to be called directly */
 void _logger(const enum logger_verbosity severity,
 	     const char *file, const char *func,
 	     const size_t line, const char *fmt, ...)
+#if !defined(__clang__) && defined(_WIN32)
+	__attribute__((format(__gnu_printf__, 5, 6)));
+#else
 	__attribute__((format(printf, 5, 6)));
+#endif
 void _logger_binary(const enum logger_verbosity severity,
 		    const unsigned char *bin, const size_t binlen,
 		    const char *str, const char *file,
 		    const char *func, const size_t line);
+#endif
 
 /**
  * logger - log string with given severity

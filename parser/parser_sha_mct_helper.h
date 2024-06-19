@@ -148,6 +148,7 @@ out:
 	return ret;
 }
 
+#undef min
 #define min(x, y)	(((size_t)x < (size_t)y) ? x : y)
 
 #define GCC_VERSION (__GNUC__ * 10000		\

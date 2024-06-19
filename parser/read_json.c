@@ -25,10 +25,13 @@
 #include <errno.h>
 #include <limits.h>
 #include <strings.h>
-#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifndef _WIN32
+# include <sys/mman.h>
+#endif
 
 #include "read_json.h"
 #include "parser.h"
@@ -325,7 +328,10 @@ int json_get_string_buf(const struct json_object *obj, const char *name,
 	strlcpy((char *)buf->buf, string, buf->len + 1);
 #else
 	/* strncpy does not add the trailing NULL terminator */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
 	strncpy((char *)buf->buf, string, buf->len);
+#pragma GCC diagnostic pop
 #endif
 
 	return 0;
@@ -458,6 +464,7 @@ int json_write_data(struct json_object *jobj, const char *filename)
 	return 0;
 }
 
+#ifndef _WIN32
 static int check_filetype(int fd, struct stat *sb)
 {
 	int ret = fstat(fd, sb);
@@ -472,13 +479,14 @@ static int check_filetype(int fd, struct stat *sb)
 
 	return 0;
 }
+#endif
 
 int json_read_data(const char *filename, struct json_object **inobj)
 {
 	struct json_object *o;
 	int ret;
 
-#if 0
+#ifdef _WIN32
 	o = json_object_from_file(filename);
 #else
 	struct stat sb;

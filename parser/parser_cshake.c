@@ -19,6 +19,7 @@
 
 #include <string.h>
 
+#include "constructor.h"
 #include "conversion_be_le.h"
 #include "parser.h"
 #include "stringhelper.h"

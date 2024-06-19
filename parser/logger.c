@@ -29,6 +29,10 @@
 #include "logger.h"
 #include "term_colors.h"
 
+#ifdef _WIN32
+# define localtime_r(timep, result) (localtime_s(result, timep) ? NULL : result)
+#endif
+
 static enum logger_verbosity logger_verbosity_level = LOGGER_NONE;
 
 static void logger_severity(enum logger_verbosity severity, char *sev,

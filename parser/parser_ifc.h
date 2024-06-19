@@ -20,6 +20,9 @@
 #ifndef PARSER_IFC_H
 #define PARSER_IFC_H
 
+#include "parser_flags.h"
+#include "stringhelper.h"
+
 #ifdef __cplusplus
 extern "C"
 {

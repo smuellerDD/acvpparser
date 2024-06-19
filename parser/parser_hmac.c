@@ -19,6 +19,8 @@
 
 #include <string.h>
 
+#include "cipher_definitions.h"
+#include "constructor.h"
 #include "stringhelper.h"
 #include "read_json.h"
 #include "logger.h"

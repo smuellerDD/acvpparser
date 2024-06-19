@@ -20,9 +20,8 @@
 
 /* required for posix memalign */
 #define _GNU_SOURCE
-#include <getopt.h>
-#include <stdlib.h>
-#include <strings.h>
+
+#include "frontend_headers.h"
 
 #include <leancrypto.h>
 
@@ -35,7 +34,6 @@
 #include "aes_riscv64.h"
 
 #include "dilithium_signature_c.h"
-#include "ed25519.h"
 #include "kyber_kem_c.h"
 #include "sha3_arm_asm.h"
 #include "sha3_arm_ce.h"
@@ -46,9 +44,11 @@
 #include "sha3_riscv_asm.h"
 #ifdef __x86_64__
 #include "shake_4x_avx2.h"
+#include "kyber_kem_avx2.h"
 #endif
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include "shake_2x_armv8.h"
+#include "kyber_kem_armv8.h"
 #endif
 
 /************************************************
@@ -65,7 +65,7 @@ static void lc_cipher_check_c(const struct lc_sym *selected,
 
 static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 {
-	char *envstr = getenv("LC_AES");
+	const char *envstr = getenv("LC_AES");
 
 	if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "AES implementation: C\n");
@@ -158,7 +158,6 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 
 	return 0;
 }
-
 
 static int lc_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
 {
@@ -336,7 +335,7 @@ lc_hash_check_c(const struct lc_hash *selected, const struct lc_hash *c,
 
 static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 {
-	char *envstr = getenv("LC_SHA3");
+	const char *envstr = getenv("LC_SHA3");
 
 	switch (cipher) {
 	case ACVP_HMACSHA2_256:
@@ -807,7 +806,7 @@ static int lc_shake_armv8_2x_generate(struct sha_data *data)
 
 static int lc_hash_generate(struct sha_data *data, flags_t parsed_flags)
 {
-	char *envstr = getenv("LC_SHAKE");
+	const char *envstr = getenv("LC_SHAKE");
 	const struct lc_hash *lc_hash;
 	BUFFER_INIT(msg_p);
 	int ret;
@@ -1330,31 +1329,6 @@ static void lc_hkdf_backend(void)
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
-static int lc_compare(const uint8_t *act, const uint8_t *exp,
-		      const size_t len, const char *info)
-{
-	if (memcmp(act, exp, len)) {
-		unsigned int i;
-
-		printf("Expected %s ", info);
-		for (i = 0; i < len; i++)
-			printf("0x%.2x ", *(exp + i));
-
-		printf("\n");
-
-		printf("Actual %s ", info);
-		for (i = 0; i < len; i++)
-			printf("0x%.2x ", *(act + i));
-
-		printf("\n");
-
-		return 1;
-	}
-
-	return 0;
-}
-
-
 struct static_rng {
 	const uint8_t *seed;
 	size_t seedlen;
@@ -1399,6 +1373,33 @@ static const struct lc_rng lc_static_drng = {
 	.zero = lc_static_rng_zero,
 };
 
+#if 0
+#include <getopt.h>
+
+static int lc_compare(const uint8_t *act, const uint8_t *exp,
+		      const size_t len, const char *info)
+{
+	if (memcmp(act, exp, len)) {
+		unsigned int i;
+
+		printf("Expected %s ", info);
+		for (i = 0; i < len; i++)
+			printf("0x%.2x ", *(exp + i));
+
+		printf("\n");
+
+		printf("Actual %s ", info);
+		for (i = 0; i < len; i++)
+			printf("0x%.2x ", *(act + i));
+
+		printf("\n");
+
+		return 1;
+	}
+
+	return 0;
+}
+
 #include "dilithium_tester_vectors_level2_hex.h"
 static int lc_dilithium_one(const struct dilithium_testvector_hex *vector)
 {
@@ -1424,7 +1425,7 @@ static int lc_dilithium_one(const struct dilithium_testvector_hex *vector)
 			  "Dilithium Sig");
 
 	if (lc_dilithium_verify_c(&d_sig, vector->msg, 8, &d_pk))
-			printf("Signature verification failed!\n");
+		printf("Signature verification failed!\n");
 
 out:
 	return ret;
@@ -1701,6 +1702,7 @@ static void lc_main_extension(void)
 {
 	register_main_extension(&lc_main_extension_def);
 }
+#endif
 
 /************************************************
  * EDDSA interface functions
@@ -1859,3 +1861,1285 @@ static void lc_eddsa_backend(void)
 {
 	register_eddsa_impl(&lc_eddsa);
 }
+
+/************************************************
+ * ML-DSA interface functions
+ ************************************************/
+
+/******************************** Dilithium 87 ********************************/
+
+struct dilithium_87_funcs {
+	int (*dilithium_keypair)(struct lc_dilithium_pk *pk,
+				 struct lc_dilithium_sk *sk,
+				 struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_sign)(struct lc_dilithium_sig *sig,
+			      const uint8_t *m, size_t mlen,
+			      const struct lc_dilithium_sk *sk,
+			      struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_verify)(const struct lc_dilithium_sig *sig,
+				const uint8_t *m, size_t mlen,
+				const struct lc_dilithium_pk *pk);
+};
+
+static int lc_get_dilithium_87(struct dilithium_87_funcs *funcs)
+{
+	const char *envstr = getenv("LC_DILITHIUM");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: common\n");
+		funcs->dilithium_keypair = lc_dilithium_keypair;
+		funcs->dilithium_sign = lc_dilithium_sign;
+		funcs->dilithium_verify = lc_dilithium_verify;
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
+		funcs->dilithium_keypair = lc_dilithium_keypair_c;
+		funcs->dilithium_sign = lc_dilithium_sign_c;
+		funcs->dilithium_verify = lc_dilithium_verify_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Dilithium-87 implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_dsa_87_keygen(struct ml_dsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_87_funcs funcs;
+	struct lc_dilithium_pk lc_pk;
+	struct lc_dilithium_sk lc_sk;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_87(&funcs));
+
+	s_rng_state.seed = data->seed.buf;
+	s_rng_state.seedlen = data->seed.len;
+	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
+	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
+	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_87_funcs funcs;
+	struct lc_dilithium_sk sk;
+	struct lc_dilithium_sig sig;
+	int ret;
+
+	CKINT(lc_get_dilithium_87(&funcs));
+
+	if (data->sk.len) {
+		if (data->sk.len != sizeof(sk.sk))
+			return -EFAULT;
+		memcpy(sk.sk, data->sk.buf, data->sk.len);
+	} else if (data->privkey) {
+		struct lc_dilithium_sk *tmp = data->privkey;
+
+		memcpy(sk.sk, tmp->sk, lc_dilithium_sk_size());
+	} else
+		return -EOPNOTSUPP;
+
+	if (data->rnd.len) {
+		/* random data is provided by test vector */
+
+		struct static_rng s_rng_state;
+		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+					     .rng_state = &s_rng_state };
+
+		s_rng_state.seed = data->rnd.buf;
+		s_rng_state.seedlen = data->rnd.len;
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, &s_drng));
+	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
+		/* Module is required to generate random data */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, lc_seeded_rng));
+	} else {
+		/* Module is required to perform deterministic operation */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, NULL));
+	}
+
+	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
+	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
+
+#if 0
+	struct lc_dilithium_pk pk;
+
+	if (sizeof(pk.pk) == data->pk.len) {
+		memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
+					     data->msg.len, &pk));
+	}
+#endif
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_87_sigver(struct ml_dsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_87_funcs funcs;
+	struct lc_dilithium_pk pk;
+	struct lc_dilithium_sig sig;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_87(&funcs));
+
+	if (sizeof(pk.pk) != data->pk.len)
+		return -EOPNOTSUPP;
+	memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+	if (sizeof(sig.sig) != data->sig.len)
+		return -EOPNOTSUPP;
+	memcpy(sig.sig, data->sig.buf, data->sig.len);
+
+	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
+
+	if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (!ret) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+	} else {
+		/* This can happen when data is wrong */
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_87_keygen_en(uint64_t cipher, struct buffer *pk,
+				  void **sk)
+{
+	struct lc_dilithium_pk lc_pk;
+	struct lc_dilithium_sk *lc_sk;
+	int ret;
+
+	(void)cipher;
+
+	lc_sk = calloc(1, sizeof(struct lc_dilithium_sk));
+	CKNULL(lc_sk, -ENOMEM);
+
+	CKINT(lc_dilithium_keypair(&lc_pk, lc_sk, lc_seeded_rng));
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
+	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	*sk = lc_sk;
+
+out:
+	return ret;
+}
+
+/******************************** Dilithium 65 ********************************/
+
+struct dilithium_65_funcs {
+	int (*dilithium_keypair)(struct lc_dilithium_65_pk *pk,
+				 struct lc_dilithium_65_sk *sk,
+				 struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_sign)(struct lc_dilithium_65_sig *sig,
+			      const uint8_t *m, size_t mlen,
+			      const struct lc_dilithium_65_sk *sk,
+			      struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_verify)(const struct lc_dilithium_65_sig *sig,
+				const uint8_t *m, size_t mlen,
+				const struct lc_dilithium_65_pk *pk);
+};
+
+static int lc_get_dilithium_65(struct dilithium_65_funcs *funcs)
+{
+	const char *envstr = getenv("LC_DILITHIUM");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Dilithium-65 implementation: common\n");
+		funcs->dilithium_keypair = lc_dilithium_65_keypair;
+		funcs->dilithium_sign = lc_dilithium_65_sign;
+		funcs->dilithium_verify = lc_dilithium_65_verify;
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
+		funcs->dilithium_keypair = lc_dilithium_65_keypair_c;
+		funcs->dilithium_sign = lc_dilithium_65_sign_c;
+		funcs->dilithium_verify = lc_dilithium_65_verify_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Dilithium-65 implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_dsa_65_keygen(struct ml_dsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_65_funcs funcs;
+	struct lc_dilithium_65_pk lc_pk;
+	struct lc_dilithium_65_sk lc_sk;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_65(&funcs));
+
+	s_rng_state.seed = data->seed.buf;
+	s_rng_state.seedlen = data->seed.len;
+	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
+	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
+	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_65_siggen(struct ml_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_65_funcs funcs;
+	struct lc_dilithium_65_sk sk;
+	struct lc_dilithium_65_sig sig;
+	int ret;
+
+	CKINT(lc_get_dilithium_65(&funcs));
+
+	if (data->sk.len) {
+		if (data->sk.len != sizeof(sk.sk))
+			return -EFAULT;
+		memcpy(sk.sk, data->sk.buf, data->sk.len);
+	} else if (data->privkey) {
+		struct lc_dilithium_65_sk *tmp = data->privkey;
+
+		memcpy(sk.sk, tmp->sk, lc_dilithium_65_sk_size());
+	} else
+		return -EOPNOTSUPP;
+
+	if (data->rnd.len) {
+		/* random data is provided by test vector */
+
+		struct static_rng s_rng_state;
+		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+					     .rng_state = &s_rng_state };
+
+		s_rng_state.seed = data->rnd.buf;
+		s_rng_state.seedlen = data->rnd.len;
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, &s_drng));
+	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
+		/* Module is required to generate random data */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, lc_seeded_rng));
+	} else {
+		/* Module is required to perform deterministic operation */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, NULL));
+	}
+
+	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
+	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
+
+#if 0
+	struct lc_dilithium_65_pk pk;
+
+	if (sizeof(pk.pk) == data->pk.len) {
+		memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
+					     data->msg.len, &pk));
+	}
+#endif
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_65_sigver(struct ml_dsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_65_funcs funcs;
+	struct lc_dilithium_65_pk pk;
+	struct lc_dilithium_65_sig sig;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_65(&funcs));
+
+	if (sizeof(pk.pk) != data->pk.len)
+		return -EOPNOTSUPP;
+	memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+	if (sizeof(sig.sig) != data->sig.len)
+		return -EOPNOTSUPP;
+	memcpy(sig.sig, data->sig.buf, data->sig.len);
+
+	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
+
+	if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (!ret) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+	} else {
+		/* This can happen when data is wrong */
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_65_keygen_en(uint64_t cipher, struct buffer *pk,
+				  void **sk)
+{
+	struct lc_dilithium_65_pk lc_pk;
+	struct lc_dilithium_65_sk *lc_sk = NULL;
+	int ret;
+
+	(void)cipher;
+
+	lc_sk = calloc(1, sizeof(struct lc_dilithium_65_sk));
+	CKNULL(lc_sk, -ENOMEM);
+
+	CKINT_LOG(lc_dilithium_65_keypair(&lc_pk, lc_sk, lc_seeded_rng),
+		  "ML-DSA-65 keygen failed %d\n", ret);
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
+	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	*sk = lc_sk;
+
+out:
+	return ret;
+}
+
+/******************************** Dilithium 44 ********************************/
+
+struct dilithium_44_funcs {
+	int (*dilithium_keypair)(struct lc_dilithium_44_pk *pk,
+				 struct lc_dilithium_44_sk *sk,
+				 struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_sign)(struct lc_dilithium_44_sig *sig,
+			      const uint8_t *m, size_t mlen,
+			      const struct lc_dilithium_44_sk *sk,
+			      struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_verify)(const struct lc_dilithium_44_sig *sig,
+				const uint8_t *m, size_t mlen,
+				const struct lc_dilithium_44_pk *pk);
+};
+
+static int lc_get_dilithium_44(struct dilithium_44_funcs *funcs)
+{
+	const char *envstr = getenv("LC_DILITHIUM");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Dilithium-44 implementation: common\n");
+		funcs->dilithium_keypair = lc_dilithium_44_keypair;
+		funcs->dilithium_sign = lc_dilithium_44_sign;
+		funcs->dilithium_verify = lc_dilithium_44_verify;
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Dilithium implementation: C\n");
+		funcs->dilithium_keypair = lc_dilithium_44_keypair_c;
+		funcs->dilithium_sign = lc_dilithium_44_sign_c;
+		funcs->dilithium_verify = lc_dilithium_44_verify_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Dilithium-44 implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_dsa_44_keygen(struct ml_dsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_44_funcs funcs;
+	struct lc_dilithium_44_pk lc_pk;
+	struct lc_dilithium_44_sk lc_sk;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_44(&funcs));
+
+	s_rng_state.seed = data->seed.buf;
+	s_rng_state.seedlen = data->seed.len;
+	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
+	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
+	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_44_siggen(struct ml_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_44_funcs funcs;
+	struct lc_dilithium_44_sk sk;
+	struct lc_dilithium_44_sig sig;
+	int ret;
+
+	CKINT(lc_get_dilithium_44(&funcs));
+
+	if (data->sk.len) {
+		if (data->sk.len != sizeof(sk.sk))
+			return -EFAULT;
+		memcpy(sk.sk, data->sk.buf, data->sk.len);
+	} else if (data->privkey) {
+		struct lc_dilithium_44_sk *tmp = data->privkey;
+
+		memcpy(sk.sk, tmp->sk, lc_dilithium_44_sk_size());
+	} else
+		return -EOPNOTSUPP;
+
+	if (data->rnd.len) {
+		/* random data is provided by test vector */
+
+		struct static_rng s_rng_state;
+		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+					     .rng_state = &s_rng_state };
+
+		s_rng_state.seed = data->rnd.buf;
+		s_rng_state.seedlen = data->rnd.len;
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, &s_drng));
+	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
+		/* Module is required to generate random data */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, lc_seeded_rng));
+	} else {
+		/* Module is required to perform deterministic operation */
+
+		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
+					   &sk, NULL));
+	}
+
+	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
+	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
+
+#if 0
+	struct lc_dilithium_44_pk pk;
+
+	if (sizeof(pk.pk) == data->pk.len) {
+		memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
+					     data->msg.len, &pk));
+	}
+#endif
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_44_sigver(struct ml_dsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	struct dilithium_44_funcs funcs;
+	struct lc_dilithium_44_pk pk;
+	struct lc_dilithium_44_sig sig;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_dilithium_44(&funcs));
+
+	if (sizeof(pk.pk) != data->pk.len)
+		return -EOPNOTSUPP;
+	memcpy(pk.pk, data->pk.buf, data->pk.len);
+
+	if (sizeof(sig.sig) != data->sig.len)
+		return -EOPNOTSUPP;
+	memcpy(sig.sig, data->sig.buf, data->sig.len);
+
+	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
+
+	if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (!ret) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+	} else {
+		/* This can happen when data is wrong */
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	return ret;
+}
+
+static int lc_ml_dsa_44_keygen_en(uint64_t cipher, struct buffer *pk,
+				  void **sk)
+{
+	struct lc_dilithium_44_pk lc_pk;
+	struct lc_dilithium_44_sk *lc_sk = NULL;
+	int ret;
+
+	(void)cipher;
+
+	lc_sk = calloc(1, sizeof(struct lc_dilithium_44_sk));
+	CKNULL(lc_sk, -ENOMEM);
+
+	CKINT(lc_dilithium_44_keypair(&lc_pk, lc_sk, lc_seeded_rng));
+
+	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
+	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
+
+	*sk = lc_sk;
+
+out:
+	return ret;
+}
+
+/******************************** Common Code *********************************/
+
+static int lc_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_DSA_44)
+		return lc_ml_dsa_44_keygen(data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_65)
+		return lc_ml_dsa_65_keygen (data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_87)
+		return lc_ml_dsa_87_keygen(data, parsed_flags);
+	return -EOPNOTSUPP;
+}
+
+static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_DSA_44)
+		return lc_ml_dsa_44_siggen(data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_65)
+		return lc_ml_dsa_65_siggen (data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_87)
+		return lc_ml_dsa_87_siggen(data, parsed_flags);
+	return -EOPNOTSUPP;
+}
+
+static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
+			    flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_DSA_44)
+		return lc_ml_dsa_44_sigver(data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_65)
+		return lc_ml_dsa_65_sigver(data, parsed_flags);
+	if (data->cipher == ACVP_ML_DSA_87)
+		return lc_ml_dsa_87_sigver(data, parsed_flags);
+	return -EOPNOTSUPP;
+}
+
+static int lc_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk,
+			       void **sk)
+{
+	if (cipher == ACVP_ML_DSA_44)
+		return lc_ml_dsa_44_keygen_en(cipher, pk, sk);
+	if (cipher == ACVP_ML_DSA_65)
+		return lc_ml_dsa_65_keygen_en(cipher, pk, sk);
+	if (cipher == ACVP_ML_DSA_87)
+		return lc_ml_dsa_87_keygen_en(cipher, pk, sk);
+	return -EOPNOTSUPP;
+}
+
+static void lc_ml_dsa_free_key(void *privkey)
+{
+	if (privkey)
+		free(privkey);
+}
+
+static struct ml_dsa_backend lc_ml_dsa =
+{
+	lc_ml_dsa_keygen,
+	lc_ml_dsa_siggen,
+	lc_ml_dsa_sigver,
+	lc_ml_dsa_keygen_en,
+	lc_ml_dsa_free_key
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_ml_dsa_backend)
+static void lc_ml_dsa_backend(void)
+{
+	register_ml_dsa_impl(&lc_ml_dsa);
+}
+
+/************************************************
+ * ML-KEM interface functions
+ ************************************************/
+
+struct kyber_rng {
+	const uint8_t *d;
+	size_t dlen;
+	const uint8_t *z;
+	size_t zlen;
+
+	const uint8_t *ptr;
+	size_t *ptr_len;
+};
+
+static int lc_kyber_rng_gen(void *_state, const uint8_t *addtl_input,
+			    size_t addtl_input_len, uint8_t *out,
+			    size_t outlen)
+{
+	struct kyber_rng *state = _state;
+
+	(void)addtl_input;
+	(void)addtl_input_len;
+
+	if (outlen != *state->ptr_len)
+		return -EINVAL;
+
+	memcpy(out, state->ptr, outlen);
+
+	/* Flip-flop between seed values */
+	if (state->ptr == state->d) {
+		state->ptr = state->z;
+		state->ptr_len = &state->zlen;
+	} else {
+		state->ptr = state->d;
+		state->ptr_len = &state->dlen;
+	}
+
+	return 0;
+}
+
+static int lc_kyber_rng_seed(void *_state, const uint8_t *seed, size_t seedlen,
+			      const uint8_t *persbuf, size_t perslen)
+{
+	(void)_state;
+	(void)seed;
+	(void)seedlen;
+	(void)persbuf;
+	(void)perslen;
+	return 0;
+}
+
+static void lc_kyber_rng_zero(void *_state)
+{
+	(void)_state;
+}
+
+static const struct lc_rng lc_kyber_drng = {
+	.generate = lc_kyber_rng_gen,
+	.seed = lc_kyber_rng_seed,
+	.zero = lc_kyber_rng_zero,
+};
+
+/********************************* Kyber 1024 *********************************/
+
+struct kyber_funcs {
+	int (*kyber_keypair)(struct lc_kyber_pk *pk,
+			     struct lc_kyber_sk *sk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_enc_int)(struct lc_kyber_ct *ct,
+			     struct lc_kyber_ss *ss,
+			     const struct lc_kyber_pk *pk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_dec)(struct lc_kyber_ss *ss,
+			 const struct lc_kyber_ct *ct,
+			 const struct lc_kyber_sk *sk);
+};
+
+static int lc_get_kyber(struct kyber_funcs *funcs)
+{
+	const char *envstr = getenv("LC_KYBER");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Kyber-1024 implementation: common\n");
+#ifdef __x86_64__
+		funcs->kyber_keypair = lc_kyber_keypair_avx;
+		funcs->kyber_enc_int = lc_kyber_enc_avx;
+		funcs->kyber_dec = lc_kyber_dec_avx;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+		funcs->kyber_keypair = lc_kyber_keypair_armv8;
+		funcs->kyber_enc_int = lc_kyber_enc_armv8;
+		funcs->kyber_dec = lc_kyber_dec_armv8;
+#else
+		funcs->kyber_keypair = lc_kyber_keypair;
+		funcs->kyber_enc_int = lc_kyber_enc_c;
+		funcs->kyber_dec = lc_kyber_dec;
+#endif
+
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Kyber implementation: C\n");
+		funcs->kyber_keypair = lc_kyber_keypair_c;
+		funcs->kyber_enc_int = lc_kyber_enc_c;
+		funcs->kyber_dec = lc_kyber_dec_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_kem_1024_keygen(struct ml_kem_keygen_data *data,
+				 flags_t parsed_flags)
+{
+	struct kyber_funcs funcs;
+	struct lc_kyber_pk pk;
+	struct lc_kyber_sk sk;
+	struct kyber_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber(&funcs));
+
+	s_rng_state.d = data->d.buf;
+	s_rng_state.dlen = data->d.len;
+	s_rng_state.z = data->z.buf;
+	s_rng_state.zlen = data->z.len;
+
+	/* The d value is the first random number to be supplied */
+	s_rng_state.ptr = s_rng_state.d;
+	s_rng_state.ptr_len = &s_rng_state.dlen;
+
+	CKINT(funcs.kyber_keypair(&pk, &sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
+	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
+
+	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
+	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_1024_encapsulation(struct ml_kem_encapsulation_data *data,
+					flags_t parsed_flags)
+{
+	struct kyber_funcs funcs;
+	struct lc_kyber_pk pk;
+	struct lc_kyber_ct ct;
+	struct lc_kyber_ss ss;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber(&funcs));
+
+	if (sizeof(pk.pk) != data->ek.len) {
+		logger(LOGGER_ERR,
+		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(pk.pk), data->ek.len);
+		return -EOPNOTSUPP;
+	}
+	memcpy(pk.pk, data->ek.buf, data->ek.len);
+
+	s_rng_state.seed = data->msg.buf;
+	s_rng_state.seedlen = data->msg.len;
+
+	if (funcs.kyber_enc_int) {
+		CKINT(funcs.kyber_enc_int(&ct, &ss, &pk, &s_drng));
+	} else {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
+	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_1024_decapsulation(struct ml_kem_decapsulation_data *data,
+					flags_t parsed_flags)
+{
+	struct kyber_funcs funcs;
+	struct lc_kyber_sk sk;
+	struct lc_kyber_ct ct;
+	struct lc_kyber_ss ss;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber(&funcs));
+
+	if (sizeof(sk.sk) != data->dk.len) {
+		logger(LOGGER_ERR,
+		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(sk.sk), data->dk.len);
+		return -EFAULT;
+	}
+	memcpy(sk.sk, data->dk.buf, data->dk.len);
+
+	if (sizeof(ct.ct) != data->c.len) {
+		logger(LOGGER_ERR,
+		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(ct.ct), data->c.len);
+		return -EFAULT;
+	}
+	memcpy(ct.ct, data->c.buf, data->c.len);
+
+	CKINT(funcs.kyber_dec(&ss, &ct, &sk));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+/********************************* Kyber 768 **********************************/
+
+struct kyber_768_funcs {
+	int (*kyber_768_keypair)(struct lc_kyber_768_pk *pk,
+			     struct lc_kyber_768_sk *sk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_768_enc_int)(struct lc_kyber_768_ct *ct,
+			     struct lc_kyber_768_ss *ss,
+			     const struct lc_kyber_768_pk *pk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_768_dec)(struct lc_kyber_768_ss *ss,
+			 const struct lc_kyber_768_ct *ct,
+			 const struct lc_kyber_768_sk *sk);
+};
+
+static int lc_get_kyber_768(struct kyber_768_funcs *funcs)
+{
+	const char *envstr = getenv("LC_KYBER");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Kyber-768 implementation: common\n");
+#ifdef __x86_64__
+		funcs->kyber_768_keypair = lc_kyber_768_keypair_avx;
+		funcs->kyber_768_enc_int = lc_kyber_768_enc_avx;
+		funcs->kyber_768_dec = lc_kyber_768_dec_avx;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+		funcs->kyber_768_keypair = lc_kyber_768_keypair_armv8;
+		funcs->kyber_768_enc_int = lc_kyber_768_enc_armv8;
+		funcs->kyber_768_dec = lc_kyber_768_dec_armv8;
+#else
+		funcs->kyber_768_keypair = lc_kyber_768_keypair;
+		funcs->kyber_768_enc_int = lc_kyber_768_enc;
+		funcs->kyber_768_dec = lc_kyber_768_dec;
+#endif
+
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Kyber-768 implementation: C\n");
+		funcs->kyber_768_keypair = lc_kyber_768_keypair_c;
+		funcs->kyber_768_enc_int = lc_kyber_768_enc_c;
+		funcs->kyber_768_dec = lc_kyber_768_dec_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_kem_768_keygen(struct ml_kem_keygen_data *data,
+				flags_t parsed_flags)
+{
+	struct kyber_768_funcs funcs;
+	struct lc_kyber_768_pk pk;
+	struct lc_kyber_768_sk sk;
+	struct kyber_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_768(&funcs));
+
+	s_rng_state.d = data->d.buf;
+	s_rng_state.dlen = data->d.len;
+	s_rng_state.z = data->z.buf;
+	s_rng_state.zlen = data->z.len;
+
+	/* The d value is the first random number to be supplied */
+	s_rng_state.ptr = s_rng_state.d;
+	s_rng_state.ptr_len = &s_rng_state.dlen;
+
+	CKINT(funcs.kyber_768_keypair(&pk, &sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
+	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
+
+	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
+	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_768_encapsulation(struct ml_kem_encapsulation_data *data,
+				       flags_t parsed_flags)
+{
+	struct kyber_768_funcs funcs;
+	struct lc_kyber_768_pk pk;
+	struct lc_kyber_768_ct ct;
+	struct lc_kyber_768_ss ss;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_768(&funcs));
+
+	if (sizeof(pk.pk) != data->ek.len) {
+		logger(LOGGER_ERR,
+		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(pk.pk), data->ek.len);
+		return -EOPNOTSUPP;
+	}
+	memcpy(pk.pk, data->ek.buf, data->ek.len);
+
+	s_rng_state.seed = data->msg.buf;
+	s_rng_state.seedlen = data->msg.len;
+
+	if (funcs.kyber_768_enc_int) {
+		CKINT(funcs.kyber_768_enc_int(&ct, &ss, &pk, &s_drng));
+	} else {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
+	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_768_decapsulation(struct ml_kem_decapsulation_data *data,
+				       flags_t parsed_flags)
+{
+	struct kyber_768_funcs funcs;
+	struct lc_kyber_768_sk sk;
+	struct lc_kyber_768_ct ct;
+	struct lc_kyber_768_ss ss;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_768(&funcs));
+
+	if (sizeof(sk.sk) != data->dk.len) {
+		logger(LOGGER_ERR,
+		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(sk.sk), data->dk.len);
+		return -EFAULT;
+	}
+	memcpy(sk.sk, data->dk.buf, data->dk.len);
+
+	if (sizeof(ct.ct) != data->c.len) {
+		logger(LOGGER_ERR,
+		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(ct.ct), data->c.len);
+		return -EFAULT;
+	}
+	memcpy(ct.ct, data->c.buf, data->c.len);
+
+	CKINT(funcs.kyber_768_dec(&ss, &ct, &sk));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+/********************************* Kyber 512 **********************************/
+
+struct kyber_512_funcs {
+	int (*kyber_512_keypair)(struct lc_kyber_512_pk *pk,
+			     struct lc_kyber_512_sk *sk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_512_enc_int)(struct lc_kyber_512_ct *ct,
+			     struct lc_kyber_512_ss *ss,
+			     const struct lc_kyber_512_pk *pk,
+			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_512_dec)(struct lc_kyber_512_ss *ss,
+			 const struct lc_kyber_512_ct *ct,
+			 const struct lc_kyber_512_sk *sk);
+};
+
+static int lc_get_kyber_512(struct kyber_512_funcs *funcs)
+{
+	const char *envstr = getenv("LC_KYBER");
+
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+		logger(LOGGER_VERBOSE, "Kyber-512 implementation: common, but using C\n");
+		funcs->kyber_512_keypair = lc_kyber_512_keypair_c;
+		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
+		funcs->kyber_512_dec = lc_kyber_512_dec_c;
+	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Kyber-512 implementation: C\n");
+		funcs->kyber_512_keypair = lc_kyber_512_keypair_c;
+		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
+		funcs->kyber_512_dec = lc_kyber_512_dec_c;
+	} else {
+		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_ml_kem_512_keygen(struct ml_kem_keygen_data *data,
+				flags_t parsed_flags)
+{
+	struct kyber_512_funcs funcs;
+	struct lc_kyber_512_pk pk;
+	struct lc_kyber_512_sk sk;
+	struct kyber_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_512(&funcs));
+
+	s_rng_state.d = data->d.buf;
+	s_rng_state.dlen = data->d.len;
+	s_rng_state.z = data->z.buf;
+	s_rng_state.zlen = data->z.len;
+
+	/* The d value is the first random number to be supplied */
+	s_rng_state.ptr = s_rng_state.d;
+	s_rng_state.ptr_len = &s_rng_state.dlen;
+
+	CKINT(funcs.kyber_512_keypair(&pk, &sk, &s_drng));
+
+	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
+	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
+
+	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
+	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_512_encapsulation(struct ml_kem_encapsulation_data *data,
+				       flags_t parsed_flags)
+{
+	struct kyber_512_funcs funcs;
+	struct lc_kyber_512_pk pk;
+	struct lc_kyber_512_ct ct;
+	struct lc_kyber_512_ss ss;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_512(&funcs));
+
+	if (sizeof(pk.pk) != data->ek.len) {
+		logger(LOGGER_ERR,
+		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(pk.pk), data->ek.len);
+		return -EOPNOTSUPP;
+	}
+	memcpy(pk.pk, data->ek.buf, data->ek.len);
+
+	s_rng_state.seed = data->msg.buf;
+	s_rng_state.seedlen = data->msg.len;
+
+	if (funcs.kyber_512_enc_int) {
+		CKINT(funcs.kyber_512_enc_int(&ct, &ss, &pk, &s_drng));
+	} else {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
+	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+static int lc_ml_kem_512_decapsulation(struct ml_kem_decapsulation_data *data,
+				       flags_t parsed_flags)
+{
+	struct kyber_512_funcs funcs;
+	struct lc_kyber_512_sk sk;
+	struct lc_kyber_512_ct ct;
+	struct lc_kyber_512_ss ss;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_get_kyber_512(&funcs));
+
+	if (sizeof(sk.sk) != data->dk.len) {
+		logger(LOGGER_ERR,
+		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(sk.sk), data->dk.len);
+		return -EFAULT;
+	}
+	memcpy(sk.sk, data->dk.buf, data->dk.len);
+
+	if (sizeof(ct.ct) != data->c.len) {
+		logger(LOGGER_ERR,
+		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
+		       sizeof(ct.ct), data->c.len);
+		return -EFAULT;
+	}
+	memcpy(ct.ct, data->c.buf, data->c.len);
+
+	CKINT(funcs.kyber_512_dec(&ss, &ct, &sk));
+
+	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
+	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
+
+out:
+	return ret;
+}
+
+/******************************** Common Code *********************************/
+
+static int lc_ml_kem_keygen(struct ml_kem_keygen_data *data,
+			    flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_KEM_512)
+		return lc_ml_kem_512_keygen(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_768)
+		return lc_ml_kem_768_keygen(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_1024)
+		return lc_ml_kem_1024_keygen(data, parsed_flags);
+	else
+		return -EOPNOTSUPP;
+}
+
+static int lc_ml_kem_encapsulation(struct ml_kem_encapsulation_data *data,
+				   flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_KEM_512)
+		return lc_ml_kem_512_encapsulation(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_768)
+		return lc_ml_kem_768_encapsulation(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_1024)
+		return lc_ml_kem_1024_encapsulation(data, parsed_flags);
+	else
+		return -EOPNOTSUPP;
+}
+
+static int lc_ml_kem_decapsulation(struct ml_kem_decapsulation_data *data,
+				   flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ML_KEM_512)
+		return lc_ml_kem_512_decapsulation(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_768)
+		return lc_ml_kem_768_decapsulation(data, parsed_flags);
+	else if (data->cipher == ACVP_ML_KEM_1024)
+		return lc_ml_kem_1024_decapsulation(data, parsed_flags);
+	else
+		return -EOPNOTSUPP;
+}
+
+static struct ml_kem_backend lc_ml_kem =
+{
+	lc_ml_kem_keygen,
+	lc_ml_kem_encapsulation,
+	lc_ml_kem_decapsulation,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_ml_kem_backend)
+static void lc_ml_kem_backend(void)
+{
+	register_ml_kem_impl(&lc_ml_kem);
+}
+
+#ifdef __KERNEL__
+void __init linux_kernel_constructor(void)
+{
+	_init_lc_sym_backend();
+	_init_lc_sha_backend();
+	_init_lc_cshake_backend_c();
+	_init_lc_hmac_backend_c();
+	_init_lc_kmac_backend_c();
+	_init_lc_drbg_backend();
+	_init_lc_108_backend();
+	_init_lc_pbkdf_backend();
+	_init_lc_hkdf_backend();
+	_init_lc_eddsa_backend();
+	_init_lc_ml_dsa_backend();
+	_init_lc_ml_kem_backend();
+}
+#endif

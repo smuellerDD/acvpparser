@@ -1,0 +1,130 @@
+/* Protobuf protocol for the export and import of RSA
+ *
+ * Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+ *
+ * License: see LICENSE file in root directory
+ *
+ * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
+ * WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
+ * OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+ * USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ */
+
+syntax = "proto3";
+
+message RsaKeygenPrimeDataMsg {
+	uint32 modulus = 1;
+	bytes p = 2;
+	bytes q = 3;
+	bytes e = 4;
+	uint32 keygen_success = 5;
+}
+
+message RsaKeygenDataMsg {
+	uint32 modulus = 1;
+	bytes n = 2;
+	bytes d = 3;
+	bytes p = 4;
+	bytes q = 5;
+	bytes e = 6;
+
+	bytes xp = 7;
+	bytes xp1 = 8;
+	bytes xp2 = 9;
+	bytes xq = 10;
+	bytes xq1 = 11;
+	bytes xq2 = 12;
+	uint32 bitlen_in = 13;
+	uint32 bitlen1 = 14;
+	uint32 bitlen2 = 15;
+	uint32 bitlen3 = 16;
+	uint32 bitlen4 = 17;
+
+	bytes dmp1 = 18;
+	bytes dmq1 = 19;
+	bytes iqmp = 20;
+}
+
+message RsaKeygenProvPrimeDataMsg {
+	uint32 modulus = 1;
+	bytes n = 2;
+	bytes d = 3;
+	bytes p = 4;
+	bytes q = 5;
+	bytes seed = 6;
+	bytes e = 7;
+	uint64 cipher = 8;
+}
+
+message RsaSiggenDataMsg {
+	uint32 modulus = 1;
+	uint64 cipher = 2;
+	uint32 saltlen = 3;
+	bytes e = 4;
+	bytes msg = 5;
+	bytes sig = 6;
+	bytes n = 7;
+	uint32 privkey = 8;
+}
+
+message RsaSigverDataMsg {
+	uint32 modulus = 1;
+	uint64 cipher = 2;
+	uint32 saltlen = 3;
+	bytes n = 4;
+	bytes e = 5;
+	bytes msg = 6;
+	bytes sig = 7;
+	uint32 sig_result = 8;
+}
+
+message RsaSignaturePrimitiveDataMsg {
+	bytes msg = 1;
+	bytes n = 2;
+	bytes e = 3;
+	bytes d = 4;
+	bytes p = 5;
+	bytes q = 6;
+	bytes dmp1 = 7;
+	bytes dmq1 = 8;
+	bytes iqmp = 9;
+	bytes signature = 10;
+	uint32 sig_result = 11;
+}
+
+message RsaDecryptionPrimitiveDataMsg {
+	uint32 modulus = 1;
+	uint32 num = 2;
+	uint32 num_failures = 3;
+	bytes msg = 4;
+	bytes n = 5;
+	bytes e = 6;
+	bytes d = 7;
+	bytes p = 8;
+	bytes q = 9;
+	bytes dmp1 = 10;
+	bytes dmq1 = 11;
+	bytes iqmp = 12;
+	bytes s = 13;
+	uint32 dec_result = 14;
+	uint32 privkey = 15;
+}
+
+message RsaKeygenEnMsg {
+	bytes ebuf = 1;
+	uint32 modulus = 2;
+	uint32 privkey = 3;
+	bytes nbuf = 4;
+}
+
+message RsaFreeKeyMsg {
+	uint32 privkey = 1;
+}

@@ -104,9 +104,29 @@ exist.
 
 Example: To compile the OpenSSL support, invoke: `make openssl`.
 
-## Building on Cygwin
+## Building on Windows using MSYS2 (recommended)
 
-The following steps are required to build the ACVP Proxy on Cygwin:
+- Download and install MSYS2 using the instructions on https://www.msys2.org/
+
+- Open the MINGW64 environment; this will set the PATH correctly.
+
+- Verify PATH using `echo $PATH`, should start with `/mingw64/bin`.
+
+- Update the pacman databases: invoke `pacman -Syu` until no more packages are
+updated
+
+- Install the required packages: `pacman -S make mingw-w64-x86_64-toolchain`
+
+- Build acvp-parser.exe using with a build target as outlined above.
+
+Note that it is also possible to use the UCRT64 environment instead of the
+MINGW64 environment. In that case, the `mingw-w64-ucrt-x86_64-toolchain`
+packages should be installed. The reason for choosing MINGW64 over UCRT64 is
+that some libraries (e.g. OpenSSL) only provide build instructions for MinGW.
+
+## Building on Cygwin (legacy)
+
+The following steps are required to build the ACVP Parser on Cygwin:
 
 - Verify that the required cygwin packages are installed:
 
