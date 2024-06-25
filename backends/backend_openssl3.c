@@ -2815,7 +2815,8 @@ static int openssl_rsa_keygen_internal(uint32_t modulus, struct buffer *ebuf,
 	CKNULL(e, -ENOMEM);
 
 	bld = OSSL_PARAM_BLD_new();
-	if (xpbuf && xp1buf && xp2buf) {
+	if (xpbuf && xp1buf && xp2buf &&
+	    xpbuf->buf && xp1buf->buf && xp2buf->buf) {
 		CKNULL_LOG(xpbuf->len, -EFAULT,
 			   "xP must be provided by ACVP server\n");
 		CKNULL_LOG(xp1buf->len, -EFAULT,
@@ -2835,7 +2836,8 @@ static int openssl_rsa_keygen_internal(uint32_t modulus, struct buffer *ebuf,
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XP1, xp1);
 		OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_TEST_XP2, xp2);
 	}
-	if (xqbuf && xq1buf && xq2buf) {
+	if (xqbuf && xq1buf && xq2buf &&
+	    xqbuf->buf && xq1buf->buf && xq2buf->buf) {
 		CKNULL_LOG(xqbuf->len, -EFAULT,
 			   "xQ must be provided by ACVP server\n");
 		CKNULL_LOG(xq1buf->len, -EFAULT,
