@@ -1434,6 +1434,9 @@ static int openssl_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 	case ACVP_SHA1:
 		maclen = 20;
 		break;
+	case ACVP_SHA224:
+		maclen = 28;
+		break;
 	case ACVP_SHA256:
 		maclen = 32;
 		break;
