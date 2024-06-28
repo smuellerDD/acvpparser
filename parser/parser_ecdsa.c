@@ -372,10 +372,6 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry gen_ecdsa_siggen_testresult_entries[] = {
 		{"r",		{.data.buf = &ecdsa_siggen_vector.R, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
 		{"s",		{.data.buf = &ecdsa_siggen_vector.S, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
-		{"qx",		{.data.buf = &ecdsa_siggen_vector.Qx, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
-		{"qy",		{.data.buf = &ecdsa_siggen_vector.Qy, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
-		{"message",	{.data.buf = &ecdsa_siggen_vector.msg, WRITER_BIN },
-			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
 	};
 	const struct json_testresult gen_ecdsa_siggen_testresult = SET_ARRAY(gen_ecdsa_siggen_testresult_entries, &ecdsa_siggen_callbacks);
 
