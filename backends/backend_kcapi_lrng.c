@@ -162,6 +162,9 @@ static int kcapi_rawciphername(uint64_t cipher, char **cipherstring)
 	case ACVP_ECB:
 		sprintf(outstr, "ecb(aes)");
 		break;
+	case ACVP_CBC:
+		sprintf(outstr, "cbc(aes)");
+		break;
 
 	case ACVP_HMACSHA1:
 		sprintf(outstr, "hmac(sha1)");
@@ -213,6 +216,9 @@ static int kcapi_ciphername(uint64_t cipher, char **cipherstring)
 	switch (cipher) {
 	case ACVP_ECB:
 		envstr = secure_getenv("KCAPI_ECB_AES");
+		break;
+	case ACVP_CBC:
+		envstr = secure_getenv("KCAPI_CBC_AES");
 		break;
 
 	case ACVP_HMACSHA1:
