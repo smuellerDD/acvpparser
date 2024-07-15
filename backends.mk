@@ -298,7 +298,7 @@ ifeq (ippcrypto,$(firstword $(MAKECMDGOALS)))
 		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
 		LIBRARIES += crypto ssl ippcp
 	endif
-	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib64/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
 
 endif
@@ -323,7 +323,7 @@ ifeq (cryptomb,$(firstword $(MAKECMDGOALS)))
 		LIBRARIES += crypto ssl ippcp crypto_mb
 	endif
 
-	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/ -L $(OPENSSL_ROOT_DIR)/bin/
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib64/ -L $(OPENSSL_ROOT_DIR)/bin/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
 endif
 
