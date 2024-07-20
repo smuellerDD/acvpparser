@@ -413,9 +413,9 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	struct buffer ecdsa_revision = { .buf = (unsigned char *)"1.0",
 					 .len = 6 };
 	const struct json_entry gen_ecdsa_testgroup_result_entries[] = {
-		{"algorithm",	{.data.buf = &ecdsa_algo,  WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
-		{"mode",	{.data.buf = &ecdsa_sigver_mode, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
-		{"revision",	{.data.buf = &ecdsa_revision, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"algorithm",	{.data.buf = &ecdsa_algo,  WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OP_ASYM_TYPE_SIGVER },
+		{"mode",	{.data.buf = &ecdsa_sigver_mode, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OP_ASYM_TYPE_SIGVER },
+		{"revision",	{.data.buf = &ecdsa_revision, WRITER_STRING_NOFREE},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OP_ASYM_TYPE_SIGVER },
 	};
 	/*
 	 * The NULL for the function callbacks implies that the qx and qy
@@ -425,6 +425,7 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 
 	const struct json_entry gen_ecdsa_testanchor_entries[] = {
 		{"testGroups",	{.data.array = &gen_ecdsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"testGroups",	{.data.array = &ecdsa_sigver_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGVER},
 	};
 	const struct json_array gen_ecdsa_testanchor = SET_ARRAY(gen_ecdsa_testanchor_entries, &gen_ecdsa_testgroup_result);
 
