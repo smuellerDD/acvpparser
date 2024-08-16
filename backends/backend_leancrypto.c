@@ -1789,8 +1789,16 @@ static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
 	CKNULL(sk, -EINVAL);
 
 	CKINT(alloc_buf(LC_ED25519_SIGBYTES, &data->signature));
-	CKINT(lc_ed25519_sign(&sig, data->msg.buf, data->msg.len, sk,
-			      lc_seeded_rng));
+	if (data->prehash) {
+		uint8_t digest[LC_SHA512_SIZE_DIGEST];
+
+		lc_hash(lc_sha512, data->msg.buf, data->msg.len, digest);
+		CKINT(lc_ed25519ph_sign(&sig, digest, sizeof(digest), sk,
+					lc_seeded_rng));
+	} else {
+		CKINT(lc_ed25519_sign(&sig, data->msg.buf, data->msg.len, sk,
+				      lc_seeded_rng));
+	}
 
 	/* extract signature */
 
@@ -1828,7 +1836,15 @@ static int lc_eddsa_sigver(struct eddsa_sigver_data *data,
 	memcpy(sig.sig, data->signature.buf, data->signature.len);
 	memcpy(pk.pk, data->q.buf, data->q.len);
 
-	ret = lc_ed25519_verify(&sig, data->msg.buf, data->msg.len, &pk);
+	if (data->prehash) {
+		uint8_t digest[LC_SHA512_SIZE_DIGEST];
+
+		lc_hash(lc_sha512, data->msg.buf, data->msg.len, digest);
+		ret = lc_ed25519ph_verify(&sig, digest, sizeof(digest), &pk);
+	} else {
+		ret = lc_ed25519_verify(&sig, data->msg.buf, data->msg.len,
+					&pk);
+	}
 
 	if (!ret) {
 		logger(LOGGER_DEBUG, "EDDSA signature successfully verified\n");
@@ -1869,16 +1885,16 @@ static void lc_eddsa_backend(void)
 /******************************** Dilithium 87 ********************************/
 
 struct dilithium_87_funcs {
-	int (*dilithium_keypair)(struct lc_dilithium_pk *pk,
-				 struct lc_dilithium_sk *sk,
-				 struct lc_rng_ctx *rng_ctx);
-	int (*dilithium_sign)(struct lc_dilithium_sig *sig,
+	int (*dilithium_keypair_from_seed)(struct lc_dilithium_87_pk *pk,
+					   struct lc_dilithium_87_sk *sk,
+					   const uint8_t *seed, size_t seedlen);
+	int (*dilithium_sign)(struct lc_dilithium_87_sig *sig,
 			      const uint8_t *m, size_t mlen,
-			      const struct lc_dilithium_sk *sk,
+			      const struct lc_dilithium_87_sk *sk,
 			      struct lc_rng_ctx *rng_ctx);
-	int (*dilithium_verify)(const struct lc_dilithium_sig *sig,
+	int (*dilithium_verify)(const struct lc_dilithium_87_sig *sig,
 				const uint8_t *m, size_t mlen,
-				const struct lc_dilithium_pk *pk);
+				const struct lc_dilithium_87_pk *pk);
 };
 
 static int lc_get_dilithium_87(struct dilithium_87_funcs *funcs)
@@ -1887,14 +1903,16 @@ static int lc_get_dilithium_87(struct dilithium_87_funcs *funcs)
 
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: common\n");
-		funcs->dilithium_keypair = lc_dilithium_keypair;
-		funcs->dilithium_sign = lc_dilithium_sign;
-		funcs->dilithium_verify = lc_dilithium_verify;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_87_keypair_from_seed;
+		funcs->dilithium_sign = lc_dilithium_87_sign;
+		funcs->dilithium_verify = lc_dilithium_87_verify;
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
-		funcs->dilithium_keypair = lc_dilithium_keypair_c;
-		funcs->dilithium_sign = lc_dilithium_sign_c;
-		funcs->dilithium_verify = lc_dilithium_verify_c;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_87_keypair_from_seed_c;
+		funcs->dilithium_sign = lc_dilithium_87_sign_c;
+		funcs->dilithium_verify = lc_dilithium_87_verify_c;
 	} else {
 		logger(LOGGER_ERR, "Unknown Dilithium-87 implementation %s\n", envstr);
 		return -EOPNOTSUPP;
@@ -1907,11 +1925,8 @@ static int lc_ml_dsa_87_keygen(struct ml_dsa_keygen_data *data,
 			       flags_t parsed_flags)
 {
 	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_pk lc_pk;
-	struct lc_dilithium_sk lc_sk;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
+	struct lc_dilithium_87_pk lc_pk;
+	struct lc_dilithium_87_sk lc_sk;
 
 	int ret;
 
@@ -1919,9 +1934,8 @@ static int lc_ml_dsa_87_keygen(struct ml_dsa_keygen_data *data,
 
 	CKINT(lc_get_dilithium_87(&funcs));
 
-	s_rng_state.seed = data->seed.buf;
-	s_rng_state.seedlen = data->seed.len;
-	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk, data->seed.buf,
+						data->seed.len));
 
 	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
 	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
@@ -1937,8 +1951,8 @@ static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
 			       flags_t parsed_flags)
 {
 	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_sk sk;
-	struct lc_dilithium_sig sig;
+	struct lc_dilithium_87_sk sk;
+	struct lc_dilithium_87_sig sig;
 	int ret;
 
 	CKINT(lc_get_dilithium_87(&funcs));
@@ -1948,9 +1962,9 @@ static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
 			return -EFAULT;
 		memcpy(sk.sk, data->sk.buf, data->sk.len);
 	} else if (data->privkey) {
-		struct lc_dilithium_sk *tmp = data->privkey;
+		struct lc_dilithium_87_sk *tmp = data->privkey;
 
-		memcpy(sk.sk, tmp->sk, lc_dilithium_sk_size());
+		memcpy(sk.sk, tmp->sk, lc_dilithium_87_sk_size());
 	} else
 		return -EOPNOTSUPP;
 
@@ -2001,8 +2015,8 @@ static int lc_ml_dsa_87_sigver(struct ml_dsa_sigver_data *data,
 			       flags_t parsed_flags)
 {
 	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_pk pk;
-	struct lc_dilithium_sig sig;
+	struct lc_dilithium_87_pk pk;
+	struct lc_dilithium_87_sig sig;
 	int ret;
 
 	(void)parsed_flags;
@@ -2041,16 +2055,16 @@ out:
 static int lc_ml_dsa_87_keygen_en(uint64_t cipher, struct buffer *pk,
 				  void **sk)
 {
-	struct lc_dilithium_pk lc_pk;
-	struct lc_dilithium_sk *lc_sk;
+	struct lc_dilithium_87_pk lc_pk;
+	struct lc_dilithium_87_sk *lc_sk;
 	int ret;
 
 	(void)cipher;
 
-	lc_sk = calloc(1, sizeof(struct lc_dilithium_sk));
+	lc_sk = calloc(1, sizeof(struct lc_dilithium_87_sk));
 	CKNULL(lc_sk, -ENOMEM);
 
-	CKINT(lc_dilithium_keypair(&lc_pk, lc_sk, lc_seeded_rng));
+	CKINT(lc_dilithium_87_keypair(&lc_pk, lc_sk, lc_seeded_rng));
 
 	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
 	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
@@ -2064,9 +2078,9 @@ out:
 /******************************** Dilithium 65 ********************************/
 
 struct dilithium_65_funcs {
-	int (*dilithium_keypair)(struct lc_dilithium_65_pk *pk,
-				 struct lc_dilithium_65_sk *sk,
-				 struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_keypair_from_seed)(struct lc_dilithium_65_pk *pk,
+					   struct lc_dilithium_65_sk *sk,
+					   const uint8_t *seed, size_t seedlen);
 	int (*dilithium_sign)(struct lc_dilithium_65_sig *sig,
 			      const uint8_t *m, size_t mlen,
 			      const struct lc_dilithium_65_sk *sk,
@@ -2082,12 +2096,14 @@ static int lc_get_dilithium_65(struct dilithium_65_funcs *funcs)
 
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Dilithium-65 implementation: common\n");
-		funcs->dilithium_keypair = lc_dilithium_65_keypair;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_65_keypair_from_seed;
 		funcs->dilithium_sign = lc_dilithium_65_sign;
 		funcs->dilithium_verify = lc_dilithium_65_verify;
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
-		funcs->dilithium_keypair = lc_dilithium_65_keypair_c;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_65_keypair_from_seed_c;
 		funcs->dilithium_sign = lc_dilithium_65_sign_c;
 		funcs->dilithium_verify = lc_dilithium_65_verify_c;
 	} else {
@@ -2104,9 +2120,6 @@ static int lc_ml_dsa_65_keygen(struct ml_dsa_keygen_data *data,
 	struct dilithium_65_funcs funcs;
 	struct lc_dilithium_65_pk lc_pk;
 	struct lc_dilithium_65_sk lc_sk;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
 
 	int ret;
 
@@ -2114,9 +2127,8 @@ static int lc_ml_dsa_65_keygen(struct ml_dsa_keygen_data *data,
 
 	CKINT(lc_get_dilithium_65(&funcs));
 
-	s_rng_state.seed = data->seed.buf;
-	s_rng_state.seedlen = data->seed.len;
-	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk,
+						data->seed.buf, data->seed.len));
 
 	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
 	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
@@ -2260,9 +2272,9 @@ out:
 /******************************** Dilithium 44 ********************************/
 
 struct dilithium_44_funcs {
-	int (*dilithium_keypair)(struct lc_dilithium_44_pk *pk,
-				 struct lc_dilithium_44_sk *sk,
-				 struct lc_rng_ctx *rng_ctx);
+	int (*dilithium_keypair_from_seed)(struct lc_dilithium_44_pk *pk,
+					   struct lc_dilithium_44_sk *sk,
+					   const uint8_t *seed, size_t seedlen);
 	int (*dilithium_sign)(struct lc_dilithium_44_sig *sig,
 			      const uint8_t *m, size_t mlen,
 			      const struct lc_dilithium_44_sk *sk,
@@ -2278,12 +2290,14 @@ static int lc_get_dilithium_44(struct dilithium_44_funcs *funcs)
 
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Dilithium-44 implementation: common\n");
-		funcs->dilithium_keypair = lc_dilithium_44_keypair;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_44_keypair_from_seed;
 		funcs->dilithium_sign = lc_dilithium_44_sign;
 		funcs->dilithium_verify = lc_dilithium_44_verify;
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Dilithium implementation: C\n");
-		funcs->dilithium_keypair = lc_dilithium_44_keypair_c;
+		funcs->dilithium_keypair_from_seed =
+			lc_dilithium_44_keypair_from_seed_c;
 		funcs->dilithium_sign = lc_dilithium_44_sign_c;
 		funcs->dilithium_verify = lc_dilithium_44_verify_c;
 	} else {
@@ -2300,9 +2314,6 @@ static int lc_ml_dsa_44_keygen(struct ml_dsa_keygen_data *data,
 	struct dilithium_44_funcs funcs;
 	struct lc_dilithium_44_pk lc_pk;
 	struct lc_dilithium_44_sk lc_sk;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
 
 	int ret;
 
@@ -2310,9 +2321,8 @@ static int lc_ml_dsa_44_keygen(struct ml_dsa_keygen_data *data,
 
 	CKINT(lc_get_dilithium_44(&funcs));
 
-	s_rng_state.seed = data->seed.buf;
-	s_rng_state.seedlen = data->seed.len;
-	CKINT(funcs.dilithium_keypair(&lc_pk, &lc_sk, &s_drng));
+	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk, data->seed.buf,
+						data->seed.len));
 
 	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
 	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
@@ -2527,104 +2537,48 @@ static void lc_ml_dsa_backend(void)
  * ML-KEM interface functions
  ************************************************/
 
-struct kyber_rng {
-	const uint8_t *d;
-	size_t dlen;
-	const uint8_t *z;
-	size_t zlen;
-
-	const uint8_t *ptr;
-	size_t *ptr_len;
-};
-
-static int lc_kyber_rng_gen(void *_state, const uint8_t *addtl_input,
-			    size_t addtl_input_len, uint8_t *out,
-			    size_t outlen)
-{
-	struct kyber_rng *state = _state;
-
-	(void)addtl_input;
-	(void)addtl_input_len;
-
-	if (outlen != *state->ptr_len)
-		return -EINVAL;
-
-	memcpy(out, state->ptr, outlen);
-
-	/* Flip-flop between seed values */
-	if (state->ptr == state->d) {
-		state->ptr = state->z;
-		state->ptr_len = &state->zlen;
-	} else {
-		state->ptr = state->d;
-		state->ptr_len = &state->dlen;
-	}
-
-	return 0;
-}
-
-static int lc_kyber_rng_seed(void *_state, const uint8_t *seed, size_t seedlen,
-			      const uint8_t *persbuf, size_t perslen)
-{
-	(void)_state;
-	(void)seed;
-	(void)seedlen;
-	(void)persbuf;
-	(void)perslen;
-	return 0;
-}
-
-static void lc_kyber_rng_zero(void *_state)
-{
-	(void)_state;
-}
-
-static const struct lc_rng lc_kyber_drng = {
-	.generate = lc_kyber_rng_gen,
-	.seed = lc_kyber_rng_seed,
-	.zero = lc_kyber_rng_zero,
-};
-
 /********************************* Kyber 1024 *********************************/
 
-struct kyber_funcs {
-	int (*kyber_keypair)(struct lc_kyber_pk *pk,
-			     struct lc_kyber_sk *sk,
+struct kyber_1024_funcs {
+	int (*kyber_keypair_from_seed)(struct lc_kyber_1024_pk *pk,
+				       struct lc_kyber_1024_sk *sk,
+				       const uint8_t *seed, size_t seedlen);
+	int (*kyber_enc_int)(struct lc_kyber_1024_ct *ct,
+			     struct lc_kyber_1024_ss *ss,
+			     const struct lc_kyber_1024_pk *pk,
 			     struct lc_rng_ctx *rng_ctx);
-	int (*kyber_enc_int)(struct lc_kyber_ct *ct,
-			     struct lc_kyber_ss *ss,
-			     const struct lc_kyber_pk *pk,
-			     struct lc_rng_ctx *rng_ctx);
-	int (*kyber_dec)(struct lc_kyber_ss *ss,
-			 const struct lc_kyber_ct *ct,
-			 const struct lc_kyber_sk *sk);
+	int (*kyber_dec)(struct lc_kyber_1024_ss *ss,
+			 const struct lc_kyber_1024_ct *ct,
+			 const struct lc_kyber_1024_sk *sk);
 };
 
-static int lc_get_kyber(struct kyber_funcs *funcs)
+static int lc_get_kyber(struct kyber_1024_funcs *funcs)
 {
 	const char *envstr = getenv("LC_KYBER");
 
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Kyber-1024 implementation: common\n");
 #ifdef __x86_64__
-		funcs->kyber_keypair = lc_kyber_keypair_avx;
-		funcs->kyber_enc_int = lc_kyber_enc_avx;
-		funcs->kyber_dec = lc_kyber_dec_avx;
+		funcs->kyber_keypair_from_seed =
+			lc_kyber_1024_keypair_from_seed_avx;
+		funcs->kyber_enc_int = lc_kyber_1024_enc_avx;
+		funcs->kyber_dec = lc_kyber_1024_dec_avx;
 #elif defined(__aarch64__) || defined(_M_ARM64)
-		funcs->kyber_keypair = lc_kyber_keypair_armv8;
-		funcs->kyber_enc_int = lc_kyber_enc_armv8;
-		funcs->kyber_dec = lc_kyber_dec_armv8;
+		funcs->kyber_keypair_from_seed = lc_kyber_1024_keypair_from_seed_armv8;
+		funcs->kyber_enc_int = lc_kyber_1024_enc_armv8;
+		funcs->kyber_dec = lc_kyber_1024_dec_armv8;
 #else
-		funcs->kyber_keypair = lc_kyber_keypair;
-		funcs->kyber_enc_int = lc_kyber_enc_c;
-		funcs->kyber_dec = lc_kyber_dec;
+		funcs->kyber_keypair_from_seed = lc_kyber_1024_keypair_from_seed;
+		funcs->kyber_enc_int = lc_kyber_1024_enc_c;
+		funcs->kyber_dec = lc_kyber_1024_dec;
 #endif
 
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Kyber implementation: C\n");
-		funcs->kyber_keypair = lc_kyber_keypair_c;
-		funcs->kyber_enc_int = lc_kyber_enc_c;
-		funcs->kyber_dec = lc_kyber_dec_c;
+		funcs->kyber_keypair_from_seed =
+			lc_kyber_1024_keypair_from_seed_c;
+		funcs->kyber_enc_int = lc_kyber_1024_enc_c;
+		funcs->kyber_dec = lc_kyber_1024_dec_c;
 	} else {
 		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
 		return -EOPNOTSUPP;
@@ -2636,28 +2590,22 @@ static int lc_get_kyber(struct kyber_funcs *funcs)
 static int lc_ml_kem_1024_keygen(struct ml_kem_keygen_data *data,
 				 flags_t parsed_flags)
 {
-	struct kyber_funcs funcs;
-	struct lc_kyber_pk pk;
-	struct lc_kyber_sk sk;
-	struct kyber_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
-				     .rng_state = &s_rng_state };
+	struct kyber_1024_funcs funcs;
+	struct lc_kyber_1024_pk pk;
+	struct lc_kyber_1024_sk sk;
+	uint8_t buf[64];
 	int ret;
 
 	(void)parsed_flags;
 
+	if (data->d.len + data->z.len != sizeof(buf))
+		return -EINVAL;
+	memcpy(buf, data->d.buf, data->d.len);
+	memcpy(buf + data->d.len, data->z.buf, data->z.len);
+
 	CKINT(lc_get_kyber(&funcs));
 
-	s_rng_state.d = data->d.buf;
-	s_rng_state.dlen = data->d.len;
-	s_rng_state.z = data->z.buf;
-	s_rng_state.zlen = data->z.len;
-
-	/* The d value is the first random number to be supplied */
-	s_rng_state.ptr = s_rng_state.d;
-	s_rng_state.ptr_len = &s_rng_state.dlen;
-
-	CKINT(funcs.kyber_keypair(&pk, &sk, &s_drng));
+	CKINT(funcs.kyber_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
 
 	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
 	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
@@ -2672,10 +2620,10 @@ out:
 static int lc_ml_kem_1024_encapsulation(struct ml_kem_encapsulation_data *data,
 					flags_t parsed_flags)
 {
-	struct kyber_funcs funcs;
-	struct lc_kyber_pk pk;
-	struct lc_kyber_ct ct;
-	struct lc_kyber_ss ss;
+	struct kyber_1024_funcs funcs;
+	struct lc_kyber_1024_pk pk;
+	struct lc_kyber_1024_ct ct;
+	struct lc_kyber_1024_ss ss;
 	struct static_rng s_rng_state;
 	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
 				     .rng_state = &s_rng_state };
@@ -2716,10 +2664,10 @@ out:
 static int lc_ml_kem_1024_decapsulation(struct ml_kem_decapsulation_data *data,
 					flags_t parsed_flags)
 {
-	struct kyber_funcs funcs;
-	struct lc_kyber_sk sk;
-	struct lc_kyber_ct ct;
-	struct lc_kyber_ss ss;
+	struct kyber_1024_funcs funcs;
+	struct lc_kyber_1024_sk sk;
+	struct lc_kyber_1024_ct ct;
+	struct lc_kyber_1024_ss ss;
 	int ret;
 
 	(void)parsed_flags;
@@ -2754,9 +2702,9 @@ out:
 /********************************* Kyber 768 **********************************/
 
 struct kyber_768_funcs {
-	int (*kyber_768_keypair)(struct lc_kyber_768_pk *pk,
-			     struct lc_kyber_768_sk *sk,
-			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_768_keypair_from_seed)(struct lc_kyber_768_pk *pk,
+					   struct lc_kyber_768_sk *sk,
+					   const uint8_t *seed, size_t seedlen);
 	int (*kyber_768_enc_int)(struct lc_kyber_768_ct *ct,
 			     struct lc_kyber_768_ss *ss,
 			     const struct lc_kyber_768_pk *pk,
@@ -2773,22 +2721,26 @@ static int lc_get_kyber_768(struct kyber_768_funcs *funcs)
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Kyber-768 implementation: common\n");
 #ifdef __x86_64__
-		funcs->kyber_768_keypair = lc_kyber_768_keypair_avx;
+		funcs->kyber_768_keypair_from_seed =
+			lc_kyber_768_keypair_from_seed_avx;
 		funcs->kyber_768_enc_int = lc_kyber_768_enc_avx;
 		funcs->kyber_768_dec = lc_kyber_768_dec_avx;
 #elif defined(__aarch64__) || defined(_M_ARM64)
-		funcs->kyber_768_keypair = lc_kyber_768_keypair_armv8;
+		funcs->kyber_768_keypair_from_seed =
+			lc_kyber_768_keypair_from_seed_armv8;
 		funcs->kyber_768_enc_int = lc_kyber_768_enc_armv8;
 		funcs->kyber_768_dec = lc_kyber_768_dec_armv8;
 #else
-		funcs->kyber_768_keypair = lc_kyber_768_keypair;
-		funcs->kyber_768_enc_int = lc_kyber_768_enc;
-		funcs->kyber_768_dec = lc_kyber_768_dec;
+		funcs->kyber_768_keypair_from_seed =
+			lc_kyber_768_keypair_from_seed_c;
+		funcs->kyber_768_enc_int = lc_kyber_768_enc_c;
+		funcs->kyber_768_dec = lc_kyber_768_dec_c;
 #endif
 
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Kyber-768 implementation: C\n");
-		funcs->kyber_768_keypair = lc_kyber_768_keypair_c;
+		funcs->kyber_768_keypair_from_seed =
+			lc_kyber_768_keypair_from_seed_c;
 		funcs->kyber_768_enc_int = lc_kyber_768_enc_c;
 		funcs->kyber_768_dec = lc_kyber_768_dec_c;
 	} else {
@@ -2800,30 +2752,24 @@ static int lc_get_kyber_768(struct kyber_768_funcs *funcs)
 }
 
 static int lc_ml_kem_768_keygen(struct ml_kem_keygen_data *data,
-				flags_t parsed_flags)
+				 flags_t parsed_flags)
 {
 	struct kyber_768_funcs funcs;
 	struct lc_kyber_768_pk pk;
 	struct lc_kyber_768_sk sk;
-	struct kyber_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
-				     .rng_state = &s_rng_state };
+	uint8_t buf[64];
 	int ret;
 
 	(void)parsed_flags;
 
+	if (data->d.len + data->z.len != sizeof(buf))
+		return -EINVAL;
+	memcpy(buf, data->d.buf, data->d.len);
+	memcpy(buf + data->d.len, data->z.buf, data->z.len);
+
 	CKINT(lc_get_kyber_768(&funcs));
 
-	s_rng_state.d = data->d.buf;
-	s_rng_state.dlen = data->d.len;
-	s_rng_state.z = data->z.buf;
-	s_rng_state.zlen = data->z.len;
-
-	/* The d value is the first random number to be supplied */
-	s_rng_state.ptr = s_rng_state.d;
-	s_rng_state.ptr_len = &s_rng_state.dlen;
-
-	CKINT(funcs.kyber_768_keypair(&pk, &sk, &s_drng));
+	CKINT(funcs.kyber_768_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
 
 	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
 	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
@@ -2920,9 +2866,9 @@ out:
 /********************************* Kyber 512 **********************************/
 
 struct kyber_512_funcs {
-	int (*kyber_512_keypair)(struct lc_kyber_512_pk *pk,
-			     struct lc_kyber_512_sk *sk,
-			     struct lc_rng_ctx *rng_ctx);
+	int (*kyber_512_keypair_from_seed)(struct lc_kyber_512_pk *pk,
+					   struct lc_kyber_512_sk *sk,
+					   const uint8_t *seed, size_t seedlen);
 	int (*kyber_512_enc_int)(struct lc_kyber_512_ct *ct,
 			     struct lc_kyber_512_ss *ss,
 			     const struct lc_kyber_512_pk *pk,
@@ -2938,12 +2884,14 @@ static int lc_get_kyber_512(struct kyber_512_funcs *funcs)
 
 	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
 		logger(LOGGER_VERBOSE, "Kyber-512 implementation: common, but using C\n");
-		funcs->kyber_512_keypair = lc_kyber_512_keypair_c;
+		funcs->kyber_512_keypair_from_seed =
+			lc_kyber_512_keypair_from_seed_c;
 		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
 		funcs->kyber_512_dec = lc_kyber_512_dec_c;
 	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
 		logger(LOGGER_VERBOSE, "Kyber-512 implementation: C\n");
-		funcs->kyber_512_keypair = lc_kyber_512_keypair_c;
+		funcs->kyber_512_keypair_from_seed =
+			lc_kyber_512_keypair_from_seed_c;
 		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
 		funcs->kyber_512_dec = lc_kyber_512_dec_c;
 	} else {
@@ -2960,25 +2908,19 @@ static int lc_ml_kem_512_keygen(struct ml_kem_keygen_data *data,
 	struct kyber_512_funcs funcs;
 	struct lc_kyber_512_pk pk;
 	struct lc_kyber_512_sk sk;
-	struct kyber_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_kyber_drng,
-				     .rng_state = &s_rng_state };
+	uint8_t buf[64];
 	int ret;
 
 	(void)parsed_flags;
 
+	if (data->d.len + data->z.len != sizeof(buf))
+		return -EINVAL;
+	memcpy(buf, data->d.buf, data->d.len);
+	memcpy(buf + data->d.len, data->z.buf, data->z.len);
+
 	CKINT(lc_get_kyber_512(&funcs));
 
-	s_rng_state.d = data->d.buf;
-	s_rng_state.dlen = data->d.len;
-	s_rng_state.z = data->z.buf;
-	s_rng_state.zlen = data->z.len;
-
-	/* The d value is the first random number to be supplied */
-	s_rng_state.ptr = s_rng_state.d;
-	s_rng_state.ptr_len = &s_rng_state.dlen;
-
-	CKINT(funcs.kyber_512_keypair(&pk, &sk, &s_drng));
+	CKINT(funcs.kyber_512_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
 
 	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
 	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));

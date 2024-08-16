@@ -24,20 +24,31 @@
 extern "C" {
 #endif
 
-int lc_kyber_keypair_c(struct lc_kyber_pk *pk, struct lc_kyber_sk *sk,
-		       struct lc_rng_ctx *rng_ctx);
-int lc_kyber_enc_c(struct lc_kyber_ct *ct, struct lc_kyber_ss *ss,
-		   const struct lc_kyber_pk *pk, struct lc_rng_ctx *rng_ctx);
-int lc_kyber_enc_kdf_c(struct lc_kyber_ct *ct, uint8_t *ss, size_t ss_len,
-		       const struct lc_kyber_pk *pk,
-		       struct lc_rng_ctx *rng_ctx);
-int lc_kyber_dec_c(struct lc_kyber_ss *ss, const struct lc_kyber_ct *ct,
-		   const struct lc_kyber_sk *sk);
-int lc_kyber_dec_kdf_c(uint8_t *ss, size_t ss_len, const struct lc_kyber_ct *ct,
-		       const struct lc_kyber_sk *sk);
+int lc_kyber_1024_keypair_c(struct lc_kyber_1024_pk *pk,
+			    struct lc_kyber_1024_sk *sk,
+			    struct lc_rng_ctx *rng_ctx);
+int lc_kyber_1024_keypair_from_seed_c(struct lc_kyber_1024_pk *pk,
+				      struct lc_kyber_1024_sk *sk,
+				      const uint8_t *seed, size_t seedlen);
+int lc_kyber_1024_enc_c(struct lc_kyber_1024_ct *ct,
+			struct lc_kyber_1024_ss *ss,
+			const struct lc_kyber_1024_pk *pk,
+			struct lc_rng_ctx *rng_ctx);
+int lc_kyber_1024_enc_kdf_c(struct lc_kyber_1024_ct *ct, uint8_t *ss,
+			    size_t ss_len, const struct lc_kyber_1024_pk *pk,
+			    struct lc_rng_ctx *rng_ctx);
+int lc_kyber_1024_dec_c(struct lc_kyber_1024_ss *ss,
+			const struct lc_kyber_1024_ct *ct,
+			const struct lc_kyber_1024_sk *sk);
+int lc_kyber_1024_dec_kdf_c(uint8_t *ss, size_t ss_len,
+			    const struct lc_kyber_1024_ct *ct,
+			    const struct lc_kyber_1024_sk *sk);
 
 int lc_kyber_768_keypair_c(struct lc_kyber_768_pk *pk, struct lc_kyber_768_sk *sk,
 		       struct lc_rng_ctx *rng_ctx);
+int lc_kyber_768_keypair_from_seed_c(struct lc_kyber_768_pk *pk,
+				     struct lc_kyber_768_sk *sk,
+				     const uint8_t *seed, size_t seedlen);
 int lc_kyber_768_enc_c(struct lc_kyber_768_ct *ct, struct lc_kyber_768_ss *ss,
 		   const struct lc_kyber_768_pk *pk, struct lc_rng_ctx *rng_ctx);
 int lc_kyber_768_enc_kdf_c(struct lc_kyber_768_ct *ct, uint8_t *ss, size_t ss_len,
@@ -50,6 +61,9 @@ int lc_kyber_768_dec_kdf_c(uint8_t *ss, size_t ss_len, const struct lc_kyber_768
 
 int lc_kyber_512_keypair_c(struct lc_kyber_512_pk *pk, struct lc_kyber_512_sk *sk,
 		       struct lc_rng_ctx *rng_ctx);
+int lc_kyber_512_keypair_from_seed_c(struct lc_kyber_512_pk *pk,
+				     struct lc_kyber_512_sk *sk,
+				     const uint8_t *seed, size_t seedlen);
 int lc_kyber_512_enc_c(struct lc_kyber_512_ct *ct, struct lc_kyber_512_ss *ss,
 		   const struct lc_kyber_512_pk *pk, struct lc_rng_ctx *rng_ctx);
 int lc_kyber_512_enc_kdf_c(struct lc_kyber_512_ct *ct, uint8_t *ss, size_t ss_len,

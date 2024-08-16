@@ -73,6 +73,7 @@ void _init_register_proto_sym(void);
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>

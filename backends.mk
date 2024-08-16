@@ -362,10 +362,39 @@ PROTODEFDIR := backend_interfaces/protobuf/pb
 ifeq (protobuf,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_protobuf.c
 	C_SRCS += backend_interfaces/protobuf/src/protobuf-c.c
-	INCLUDE_DIRS += ./ backend_interfaces/protobuf $(PROTODEFDIR)
-
 	C_SRCS += $(PROTOFILE_C)
+	INCLUDE_DIRS += ./ backend_interfaces/protobuf $(PROTODEFDIR)
 endif
+
+######## CONFIGURE BACKEND mbedtls-psa ########################################
+ifeq (mbedtls-psa,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_mbedtls.c
+	LIBRARIES += mbedcrypto
+endif
+###########################################################
+
+######## CONFIGURE BACKEND mbedtls ############################################
+ifeq (mbedtls,$(firstword $(MAKECMDGOALS)))
+	C_SRCS += backends/backend_mbedtls.c
+	LIBRARIES += mbedcrypto
+	INCLUDE_DIRS += /home/sm/hacking/libs/include
+	LIBRARY_DIRS += /home/sm/hacking/libs/lib
+	# Stip unneeded C files - as the proto_*.c files are loaded with the
+	# constructor, the dead-code-stripping logic does not remove it.
+	# The protobuf parser code is dead-code-stripped.
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*ml-kem*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*ml-dsa*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*pbkdf*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*sym*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*kmac*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*kbkdf*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*hkdf*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*eddsa*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*cshake*.c), $(C_SRCS))
+
+endif
+###############################################################################
+
 
 ######################################################
 ######################################################
@@ -378,7 +407,7 @@ OBJS := $(C_OBJS) $(CXX_OBJS)
 .PHONY: clean distclean acvp2cavs cavs2acvp kcapi kcapi_lrng libkcapi libgcrypt nettle gnutls openssl nss commoncrypto corecrypto openssh strongswan libreswan acvpproxy libsodium libnacl boringssl botan bouncycastle libica cpacf lrng jent leancrypto mbedtls ippcrypto cryptomb cryptombssl protobuf shlib shlib_static default files
 
 default:
-	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|leancrypto|mbedtls|ippcrypto|cryptomb|cryptombssl|protobuf|shlib|shlib_static>")
+	$(error "Usage: make <acvp2cavs|cavs2acvp|kcapi|kcapi_lrng|libkcapi|libgcrypt|nettle|gnutls|openssl|nss|commoncrypto|corecrypto-dispatch|corecypto|openssh|strongswan|libreswan|acvpproxy|libsodium|libnacl|boringssl|apple-boringssl|botan|bouncycastle|libica|cpacf|lrng|jent|leancrypto|mbedtls|mbedtls-psa|ippcrypto|cryptomb|cryptombssl|protobuf|shlib|shlib_static>")
 
 acvp2cavs: $(NAME)
 cavs2acvp: $(NAME)
@@ -408,6 +437,7 @@ lrng: $(NAME)
 jent: $(NAME)
 leancrypto: $(NAME)
 mbedtls: $(NAME)
+mbedtls-psa: $(NAME)
 ippcrypto: $(NAME)
 cryptomb: $(NAME)
 cryptombssl: $(NAME)

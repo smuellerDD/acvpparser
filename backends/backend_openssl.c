@@ -2319,7 +2319,7 @@ static int openssl_dh_set_param(const struct buffer *P /* [in] */,
 		if (keylen)
 			*keylen = P->len;
 	} else {
-		struct safeprimes *p_safeprime;
+		const struct safeprimes *p_safeprime;
 
 		CKINT(acvp_safeprime_get(safeprime, &p_safeprime));
 

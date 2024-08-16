@@ -18,7 +18,7 @@
  * DAMAGE.
  */
 
-#define _DEFAULT_SOURCE
+#define _GNU_SOURCE
 #include <ctype.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -87,12 +87,10 @@ out:
 
 static int openssh_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 {
-	BUFFER_INIT(K);
-	char *k_hex = NULL, *h_hex = NULL, *session_id_hex = NULL, *buffer_p,
-	     *k_mpint_hex = NULL;
+	char *k_hex = NULL, *h_hex = NULL, *session_id_hex = NULL, *buffer_p;
 	char ivlen_buf[11], enclen_buf[11], maclen_buf[11];
 	char buffer[4096];
-	size_t k_hex_len, h_hex_len, session_id_hex_len, k_mpint_hex_len;
+	size_t k_hex_len, h_hex_len, session_id_hex_len;
 	unsigned int ivlen, enclen, maclen, buflen;
 	pid_t pid;
 	int ret;
@@ -103,11 +101,7 @@ static int openssh_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 	filedes[0] = -1;
 	filedes[1] = -1;
 
-	CKINT(bin2hex_alloc(data->k.buf, data->k.len, &k_mpint_hex,
-			    &k_mpint_hex_len));
-	CKINT(mpint2bin(k_mpint_hex, (uint32_t)k_mpint_hex_len, &K));
-
-	CKINT(bin2hex_alloc(K.buf, K.len, &k_hex, &k_hex_len));
+	CKINT(bin2hex_alloc(data->k.buf, data->k.len, &k_hex, &k_hex_len));
 	CKINT(bin2hex_alloc(data->h.buf, data->h.len, &h_hex, &h_hex_len));
 	CKINT(bin2hex_alloc(data->session_id.buf, data->session_id.len,
 			    &session_id_hex, &session_id_hex_len));
@@ -180,7 +174,7 @@ static int openssh_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 		       "Execute: ssh-cavs -K %s -H %s -s %s -i %s -e %s -m %s\n",
 			k_hex, h_hex, session_id_hex, ivlen_buf, enclen_buf,
 			maclen_buf);
-		execlp("ssh-cavs", "ssh-cavs",
+		execlp("./ssh-cavs", "ssh-cavs",
 		       "-K", k_hex,
 		       "-H", h_hex,
 		       "-s", session_id_hex,
@@ -188,8 +182,7 @@ static int openssh_kdf_ssh(struct kdf_ssh_data *data, flags_t parsed_flags)
 		       "-e", enclen_buf,
 		       "-m", maclen_buf,
 		       (char*)NULL);
-		printf("Execl failed\n");
-		logger(LOGGER_ERR, "Execl failed\n");
+		logger(LOGGER_ERR, "Execl failed: %d\n", errno);
 		ret = -EFAULT;
 		goto out;
 	}
@@ -230,9 +223,6 @@ out:
 		free(h_hex);
 	if (session_id_hex)
 		free(session_id_hex);
-	if (k_mpint_hex)
-		free(k_mpint_hex);
-	free_buf(&K);
 	return ret;
 }
 

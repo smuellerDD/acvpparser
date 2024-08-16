@@ -108,6 +108,7 @@ static int shake_mct_helper(const struct json_array *processdata,
 				json_object_new_int((int)vector->mac.len * 8)));
 
 		/* hash becomes new message */
+		memset(vector->msg.buf, 0, vector->msg.len);
 		memcpy(vector->msg.buf, vector->mac.buf,
 		       min(vector->mac.len, vector->msg.len));
 		free_buf(&vector->mac);

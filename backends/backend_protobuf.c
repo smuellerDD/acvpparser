@@ -480,6 +480,7 @@ static int pb_aead_data_crypt(struct aead_data *data, flags_t parsed_flags,
 	AeadDataMsg_send.assoc.len = data->assoc.len;
 	AeadDataMsg_send.tag.data = data->tag.buf;
 	AeadDataMsg_send.tag.len = data->tag.len;
+	AeadDataMsg_send.taglen = data->taglen;
 	AeadDataMsg_send.cipher = data->cipher;
 	AeadDataMsg_send.ptlen = data->ptlen;
 	AeadDataMsg_send.data.data = data->data.buf;
@@ -504,8 +505,10 @@ static int pb_aead_data_crypt(struct aead_data *data, flags_t parsed_flags,
 	memcpy(data->data.buf, AeadDataMsg_recv->data.data,
 	       (data->data.len > AeadDataMsg_recv->data.len) ?
 	        AeadDataMsg_recv->data.len : data->data.len);
-	CKINT(pb_alloc_copy(&data->iv, &AeadDataMsg_recv->iv));
-	CKINT(pb_alloc_copy(&data->tag, &AeadDataMsg_recv->tag));
+	if (!data->iv.len)
+		CKINT(pb_alloc_copy(&data->iv, &AeadDataMsg_recv->iv));
+	if (!data->tag.len)
+		CKINT(pb_alloc_copy(&data->tag, &AeadDataMsg_recv->tag));
 
 	data->integrity_error = AeadDataMsg_recv->integrity_error;
 
@@ -779,6 +782,7 @@ static int pb_rsa_keygen(struct rsa_keygen_data *data, flags_t parsed_flags)
 	BUFFER_INIT(received);
 	int ret;
 
+	RsaKeygenDataMsg_send.modulus = data->modulus;
 	RsaKeygenDataMsg_send.e.data = data->e.buf;
 	RsaKeygenDataMsg_send.e.len = data->e.len;
 	RsaKeygenDataMsg_send.bitlen_in = data->bitlen_in;
@@ -802,7 +806,8 @@ static int pb_rsa_keygen(struct rsa_keygen_data *data, flags_t parsed_flags)
 	CKINT(pb_alloc_copy(&data->d, &RsaKeygenDataMsg_recv->d));
 	CKINT(pb_alloc_copy(&data->p, &RsaKeygenDataMsg_recv->p));
 	CKINT(pb_alloc_copy(&data->q, &RsaKeygenDataMsg_recv->q));
-	CKINT(pb_alloc_copy(&data->e, &RsaKeygenDataMsg_recv->e));
+	if (!data->e.len)
+		CKINT(pb_alloc_copy(&data->e, &RsaKeygenDataMsg_recv->e));
 
 	CKINT(pb_alloc_copy(&data->xp, &RsaKeygenDataMsg_recv->xp));
 	CKINT(pb_alloc_copy(&data->xp1, &RsaKeygenDataMsg_recv->xp1));

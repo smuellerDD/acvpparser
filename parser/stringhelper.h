@@ -71,6 +71,7 @@ int read_complete(int fd, uint8_t *buf, size_t buflen);
 char* get_val(char *str, const char *delim);
 int get_intval(char *str, const char *delim, uint32_t *val);
 int get_hexval(char *str, const char *delim, uint32_t *val);
+int get_binval(char *str, const char *delim, struct buffer *buf);
 void copy_ptr_buf(struct buffer *dst, struct buffer *src);
 int left_pad_buf(struct buffer *buf, size_t required_len);
 int remove_leading_zeroes(struct buffer *buf);

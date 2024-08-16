@@ -317,22 +317,19 @@ int json_get_string_buf(const struct json_object *obj, const char *name,
 	if (len > INT_MAX)
 		return -EINVAL;
 
+	/* Ensure we have an additional space for the NULL terminator */
 	ret = alloc_buf(len + 1, buf);
 	if (ret)
 		return ret;
 
+	/* Ensure we have a NULL terminator */
+	buf->buf[len] = 0;
+
+	/* For strings, the buffer length is set to the string length */
 	buf->len--;
 
-#ifdef __APPLE__
-	/* strlcpy adds the trailing NULL terminator into last character */
-	strlcpy((char *)buf->buf, string, buf->len + 1);
-#else
-	/* strncpy does not add the trailing NULL terminator */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-	strncpy((char *)buf->buf, string, buf->len);
-#pragma GCC diagnostic pop
-#endif
+	/* Copy everything, excluding the NULL terminator, to the buffer */
+	memcpy(buf->buf, string, buf->len);
 
 	return 0;
 }

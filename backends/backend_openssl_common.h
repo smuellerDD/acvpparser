@@ -31,6 +31,7 @@ extern "C"
 
 #define _GNU_SOURCE
 #include <errno.h>
+#include <inttypes.h>
 #include <openssl/aes.h>
 #include <openssl/cmac.h>
 #include <openssl/crypto.h>
@@ -42,7 +43,6 @@ extern "C"
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/hmac.h>
-#include <openssl/kdf.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
@@ -56,6 +56,10 @@ extern "C"
 #include <openssl/param_build.h>
 #include <openssl/bn.h>
 #include <openssl/provider.h>
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#include <openssl/kdf.h>
 #endif
 
 #if OPENSSL_VERSION_NUMBER < 0x30000000L
