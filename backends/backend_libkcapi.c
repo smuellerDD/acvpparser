@@ -1727,3 +1727,406 @@ static void kcapi_rsa_backend(void)
 	register_rsa_impl(&kcapi_rsa);
 }
 #endif /* LIBKCAPI_RSA_ENABLED */
+
+/************************************************
+ * ECDSA interface functions
+ ************************************************/
+#define ECDH_CURVE_STR_P192 "ecdh-nist-p192"
+#define ECDH_CURVE_STR_P256 "ecdh-nist-p256"
+#define ECDH_CURVE_STR_P384 "ecdh-nist-p384"
+#define ECDH_CURVE_ID_P192 1
+#define ECDH_CURVE_ID_P256 2
+#define ECDH_CURVE_ID_P384 3
+#define ECDH_CURVE_NUM_P192 192
+#define ECDH_CURVE_NUM_P256 256
+#define ECDH_CURVE_NUM_P384 384
+
+static int ecdsa_keygen(struct ecdsa_keygen_extra_data *data, flags_t parsed_flags)
+{
+	if(!data)
+	{
+		logger(LOGGER_ERR, "ecdsa: ecdsa_keygen_extra_data is empty, returning -EINVAL...\n");
+		return -EINVAL;
+	}
+	(void)parsed_flags;
+
+	struct kcapi_handle *handle = NULL;
+	struct kcapi_handle *ecdh = NULL;
+	struct buffer key;
+	size_t dlen, qxlen, qylen;
+	int ret=0;
+	char *curve_str = NULL;
+	int curve_num = 0;
+	int curve_id = 0;
+
+	if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP384)
+	{
+		curve_str = ECDH_CURVE_STR_P384;
+		curve_num = ECDH_CURVE_NUM_P384;
+		curve_id = ECDH_CURVE_ID_P384;
+	}
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP256)
+	{
+		curve_str = ECDH_CURVE_STR_P256;
+		curve_num = ECDH_CURVE_NUM_P256;
+		curve_id = ECDH_CURVE_ID_P256;
+	}
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP192)
+	{
+		curve_str = ECDH_CURVE_STR_P192;
+		curve_num = ECDH_CURVE_NUM_P192;
+		curve_id = ECDH_CURVE_ID_P192;
+	}
+	else
+	{
+		logger(LOGGER_ERR, "ecdsa: curve is not supported\n");
+		return -EINVAL;
+	}
+
+	key.len = 0;
+	key.buf = NULL;
+
+	if (kcapi_ecc_init(&handle, curve_str))
+	{
+		ret = -EINVAL;
+		logger(LOGGER_ERR, "ecdsa: allocation of cipher failed\n");
+		goto out;
+	}
+
+	if(curve_num == 384)
+		ecdsa_get_bufferlen(ACVP_NISTP384, &dlen, &qxlen, &qylen);
+	else
+		ecdsa_get_bufferlen(ACVP_NISTP256, &dlen, &qxlen, &qylen);
+
+	CKINT_LOG(alloc_buf(qxlen, &data->Qx), "ecdsa: Qx could not be allocated\n");
+	CKINT_LOG(alloc_buf(qylen, &data->Qy), "ecdsa: Qy could not be allocated\n");
+	CKINT_LOG(alloc_buf(dlen, &data->d), "ecdaa: private Key buffer could not be allocated\n");
+	ret = kcapi_ecc_keygen(handle, curve_num, data->d.buf, data->d.len, data->Qx.buf,
+			       data->Qx.len, data->Qy.buf, data->Qy.len);
+	if (ret < 0)
+	{
+		logger(LOGGER_ERR, "ecdsa: key generation failed with error = %d\n", ret);
+		goto out;
+	}
+
+	if (kcapi_kpp_init(&ecdh, curve_str, 0))
+	{
+		ret = -EINVAL;
+		logger(LOGGER_ERR, "ecdh: allocation of cipher failed\n");
+		goto out;
+	}
+
+	ret = kcapi_kpp_ecdh_setcurve(ecdh, curve_id);
+
+	if (ret < 0)
+	{
+		logger(LOGGER_ERR, "ecdh: curve setting failed with error: %d\n", ret);
+		goto out;
+	}
+
+	ret = kcapi_kpp_setkey(ecdh, data->d.buf, data->d.len);
+	if (ret < 0)
+	{
+		logger(LOGGER_ERR, "ecdh: key setting failed with error: %d\n", ret);
+		goto out;
+	}
+
+	CKINT_LOG(alloc_buf(qxlen + qylen, &key), "ecdh: local public Key buffer could not be allocated\n");
+
+	ret = kcapi_kpp_keygen(ecdh, key.buf, key.len, 0);
+	if(ret < 0)
+	{
+		ret = -EINVAL;
+		logger(LOGGER_ERR, "ecdsa: public keygen failed\n");
+		goto out;
+	}
+	else if(memcmp(data->Qx.buf, key.buf, qxlen) == 0 && memcmp(data->Qy.buf, key.buf+qxlen, qylen) == 0)
+	{
+		logger(LOGGER_DEBUG, "ecdsa: public keygen success\n");
+	}
+	else
+	{
+		logger(LOGGER_ERR, "ecdsa: public keygen failed\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+out:
+	kcapi_kpp_destroy(ecdh);
+	kcapi_ecc_destroy(handle);
+	if(key.buf)
+		free_buf(&key);
+	return ret;
+}
+
+static int ecdsa_keyver(struct ecdsa_pkvver_data *data, flags_t parsed_flags)
+{
+	if(!data)
+	{
+		logger(LOGGER_ERR, "ecdsa: ecdsa_pkvver_data is empty, returning -EINVAL...\n");
+		return -EINVAL;
+	}
+
+	struct kcapi_handle *handle = NULL;
+	int ret =0 , re;
+	char *curve_str = NULL;
+	int curve_num = 0;
+	(void) parsed_flags;
+
+	if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP384)
+	{
+		curve_str = ECDH_CURVE_STR_P384;
+		curve_num = ECDH_CURVE_NUM_P384;
+	}
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP256)
+	{
+		curve_str = ECDH_CURVE_STR_P256;
+		curve_num = ECDH_CURVE_NUM_P256;
+	}
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP192)
+	{
+		curve_str = ECDH_CURVE_STR_P192;
+		curve_num = ECDH_CURVE_NUM_P192;
+	}
+	else
+	{
+		logger(LOGGER_ERR, "ecdsa: curve is not supported.\n");
+		return -EINVAL;
+	}
+
+	if (kcapi_ecc_init(&handle, curve_str))
+	{
+		logger(LOGGER_ERR, "ecdsa: allocation of cipher failed\n");
+		ret = -EINVAL;
+		goto out;
+	}
+	re = kcapi_ecc_verify(handle, curve_num, data->Qx.buf,
+			      data->Qx.len, data->Qy.buf, data->Qy.len);
+	if(re < 0)
+	{
+		logger(LOGGER_ERR, "ecdsa: public keyver failed\n");
+		data->keyver_success = 0;
+	}
+	else
+	{
+		logger(LOGGER_DEBUG, "ecdsa: public keyVer success\n");
+		data->keyver_success = 1;
+	}
+out:
+	kcapi_ecc_destroy(handle);
+	return ret;
+}
+
+static int ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t parsed_flags)
+{
+	if(!data)
+	{
+		logger(LOGGER_ERR, "ecdsa: ecdsa_sigver_data is empty, returning -EINVAL...\n");
+		return -EINVAL;
+	}
+
+	struct kcapi_handle *handle = NULL, *hash_handle = NULL;
+	int ret = 0, rc = 0;
+	size_t len = 0;
+	char *curve_str = NULL;
+	(void) parsed_flags;
+
+	if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP384)
+	{
+		curve_str = "ecdsa-nist-p384";
+	}
+	else if((data->cipher & ACVP_CURVEMASK) == ACVP_NISTP256)
+	{
+		curve_str = "ecdsa-nist-p256";
+	}
+	else
+	{
+		logger(LOGGER_ERR, "ecdsa: curve not FIPS supported.\n");
+		return -EINVAL;
+	}
+
+	if(!data->component)
+	{
+		/* We need to generate the msg hash */
+		struct buffer msg = data->msg;
+		data->msg.buf = NULL;
+		data->msg.len = 0;
+		char cipher[CIPHERMAXNAME];
+
+		if(sha_mac_cipher(cipher, data->cipher & ACVP_HASHMASK, &len))
+		{
+			return -EINVAL;
+		}
+
+		if (kcapi_md_init(&hash_handle, cipher, 0))
+		{
+			logger(LOGGER_ERR, "ecdsa: allocation of hash %s failed\n", cipher);
+			return 1;
+		}
+
+		CKINT_LOG(alloc_buf(len, &data->msg), "ecdsa: msg hash buffer could not be allocated\n");
+		rc = kcapi_md_digest(hash_handle, msg.buf, msg.len, data->msg.buf, data->msg.len);
+		if (rc < 0)
+		{
+			logger(LOGGER_ERR, "ecdsa: message digest generation failed\n");
+			kcapi_md_destroy(hash_handle);
+			return 1;
+		}
+
+		kcapi_md_destroy(hash_handle);
+		if(msg.buf)
+			free_buf(&msg);
+	}
+
+	if (kcapi_akcipher_init(&handle, curve_str, 0))
+	{
+		logger(LOGGER_ERR, "ecdsa: allocation of %s cipher failed\n", curve_str);
+		return -EFAULT;
+	}
+
+	/* Encoding and setting public key */
+	struct buffer pk;
+	unsigned char *ptr;
+	pk.len = 0;
+	pk.buf = NULL;
+
+	CKINT_LOG(alloc_buf(data->Qx.len + data->Qy.len + 1, &pk), "ecdsa: public key buffer could not be allocated\n");
+	ptr = (&pk)->buf;
+
+	ptr[0] = 0x04;
+	ptr = ptr + 1;
+
+	if(data->Qx.buf)
+		memcpy(ptr, data->Qx.buf, data->Qx.len);
+	ptr = ptr + data->Qx.len;
+
+	if(data->Qy.buf)
+		memcpy(ptr, data->Qy.buf, data->Qy.len);
+
+	ret = kcapi_akcipher_setpubkey(handle, pk.buf, pk.len);
+	if (ret <= 0)
+	{
+		logger(LOGGER_ERR, "ecdsa: asymmetric cipher set public key failed\n");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	/* BER Encoding signature */
+	struct buffer in;
+	struct buffer dgst;
+	unsigned short int rlen;
+	unsigned short int slen;
+	unsigned short int total = 0, extra;
+	unsigned char *tmp;
+
+	in.len = 0;
+	in.buf = NULL;
+	dgst.len = 0;
+	dgst.buf = NULL;
+	ptr = NULL;
+
+	CKINT_LOG(alloc_buf(rc, &dgst), "ecdsa: dgst buffer could not be allocated\n");
+
+	rlen = data->R.len;
+	slen = data->S.len;
+
+	/*
+	 *        Metadata for complete key = 0x30 and sum of length of all fields
+	 *
+	 *        BER encoding the length of any field
+	 *        actual length of a field = 0x02 and len
+	 *
+	 *        if length <= 127 - 1 byte (actual length)
+	 *        if length > 127 and length <= 255 - 2 bytes (Byte1 = 0x81, Byte2 = actual length)
+	 *        if length > 255 - 3 bytes (Byte1 = 0x82, Byte2 and Byte3 = actual length)
+	 */
+
+
+	total = rlen;
+	if(rlen <= 127)
+		total = total + 2;
+	else if(rlen >= 128 && rlen <= 255)
+		total = total + 3;
+	else
+		total = total + 4;
+
+	total = total + slen;
+	if(slen <= 127)
+		total = total + 2;
+	else if(slen >= 128 && slen <= 255)
+		total = total + 3;
+	else
+		total = total + 4;
+
+	if(total <= 127)
+		extra = 2;
+	else if(total >= 128 && total <= 255)
+		extra = 3;
+	else
+		extra = 4;
+
+	CKINT_LOG(alloc_buf(total + extra + data->msg.len + 1, &in), "ecdsa: in buffer could not be allocated\n");
+	ptr = (&in)->buf;
+	ptr[0] = 0x30;
+	if(extra == 2)
+		memcpy(ptr + 1, &total, 1);
+	if(extra == 3)
+	{
+		ptr[1] = 0x81;
+		memcpy(ptr + 2, &total, 1);
+	}
+	if(extra == 4)
+	{
+		tmp =(unsigned char*) (&total);
+		ptr[1] = 0x82;
+		memcpy(ptr + 2, tmp + 1, 1);
+		memcpy(ptr + 3, tmp , 1);
+	}
+
+	ptr = ptr + extra;
+	ptr = write_field(ptr, data->R.buf, rlen);
+	ptr = write_field(ptr, data->S.buf, slen);
+
+	if(data->msg.buf)
+		memcpy(ptr + 1, data->msg.buf, data->msg.len);
+
+	ret = kcapi_akcipher_verify(handle, in.buf, in.len, dgst.buf, dgst.len, 0);
+
+	if(ret < 0)
+	{
+		data->sigver_success = 0;
+		logger(LOGGER_ERR, "ecdsa: SigVer Failed\n");
+	}
+	else
+	{
+		data->sigver_success = 1;
+		logger(LOGGER_DEBUG, "ecdsa: SigVer Success\n");
+	}
+	ret = 0;
+
+out:
+	kcapi_akcipher_destroy(handle);
+	if(in.buf)
+		free_buf(&in);
+	if(dgst.buf)
+		free_buf(&dgst);
+	if(pk.buf)
+		free_buf(&pk);
+	return ret;
+}
+
+static struct ecdsa_backend kcapi_ecdsa =
+{
+	NULL,
+	ecdsa_keygen,
+	ecdsa_keyver,
+	NULL,
+	ecdsa_sigver,
+	NULL,
+	NULL
+};
+ACVP_DEFINE_CONSTRUCTOR(kcapi_ecdsa_backend)
+static void kcapi_ecdsa_backend(void)
+{
+	register_ecdsa_impl(&kcapi_ecdsa);
+}
