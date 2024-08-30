@@ -1436,7 +1436,7 @@ static int rsa_sigver(struct rsa_sigver_data *data, flags_t parsed_flags)
 
 	CKINT_LOG(alloc_buf(dgst_len, &mac), "rsa: mac buffer could not be allocated\n");
 	ret = kcapi_md_digest(handle1, data->msg.buf, data->msg.len, mac.buf, mac.len);
-	if (0 > ret)
+	if (ret < 0)
 	{
 		logger(LOGGER_ERR, "rsa: message digest generation failed\n");
 		goto out;
@@ -1597,7 +1597,7 @@ static int rsa_siggen(struct rsa_siggen_data *data,
 	CKINT_LOG(alloc_buf(dgst_len, &mac), "rsa: mac buffer cannot be allocated\n");
 	ret = kcapi_md_digest(handle1, data->msg.buf, data->msg.len, mac.buf, mac.len);
 
-	if (0 > ret)
+	if (ret < 0)
 	{
 		logger(LOGGER_ERR, "rsa: message digest generation failed\n");
 		goto out;
