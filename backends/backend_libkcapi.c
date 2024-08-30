@@ -2139,6 +2139,9 @@ static void kcapi_ecdsa_backend(void)
 /************************************************
  * ECDH interface functions
  ************************************************/
+
+#ifdef LIBKCAPI_ECDH_ENABLED
+
 #define ECDH_SS_KEYLEN_P192 24
 #define ECDH_SS_KEYLEN_P256 32
 #define ECDH_SS_KEYLEN_P384 48
@@ -2411,3 +2414,5 @@ static void kcapi_ecdh_backend(void)
 {
 	register_ecdh_impl(&kcapi_ecdh);
 }
+
+#endif /* LIBKCAPI_ECDH_ENABLED */

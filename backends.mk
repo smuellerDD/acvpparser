@@ -38,6 +38,9 @@ ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
 	# Enable ECDSA support
 	CFLAGS += -DLIBKCAPI_ECDSA_ENABLED
 
+	# Enable ECDH support
+	CFLAGS += -DLIBKCAPI_ECDH_ENABLED
+
 	LIBRARIES += kcapi
 endif
 
