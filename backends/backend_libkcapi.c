@@ -1731,6 +1731,9 @@ static void kcapi_rsa_backend(void)
 /************************************************
  * ECDSA interface functions
  ************************************************/
+
+#ifdef LIBKCAPI_ECDSA_ENABLED
+
 #define ECDH_CURVE_STR_P192 "ecdh-nist-p192"
 #define ECDH_CURVE_STR_P256 "ecdh-nist-p256"
 #define ECDH_CURVE_STR_P384 "ecdh-nist-p384"
@@ -2130,3 +2133,5 @@ static void kcapi_ecdsa_backend(void)
 {
 	register_ecdsa_impl(&kcapi_ecdsa);
 }
+
+#endif /* LIBKCAPI_ECDSA_ENABLED */

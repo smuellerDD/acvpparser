@@ -35,6 +35,9 @@ ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
 	# Enable RSA support
 	CFLAGS += -DLIBKCAPI_RSA_ENABLED
 
+	# Enable ECDSA support
+	CFLAGS += -DLIBKCAPI_ECDSA_ENABLED
+
 	LIBRARIES += kcapi
 endif
 
