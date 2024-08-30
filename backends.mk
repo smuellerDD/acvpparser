@@ -41,6 +41,9 @@ ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
 	# Enable ECDH support
 	CFLAGS += -DLIBKCAPI_ECDH_ENABLED
 
+	# Enable DRBG support
+	CFLAGS += -DLIBKCAPI_DRBG_ENABLED
+
 	LIBRARIES += kcapi
 endif
 

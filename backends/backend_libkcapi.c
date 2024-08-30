@@ -2421,6 +2421,8 @@ static void kcapi_ecdh_backend(void)
  * DRBG interface functions
  ************************************************/
 
+#ifdef LIBKCAPI_DRBG_ENABLED
+
 static int drbg_cipher(uint64_t acvp_cipher, uint64_t type, uint32_t pr, char* cipher)
 {
 	if(pr)
@@ -2584,3 +2586,5 @@ static void kcapi_drbg_backend(void)
 {
 	register_drbg_impl(&kcapi_drbg);
 }
+
+#endif /* LIBKCAPI_DRBG_ENABLED */
