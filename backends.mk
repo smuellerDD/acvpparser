@@ -30,7 +30,11 @@ endif
 
 ifeq (libkcapi,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_libkcapi.c
-	C_SRCS += backends/rsakeys.c
+	C_SRCS += backends/backend_libkcapi_rsakeys.c
+
+	# Enable RSA support
+	CFLAGS += -DLIBKCAPI_RSA_ENABLED
+
 	LIBRARIES += kcapi
 endif
 

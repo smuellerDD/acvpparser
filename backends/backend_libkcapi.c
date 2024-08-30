@@ -1203,7 +1203,7 @@ static void libkcapi_hkdf_backend(void)
 /************************************************
  * RSA interface functions
  ************************************************/
-
+#ifdef LIBKCAPI_RSA_ENABLED
 #define CIPHERMAXNAME 63
 
 extern char n1[];
@@ -1726,3 +1726,4 @@ static void kcapi_rsa_backend(void)
 {
 	register_rsa_impl(&kcapi_rsa);
 }
+#endif /* LIBKCAPI_RSA_ENABLED */
