@@ -478,6 +478,29 @@ static int check_filetype(int fd, struct stat *sb)
 }
 #endif
 
+static struct json_object* json_tokener_parse_internal(const char *str,
+						       off_t len)
+{
+	struct json_tokener* tok;
+	struct json_object* obj;
+
+	if (len > INT_MAX || len < 0)
+		return NULL;
+
+	tok = json_tokener_new();
+	if (!tok)
+		return NULL;
+	obj = json_tokener_parse_ex(tok, str, (int)len);
+	if(tok->err != json_tokener_success) {
+		if (obj != NULL)
+			json_object_put(obj);
+		obj = NULL;
+	}
+
+	json_tokener_free(tok);
+	return obj;
+}
+
 int json_read_data(const char *filename, struct json_object **inobj)
 {
 	struct json_object *o;
@@ -509,7 +532,7 @@ int json_read_data(const char *filename, struct json_object **inobj)
 		close(fd);
 		return ret;
 	}
-	o = json_tokener_parse(data);
+	o = json_tokener_parse_internal(data, sb.st_size);
 	munmap(data, (size_t)sb.st_size);
 	close(fd);
 #endif
