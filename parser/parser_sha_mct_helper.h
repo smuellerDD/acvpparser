@@ -40,15 +40,15 @@ static inline int sha_ldt_helper(struct sha_data *data, struct buffer *msg_p)
 	int ret = 0;
 
 	if (data->ldt_expansion_size) {
-		size_t ldt_exp_bytes = data->ldt_expansion_size / 8;
-		size_t i, len;
+		uint64_t ldt_exp_bytes = data->ldt_expansion_size / 8;
+		uint64_t i, len;
 
 		if (SIZE_MAX < ldt_exp_bytes) {
 			logger(LOGGER_ERR, "LDT size not supported on IUT\n");
 			return -EINVAL;
 		}
 
-		CKINT(alloc_buf(ldt_exp_bytes, msg_p));
+		CKINT(alloc_buf((size_t)ldt_exp_bytes, msg_p));
 		for (i = 0; i < msg_p->len; i += len) {
 			len = (ldt_exp_bytes - i) < data->msg.len ?
 			      (ldt_exp_bytes - i) : data->msg.len;
