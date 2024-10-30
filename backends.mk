@@ -302,14 +302,14 @@ ifeq (ippcrypto,$(firstword $(MAKECMDGOALS)))
 	ifeq ($(uname -m),x86_64)
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
-	CFLAGS += -Wno-uninitialized
+	CFLAGS += -Wno-uninitialized -DIPPCP_PREVIEW_LMS
 
 	# Static link for lnx
 	ifeq ($(UNAME_S),Linux)
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a
 		LIBRARIES += crypto ssl
 	else
-		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/ -L $(OPENSSL_ROOT_DIR)/lib/
 		LIBRARIES += crypto ssl ippcp
 	endif
 	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib64/
@@ -333,7 +333,7 @@ ifeq (cryptomb,$(firstword $(MAKECMDGOALS)))
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a
 		LIBRARIES += crypto ssl
 	else
-		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+		LDFLAGS += -L $(IPPCRYPTOROOT)/lib/ -L $(OPENSSL_ROOT_DIR)/lib/
 		LIBRARIES += crypto ssl ippcp crypto_mb
 	endif
 
@@ -357,11 +357,11 @@ ifeq (cryptombssl,$(firstword $(MAKECMDGOALS)))
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a
 		LIBRARIES += crypto ssl
 	else
-	    LDFLAGS += -L $(IPPCRYPTOROOT)/lib/
+	    LDFLAGS += -L $(IPPCRYPTOROOT)/lib/ -L $(OPENSSL_ROOT_DIR)/lib/
 		LIBRARIES += crypto ssl ippcp crypto_mb
 	endif
 
-	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib/ -L $(OPENSSL_ROOT_DIR)/bin/
+	LDFLAGS += -L $(OPENSSL_ROOT_DIR)/lib64/ -L $(OPENSSL_ROOT_DIR)/bin/
 	LD_LIBRARY_PATH += $(OPENSSL_ROOT_DIR)/lib64/
 endif
 

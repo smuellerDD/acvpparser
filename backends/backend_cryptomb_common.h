@@ -379,7 +379,7 @@ __attribute__((aligned(64))) static const int8u pSeed[]  = "\x00\x00\x00\x00\x00
                                                            "\x00\x00";
 
 /* XOR block */
-__INLINE void XorBlock(const void* pSrc1, const void* pSrc2, void* pDst, int len)
+static void XorBlock(const void* pSrc1, const void* pSrc2, void* pDst, int len)
 {
    const Ipp8u* p1 = (const Ipp8u*)pSrc1;
    const Ipp8u* p2 = (const Ipp8u*)pSrc2;

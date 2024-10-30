@@ -688,10 +688,9 @@ static int ippcp_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **pri
             CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippcp_init_set_bn")
 
             sts = ippsRSA_GenerateKeys(E0, N, E, D, pPrvKey, buffScratch.buf,
-                                       0, pPrimeG, ippsPRNGen, pPRNG);
+                                       0, pPrimeG, ippsPRNGenRDRAND, pPRNG);
             if(ippStsInsufficientEntropy == sts) {
 			    logger(LOGGER_WARN, "ippStsInsufficientEntropy\n");
-                e0_data += 2;
                 continue;
             }
             else {
@@ -1293,7 +1292,7 @@ static int ippcp_ecdsa_keygen_en(uint64_t curve, struct buffer *Qx_buf, struct b
     Ipp32u isZeroRes;
     do {
         // get regular private key
-        sts = ippsGFpECPrivateKey(bnPrivate, pEC, ippsPRNGen, pRand);
+        sts = ippsGFpECPrivateKey(bnPrivate, pEC, ippsPRNGenRDRAND, pRand);
         CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsGFpECPrivateKey")
 
         ippsCmpZero_BN(bnPrivate, &isZeroRes);
@@ -1480,7 +1479,7 @@ static int ippcp_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_fla
 
     Ipp32u isZeroRes, isEquRes;
     do { // get new ephemeral private key
-        sts = ippsGFpECPrivateKey(bnEphPrivate, pEC, ippsPRNGen, pRand);
+        sts = ippsGFpECPrivateKey(bnEphPrivate, pEC, ippsPRNGenRDRAND, pRand);
         CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsGFpECPrivateKey")
         ippsCmpZero_BN(bnEphPrivate, &isZeroRes);
         ippsCmp_BN(bnEphPrivate, bnRegPrivate, &isEquRes);
@@ -1740,4 +1739,200 @@ ACVP_DEFINE_CONSTRUCTOR(ippcp_ecdsa_backend)
 static void ippcp_ecdsa_backend(void)
 {
 	register_ecdsa_impl(&ippcp_ecdsa);
+}
+
+/************************************************
+ * LMS interface functions
+ ************************************************/
+// fixed value
+#define IPPCP_LMS_PK_I_BYTESIZE (16)
+
+// stuff functions
+static IppsLMSAlgo getIppsLMSAlgo(const struct buffer lmsMode, Ipp32u* hashByteSize) {
+    const char * lmsTypeStr = (const char *)lmsMode.buf;
+    if(strcmp(lmsTypeStr, "LMS_SHA256_M24_H5") == 0) {
+        *hashByteSize = 24;
+        return LMS_SHA256_M24_H5;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M24_H10") == 0) {
+        *hashByteSize = 24;
+        return LMS_SHA256_M24_H10;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M24_H15") == 0) {
+        *hashByteSize = 24;
+        return LMS_SHA256_M24_H15;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M24_H20") == 0) {
+        *hashByteSize = 24;
+        return LMS_SHA256_M24_H20;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M24_H25") == 0) {
+        *hashByteSize = 24;
+        return LMS_SHA256_M24_H25;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M32_H5") == 0) {
+        *hashByteSize = 32;
+        return LMS_SHA256_M32_H5;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M32_H10") == 0) {
+        *hashByteSize = 32;
+        return LMS_SHA256_M32_H10;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M32_H15") == 0) {
+        *hashByteSize = 32;
+        return LMS_SHA256_M32_H15;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M32_H20") == 0) {
+        *hashByteSize = 32;
+        return LMS_SHA256_M32_H20;
+    }
+    else if(strcmp(lmsTypeStr, "LMS_SHA256_M32_H25") == 0) {
+        *hashByteSize = 32;
+        return LMS_SHA256_M32_H25;
+    }
+    else {
+        *hashByteSize = 0;
+        return 0;
+    }
+}
+
+static IppsLMOTSAlgo getIppsLMOTSAlgo(const struct buffer lmOtsMode, Ipp32u* pCount) {
+    const char * lmotsTypeStr = (const char *)lmOtsMode.buf;
+    if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N24_W1") == 0) {
+        *pCount = 200;
+        return LMOTS_SHA256_N24_W1;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N24_W2") == 0) {
+        *pCount = 101;
+        return LMOTS_SHA256_N24_W2;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N24_W4") == 0) {
+        *pCount = 51;
+        return LMOTS_SHA256_N24_W4;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N24_W8") == 0) {
+        *pCount = 26;
+        return LMOTS_SHA256_N24_W8;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N32_W1") == 0) {
+        *pCount = 265;
+        return LMOTS_SHA256_N32_W1;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N32_W2") == 0) {
+        *pCount = 133;
+        return LMOTS_SHA256_N32_W2;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N32_W4") == 0) {
+        *pCount = 67;
+        return LMOTS_SHA256_N32_W4;
+    }
+    else if(strcmp(lmotsTypeStr, "LMOTS_SHA256_N32_W8") == 0) {
+        *pCount = 34;
+        return LMOTS_SHA256_N32_W8;
+    }
+    else {
+        *pCount = 0;
+        return 0;
+    }
+}
+
+static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
+{
+    (void)parsed_flags;
+    IppStatus status = ippStsNoErr;
+    int ret = 0;
+
+    Ipp32u hashByteSize = 0;
+    Ipp32u pCount = 0;
+    const Ipp32s msgLen = data->msg.len;
+
+    Ipp8u* pScratchBuffer = NULL;
+    IppsLMSPublicKeyState* pPubKey = NULL;
+    IppsLMSSignatureState* pSignature = NULL;
+
+    IppsLMSAlgo lmsType = getIppsLMSAlgo(data->lmsMode, &hashByteSize);
+    IppsLMOTSAlgo lmotsType = getIppsLMOTSAlgo(data->lmOtsMode, &pCount);
+    const IppsLMSAlgoType lmsAlgType = { lmotsType, lmsType };
+    
+    /* Allocate memory for the scratch buffer */
+    int buffSize;
+    status = ippsLMSBufferGetSize(&buffSize, msgLen, lmsAlgType);
+    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSBufferGetSize")
+    pScratchBuffer = malloc(buffSize);
+
+    /* Parse public key vector */
+    IppsLMSAlgo lmsTypePk;
+    dataReverse((Ipp8u*)&lmsTypePk, (const char *)data->pub.buf, sizeof(Ipp32u));
+    
+    IppsLMOTSAlgo lmotsTypePk;
+    dataReverse((Ipp8u*)&lmotsTypePk, (const char *)data->pub.buf+sizeof(Ipp32u), sizeof(Ipp32u));
+    const IppsLMSAlgoType lmsAlgTypePk = { lmotsTypePk, lmsTypePk };
+    
+    const Ipp8u* pI = (const Ipp8u*)data->pub.buf + 2*sizeof(Ipp32u);
+    const Ipp8u* pK = pI + IPPCP_LMS_PK_I_BYTESIZE;
+    
+    /* Allocate memory for the LMS public key state */
+    int ippcpPubKeySize;
+    status = ippsLMSPublicKeyStateGetSize(&ippcpPubKeySize, lmsAlgType);
+    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSPublicKeyStateGetSize")
+    pPubKey = (IppsLMSPublicKeyState*)malloc(ippcpPubKeySize);
+
+    /* Set the LMS public key */
+    status = ippsLMSSetPublicKeyState(lmsAlgTypePk, pI, pK, pPubKey);
+    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSSetPublicKeyState")
+
+    /* Parse signature vector */
+    Ipp32u q = 0;
+    dataReverse((Ipp8u*)&q, (const char *)data->sig.buf, sizeof(Ipp32u));
+    
+    IppsLMOTSAlgo lmotsTypeSig;
+    dataReverse((Ipp8u*)&lmotsTypeSig, (const char *)data->sig.buf+sizeof(Ipp32u), sizeof(Ipp32u));
+    
+    const Ipp8u* pC = (const Ipp8u*)data->sig.buf + 2*sizeof(Ipp32u);
+    const Ipp8u* pY = pC + hashByteSize;
+
+    IppsLMSAlgo lmsTypeSig;
+    dataReverse((Ipp8u*)&lmsTypeSig, (const char *)pY+hashByteSize*pCount, sizeof(Ipp32u));
+    
+    const IppsLMSAlgoType lmsAlgTypeSig = { lmotsTypeSig, lmsTypeSig };   
+    const Ipp8u* pAuthPath = pY + sizeof(Ipp32u) + hashByteSize*pCount;
+
+    /* Allocate memory for the LMS signature state */
+    int sigBuffSize;
+    status = ippsLMSSignatureStateGetSize(&sigBuffSize, lmsAlgTypeSig);
+    if(status != ippStsNoErr) { // Do not throw error, passed parameter in dataset may be intentionally invalid
+        data->sigver_success = 0;
+        goto out;
+    }
+    pSignature = (IppsLMSSignatureState*)malloc(sigBuffSize);
+
+    /* Set the LMS signature */
+    status = ippsLMSSetSignatureState(lmsAlgTypeSig, q, pC, pY, pAuthPath, pSignature);
+    if(status != ippStsNoErr) {  // Do not throw error, passed parameter in dataset may be intentionally invalid
+        data->sigver_success = 0;
+        goto out;
+    }
+
+    int is_valid = 0;
+    /* Verify the LMS signature */
+    status = ippsLMSVerify(data->msg.buf, msgLen, pSignature, &is_valid, pPubKey, pScratchBuffer);
+    data->sigver_success = is_valid;
+
+out:
+    free(pScratchBuffer);
+    free((Ipp8u*)pPubKey);
+    free((Ipp8u*)pSignature);
+
+    return ret;
+}
+
+static struct lms_backend ippcp_lms =
+{
+	ippcp_lms_sigver     /* lms_sigver */
+};
+
+ACVP_DEFINE_CONSTRUCTOR(ippcp_lms_backend)
+static void ippcp_lms_backend(void)
+{
+	register_lms_impl(&ippcp_lms);
 }

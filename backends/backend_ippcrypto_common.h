@@ -25,7 +25,7 @@
 /* Useful defines */
 
 #define IPPCP_DATA_ALIGNMENT  ((int)sizeof(void *))
-static __inline Ipp64s IPP_INT_PTR( const void* ptr )
+static Ipp64s IPP_INT_PTR( const void* ptr )
 {
     union {
         void*   Ptr;
