@@ -336,20 +336,26 @@ static int cryptomb_ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t parsed_
     (void)parsed_flags;
     int ret = 0;
 
+    IppStatus ipp_sts = ippStsNoErr;
+    IppsHashMethod* method = NULL;
+
     /* "Feature" of p521 curve - pad the message with leading zeros to 528 bits */
     int offset = 0;
     ec_type ec = ec_unset;
     switch (data->cipher & ACVP_CURVEMASK) {
 		case ACVP_NISTP256:
             ec = nistp256;
+            method = (IppsHashMethod*)ippsHashMethod_SHA256();
 			break;
 		case ACVP_NISTP384:
             ec = nistp384;
-			break;
+            method = (IppsHashMethod*)ippsHashMethod_SHA384();
+            break;
 		case ACVP_NISTP521:
             ec = nistp521;
             offset = 2;
-			break;
+            method = (IppsHashMethod*)ippsHashMethod_SHA512();
+            break;
 		default:
 			logger(LOGGER_ERR, "Unknown curve\n");
 	}
@@ -369,7 +375,10 @@ static int cryptomb_ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t parsed_
     for(int i = 0; i < MBX_NUM_BUFFERS; i++) {
         memcpy(data_sig_s[i], data->S.buf,data->S.len);
         memcpy(data_sig_r[i], data->R.buf,data->R.len);
-        memcpy(data_msg_digest[i]+offset, data->msg.buf, data->msg.len);
+
+        // Use single-buffer to prepare the hash of the raw messages passed from FIPS Lab
+        ipp_sts = ippsHashMessage_rmf(data->msg.buf, data->msg.len, data_msg_digest[i]+offset, method);
+        CKNULL_LOG((ipp_sts == ippStsNoErr), ipp_sts, "Error in ippsHashMessage_rmf")
 
         memcpy(data_pub_x_init[i], data->Qx.buf,data->Qx.len);
         reverse_bytes((int8u*)data_pub_x[i], (int8u*)data_pub_x_init[i], data->Qx.len);
@@ -405,6 +414,7 @@ static int cryptomb_ecdsa_sigver(struct ecdsa_sigver_data *data, flags_t parsed_
         data->sigver_success = 0;
     }
 
+out:
     return ret;
 }
 
