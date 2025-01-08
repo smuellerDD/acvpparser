@@ -340,6 +340,44 @@ int openssl_cipher(uint64_t cipher, size_t keylen, const EVP_CIPHER **type)
 			goto out;
 		}
 		break;
+#ifdef OPENSSL_30X
+	case ACVP_KW_INV:
+		mask = ACVP_CIPHERTYPE_AES;
+		switch (keylen) {
+		case 16:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-128-WRAP-INV", NULL);
+			break;
+		case 24:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-192-WRAP-INV", NULL);
+			break;
+		case 32:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-256-WRAP-INV", NULL);
+			break;
+		default:
+			logger(LOGGER_WARN, "Unknown key size\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		break;
+	case ACVP_KWP_INV:
+		mask = ACVP_CIPHERTYPE_AES;
+		switch (keylen) {
+		case 16:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-128-WRAP-PAD-INV", NULL);
+			break;
+		case 24:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-192-WRAP-PAD-INV", NULL);
+			break;
+		case 32:
+			l_type = EVP_CIPHER_fetch(NULL, "AES-256-WRAP-PAD-INV", NULL);
+			break;
+		default:
+			logger(LOGGER_WARN, "Unknown key size\n");
+			ret = -EINVAL;
+			goto out;
+		}
+		break;
+#endif
 #endif
 #ifdef OPENSSL_30X
 	case ACVP_CBC_CS1:
@@ -888,9 +926,40 @@ static int openssl_mct_fini(struct sym_data *data, flags_t parsed_flags)
 	return 0;
 }
 
+static int get_keywrap_cipher(struct sym_data *data, uint64_t *kwcipher)
+{
+	uint64_t cipher;
+	int ret;
+
+	CKNULL(data, -EINVAL);
+	CKNULL(kwcipher, -EINVAL);
+	cipher = data->cipher;
+	if (strcmp((char*)data->kwcipher.buf, "inverse") == 0) {
+		switch (cipher) {
+		case ACVP_KW:
+			cipher = ACVP_KW_INV;
+			break;
+		case ACVP_KWP:
+			cipher = ACVP_KWP_INV;
+			break;
+		default:
+			logger(LOGGER_WARN, "Unknown key wrap cipher transformation mode\n");
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+
+	*kwcipher = cipher;
+	ret = 0;
+
+out:
+	return ret;
+}
+
 static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
 {
 	EVP_CIPHER_CTX *ctx = NULL;
+	uint64_t cipher = 0;
 	const EVP_CIPHER *type = NULL;
 	BUFFER_INIT(ct);
 	size_t ctlen;
@@ -899,7 +968,8 @@ static int openssl_kw_encrypt(struct sym_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
-	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
+	CKINT(get_keywrap_cipher(data, &cipher));
+	CKINT(openssl_cipher(cipher, data->key.len, &type));
 
 	ctx = EVP_CIPHER_CTX_new();
 	CKNULL(ctx, -ENOMEM);
@@ -958,13 +1028,15 @@ out:
 static int openssl_kw_decrypt(struct sym_data *data, flags_t parsed_flags)
 {
 	EVP_CIPHER_CTX *ctx = NULL;
+	uint64_t cipher = 0;
 	const EVP_CIPHER *type = NULL;
 	int outl;
 	int ret = 0;
 
 	(void)parsed_flags;
 
-	CKINT(openssl_cipher(data->cipher, data->key.len, &type));
+	CKINT(get_keywrap_cipher(data, &cipher));
+	CKINT(openssl_cipher(cipher, data->key.len, &type));
 
 	ctx = EVP_CIPHER_CTX_new();
 	CKNULL(ctx, -ENOMEM);
