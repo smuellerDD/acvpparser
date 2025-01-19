@@ -58,6 +58,7 @@
 #include "parser_lms.h"
 #include "parser_ml_dsa.h"
 #include "parser_ml_kem.h"
+#include "parser_slh_dsa.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -260,6 +261,9 @@ DEF_CALLBACK_TYPE(ml_dsa_sigver)
 DEF_CALLBACK_TYPE(ml_kem_keygen)
 DEF_CALLBACK_TYPE(ml_kem_encapsulation)
 DEF_CALLBACK_TYPE(ml_kem_decapsulation)
+DEF_CALLBACK_TYPE(slh_dsa_keygen)
+DEF_CALLBACK_TYPE(slh_dsa_siggen)
+DEF_CALLBACK_TYPE(slh_dsa_sigver)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -333,6 +337,9 @@ enum {
 	CB_TYPE_ml_kem_keygen,
 	CB_TYPE_ml_kem_encapsulation,
 	CB_TYPE_ml_kem_decapsulation,
+	CB_TYPE_slh_dsa_keygen,
+	CB_TYPE_slh_dsa_siggen,
+	CB_TYPE_slh_dsa_sigver,
 };
 struct json_callback {
 	union {
@@ -395,6 +402,9 @@ struct json_callback {
 		struct ml_kem_keygen_callback ml_kem_keygen;
 		struct ml_kem_encapsulation_callback ml_kem_encapsulation;
 		struct ml_kem_decapsulation_callback ml_kem_decapsulation;
+		struct slh_dsa_keygen_callback slh_dsa_keygen;
+		struct slh_dsa_siggen_callback slh_dsa_siggen;
+		struct slh_dsa_sigver_callback slh_dsa_sigver;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

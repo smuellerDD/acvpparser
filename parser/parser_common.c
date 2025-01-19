@@ -434,6 +434,9 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(ml_kem_keygen)
 			CB_HANDLER(ml_kem_encapsulation)
 			CB_HANDLER(ml_kem_decapsulation)
+			CB_HANDLER(slh_dsa_keygen)
+			CB_HANDLER(slh_dsa_siggen)
+			CB_HANDLER(slh_dsa_sigver)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -747,10 +750,17 @@ static const struct parser_flagsconv flagsconv_mlkem_type[] = {
 	{0, {NULL}, NULL}
 };
 
-/* Flags conversion for ML-KEM function type */
+/* Flags conversion for ML-DSA / SLH-DSA function type */
 static const struct parser_flagsconv flagsconv_mldsa_type[] = {
 	{FLAG_OP_ML_DSA_TYPE_DETERMINISTIC, {.boolean = true}, "ML-DSA deterministic function"},
 	{FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC, {.boolean = false}, "ML-DSA non-deterministic function"},
+	{0, {NULL}, NULL}
+};
+
+/* Flags conversion for ML-DSA / SLH-DSA function type */
+static const struct parser_flagsconv flagsconv_mldsa_interface[] = {
+	{FLAG_OP_ML_DSA_TYPE_EXTERNAL, {.string = "external"}, "ML-DSA external interface"},
+	{FLAG_OP_ML_DSA_TYPE_INTERNAL, {.string = "internal"}, "ML-DSA internal function"},
 	{0, {NULL}, NULL}
 };
 
@@ -830,9 +840,13 @@ static int parse_flags(const struct json_object *obj, flags_t *parsed_flags)
 	parse_flagblock(obj, parsed_flags, "function", json_type_string,
 			flagsconv_mlkem_type);
 
-	/* ML-KEM */
+	/* ML-DSA / SLH-DSA */
 	parse_flagblock(obj, parsed_flags, "deterministic", json_type_boolean,
 			flagsconv_mldsa_type);
+
+	/* ML-DSA / SLH-DSA */
+	parse_flagblock(obj, parsed_flags, "signatureInterface",
+			json_type_string, flagsconv_mldsa_interface);
 
 	return 0;
 }

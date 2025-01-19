@@ -143,6 +143,13 @@ extern "C"
 #endif
 
 /*
+ * Enable EdDSA support
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+# define OPENSSL_EDDSA
+#endif
+
+/*
  * Enable Keywrap support
  */
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
@@ -196,7 +203,18 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type);
 
 int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		struct buffer *hashzz);
-int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_Name);
+
+int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name);
+
+int openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
+			 int *out_nid, char **curve_name, char **instance_name);
+
+int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig);
+
+int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig,
+		    uint32_t *sig_result);
 
 #ifdef OPENSSL_ENABLE_TLS13
 int openssl_hkdf_extract(const EVP_MD *md,

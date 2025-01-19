@@ -90,6 +90,10 @@ enum pb_message_type {
 	PB_EDDSA_SIGVER,
 	PB_EDDSA_KEYGEN_EN,
 	PB_EDDSA_FREE_KEY,
+
+	PB_SLH_DSA_KEYGEN,
+	PB_SLH_DSA_SIGGEN,
+	PB_SLH_DSA_SIGVER,
 };
 
 /* All values are little endian values - thus proper bitswap is needed */

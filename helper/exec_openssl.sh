@@ -54,7 +54,7 @@ CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 #	Common implementations
 
 # See lib/module_implementations/definition_impl_openssl.c in acvpproxy
-EXEC_COMMON="TDES_C KBKDF KBKDF_3_1 KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2"
+EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2 KBKDF_3_1"
 
 if [ $(uname -m) = "s390x" ]; then
 	#	Implementations for s390x
@@ -102,7 +102,7 @@ elif [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 
 	EXEC="$EXEC_COMMON
 		CE VPAES AES_C
-		CE_GCM_UNROLL8_EOR3 CE_GCM VPAES_GCM AES_C_GCM
+		CE_GCM_UNROLL12_EOR3 CE_GCM_UNROLL8_EOR3 CE_GCM VPAES_GCM AES_C_GCM
 		SHA_CE NEON SHA_ASM SSH_ASM
 		SHA3_CE SHA3_ASM"
 
@@ -112,7 +112,6 @@ elif [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	# See crypto/arm_arch.h.
 	armcap=0
 	if [ $(uname -m) = "aarch64" ]; then
-		lscpu | grep "Flags" | grep -q "asimd" && armcap=$((armcap | (1 << 0)))
 		lscpu | grep "Flags" | grep -q "neon" && armcap=$((armcap | (1 << 0)))
 		lscpu | grep "Flags" | grep -q "aes" && armcap=$((armcap | (1 << 2)))
 		lscpu | grep "Flags" | grep -q "sha1" && armcap=$((armcap | (1 << 3)))
@@ -129,12 +128,14 @@ elif [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 			cat /proc/cpuinfo | grep "CPU part" | grep -q "0xd40" && armcap=$((armcap | (1 << 12)))
 			cat /proc/cpuinfo | grep "CPU part" | grep -q "0xd49" && armcap=$((armcap | (1 << 12)))
 			cat /proc/cpuinfo | grep "CPU part" | grep -q "0xd4f" && armcap=$((armcap | (1 << 12)))
+			# The CPUs below support ARMV8_UNROLL12_EOR3.
+			cat /proc/cpuinfo | grep "CPU part" | grep -q "0xd40" && armcap=$((armcap | (1 << 16)))
+			cat /proc/cpuinfo | grep "CPU part" | grep -q "0xd4f" && armcap=$((armcap | (1 << 16)))
 		fi
 		lscpu | grep "Flags" | grep -q "sve" && armcap=$((armcap | (1 << 13)))
 		lscpu | grep "Flags" | grep -q "sve2" && armcap=$((armcap | (1 << 14)))
 	else
 		# Apple Silicon has had all of these since the start.
-		armcap=$((armcap | (1 << 0)))
 		armcap=$((armcap | (1 << 0)))
 		armcap=$((armcap | (1 << 2)))
 		armcap=$((armcap | (1 << 3)))
@@ -146,9 +147,11 @@ elif [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 			# The CPUs below support ARMV8_UNROLL8_EOR3.
 			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M1" && armcap=$((armcap | (1 << 12)))
 			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M2" && armcap=$((armcap | (1 << 12)))
+			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M3" && armcap=$((armcap | (1 << 12)))
 			# The CPUs below support ARMv8.2 SHA-3 and it is used by OpenSSL.
 			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M1" && armcap=$((armcap | (1 << 15)))
 			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M2" && armcap=$((armcap | (1 << 15)))
+			sysctl -n "machdep.cpu.brand_string" | grep -q "Apple M3" && armcap=$((armcap | (1 << 15)))
 		fi
 	fi
 
@@ -162,13 +165,15 @@ elif [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	CIPHER_CALL_AES_C="OPENSSL_armcap=$((armcap & ~0x05))"
 
 	# Used by default.
-	CIPHER_CALL_CE_GCM_UNROLL8_EOR3="OPENSSL_armcap=$((armcap))"
-	# Remove bit 12 (UNROLL8_EOR3).
-	CIPHER_CALL_CE_GCM="OPENSSL_armcap=$((armcap & ~0x1000))"
-	# Remove bit 12 (UNROLL8_EOR3), 2 (AES), and 5 (PMULL).
-	CIPHER_CALL_VPAES_GCM="OPENSSL_armcap=$((armcap & ~0x1024))"
-	# Remove bit 12 (UNROLL8_EOR3), 2 (AES), 5 (PMULL), and 0 (NEON).
-	CIPHER_CALL_AES_C_GCM="OPENSSL_armcap=$((armcap & ~0x1025))"
+	CIPHER_CALL_CE_GCM_UNROLL12_EOR3="OPENSSL_armcap=$((armcap))"
+	# Remove bit 16 (UNROLL12_EOR3).
+	CIPHER_CALL_CE_GCM_UNROLL8_EOR3="OPENSSL_armcap=$((armcap & ~0x10000))"
+	# Remove bit 16 (UNROLL12_EOR3) and 12 (UNROLL8_EOR3).
+	CIPHER_CALL_CE_GCM="OPENSSL_armcap=$((armcap & ~0x11000))"
+	# Remove bit 16 (UNROLL12_EOR3), 12 (UNROLL8_EOR3), 2 (AES), and 5 (PMULL).
+	CIPHER_CALL_VPAES_GCM="OPENSSL_armcap=$((armcap & ~0x11024))"
+	# Remove bit 16 (UNROLL12_EOR3), 12 (UNROLL8_EOR3), 2 (AES), 5 (PMULL), and 0 (NEON).
+	CIPHER_CALL_AES_C_GCM="OPENSSL_armcap=$((armcap & ~0x11025))"
 
 	# Used by default.
 	CIPHER_CALL_SHA_CE="OPENSSL_armcap=$((armcap))"
@@ -206,6 +211,15 @@ elif [ $(uname -m) = "ppc" -o $(uname -m) = "ppc64" -o $(uname -m) = "ppcle" -o 
 	CIPHER_CALL_SSH_ASM="OPENSSL_ppccap=0"
 	CIPHER_CALL_SHA3_ASM="OPENSSL_ppccap=0"
 
+elif [ $(uname -m) = "mips64" ]; then
+	#	Implementations for MIPS64
+
+	EXEC="$EXEC_COMMON
+		AESASM
+		AESASM_ASM
+		SHA_ASM SSH_ASM
+		SHA3_C"
+
 else
 	#	Implementations for x86
 
@@ -220,29 +234,41 @@ else
 	# See https://www.openssl.org/docs/man3.0/man3/OPENSSL_ia32cap.html
 
 	# Used by default.
+	# This is cipher_hw_aesni_initkey in cipher_aes_hw_aesni.inc.
 	CIPHER_CALL_AESNI=""
 	# Remove bit 57 (AES-NI).
+	# This is ossl_bsaes_* or vpaes_* in cipher_hw_aes_initkey in cipher_aes_hw.c.
 	CIPHER_CALL_BAES_CTASM="OPENSSL_ia32cap=~0x0200000000000000:~0x0"
 	# Remove bit 57 (AES-NI) and 41 (SSSE3).
+	# This is AES_* in cipher_hw_aes_initkey in cipher_aes_hw.c.
 	CIPHER_CALL_AESASM="OPENSSL_ia32cap=~0x0200020000000000:~0x0"
 
 	# Used by default.
+	# This is vaes_gcm in cipher_aes_gcm_hw_vaes_avx512.inc
 	CIPHER_CALL_AESNI_AVX=""
 	# Remove bit 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is aesni_gcm in cipher_aes_gcm_hw_aesni.inc
 	CIPHER_CALL_AESNI_CLMULNI="OPENSSL_ia32cap=~0x1040000000000000:~0x00000600C0230000"
 	# Remove bit 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is also aesni_gcm in cipher_aes_gcm_hw_aesni.inc (historical reasons).
 	CIPHER_CALL_AESNI_ASM="OPENSSL_ia32cap=~0x1040000200000000:~0x00000600C0230000"
 	# Remove bit 57 (AES-NI).
+	# This is gcm_init_avx in gcm128.c.
 	CIPHER_CALL_BAES_CTASM_AVX="OPENSSL_ia32cap=~0x0200000000000000:~0x0"
 	# Remove bit 57 (AES-NI), 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is gcm_init_clmul in gcm128.c.
 	CIPHER_CALL_BAES_CTASM_CLMULNI="OPENSSL_ia32cap=~0x1240000000000000:~0x00000600C0230000"
 	# Remove bit 57 (AES-NI), 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is gcm_init_4bit in gcm128.c.
 	CIPHER_CALL_BAES_CTASM_ASM="OPENSSL_ia32cap=~0x1240000200000000:~0x00000600C0230000"
 	# Remove bit 57 (AES-NI) and 41 (SSSE3).
+	# This is gcm_init_avx in gcm128.c.
 	CIPHER_CALL_AESASM_AVX="OPENSSL_ia32cap=~0x0200020000000000:~0x0"
 	# Remove bit 57 (AES-NI), 41 (SSSE3), 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is gcm_init_clmul in gcm128.c.
 	CIPHER_CALL_AESASM_CLMULNI="OPENSSL_ia32cap=~0x1240020000000000:~0x00000600C0230000"
 	# Remove bit 57 (AES-NI), 41 (SSSE3), 54 (MOVBE), 60 (AVX), 33 (PCLMULQDQ), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
+	# This is gcm_init_4bit in gcm128.c.
 	CIPHER_CALL_AESASM_ASM="OPENSSL_ia32cap=~0x1240020200000000:~0x00000600C0230000"
 
 	# Used by default.

@@ -17,15 +17,12 @@ To compile the code, do the following:
 
 2. add the following to Makefile.in
 
-SSHCAVSOBJS := roaming_dummy.o
-ssh-cavs$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHCAVSOBJS) ssh-cavs.o
-        $(LD) -o $@ $(SSHCAVSOBJS) ssh-cavs.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ssh-cavs$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-cavs.o
+	$(LD) -o $@ ssh-cavs.o $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
 
-3. Add ssh-cavs$(EXEEXT) to the TARGETS line in Makefile.in
+3. configure SSH code with the configure option from 1c.
 
-4. configure SSH code with the configure option from 1c.
-
-5. Compile the ssh code via "make" command
+4. Compile the ssh-cavs code via "make ssh-cavs" command
 
 Execute Test
 ------------

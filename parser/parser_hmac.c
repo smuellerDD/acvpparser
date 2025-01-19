@@ -80,6 +80,11 @@ static int sym_tdes_concatenate_keys(const struct json_array *processdata,
 }
 #endif
 
+// No longer used: due to the definition of CMAC in SP 800-140C, the
+// verification operation must be performed by the IUT and cannot be performed
+// by the parser or the backend. CMAC verification should not be claimed unless
+// the IUT truly has a service or an API function to perform this operation.
+#if 0
 static int cmac_ver_helper(const struct json_array *processdata,
 			   flags_t parsed_flags,
 			   struct json_object *testvector,
@@ -118,6 +123,7 @@ out:
 	free_buf(&buf);
 	return ret;
 }
+#endif
 
 static int hmac_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)
@@ -195,7 +201,7 @@ static int cmac_tester(struct json_object *in, struct json_object *out,
 	}
 
 	/* Referencing the backend functions */
-	const struct hmac_callback cmac_ver = { hmac_backend->hmac_generate, &vector, cmac_ver_helper};
+	const struct hmac_callback cmac_ver = { hmac_backend->cmac_verify, &vector, NULL};
 	const struct json_callback cmac_callback_ver[] = {
 		{ .callback.hmac = cmac_ver, CB_TYPE_hmac, FLAG_OP_CMAC_VER_TEST | FLAG_OP_AFT},
 	};

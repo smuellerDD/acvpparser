@@ -77,9 +77,11 @@ form of connection to the IPC mechanism. The connection is established by implem
 
 The ACVP-Proto code is compiled with the `Makefile.proto`. This makefile has the same calling convention as the ACVP-Parser code by requiring a parameter pointing to the backend to be wrapped. Thus, compile the code as follows:
 
-* ACVP-Parser: `make protobuf`
+* ACVP-Parser: `make protobuf` (in case you compile the ACVP-Proto Linux kernel support in the same code tree, see the remark for the ACVP-Proto Linux Kernel Space compilation below)
 
-* ACVP-Proto: `make -f Makefile.proto <backend>`
+* ACVP-Proto User Space: `make -f Makefile.proto <backend>`
+
+* ACVP-Proto Linux Kernel Space: The ACVP-Proto can be compiled for the Linux kernel space as provided in the `linux_kernel` directory. The backend must be selected in `linux_kernel/Makefile` - at the moment, only the `leancrypto` backend is supported. Once the backend is selected in the `Makefile`, compile it: `make clean && make`. Note, the kernel compilation partially compiles the same C files as the users space ACVP-Parser. As the compilation differs, you MUST do a `make clean` before the `make` invocation. The same applies when you compile the user space ACVP-Parser after you compiled the Linux kernel module.
 
 Note, the ACVP-Proto is implemented such that it can be compiled with any backend developed for the ACVP-Parser, i.e. it uses the same registration logic and callback logic. However, at the time of writing, the ACVP-Proto does not support all algorithm types (i.e. not all algorithm types are covered with a protobuf-handler in `proto/`). Thus, it may be possible that during link time some "register_*" symbols may be found missing. In this case, the protobuf support for those algorithms needs to be added to ACVP-Proto as follows:
 

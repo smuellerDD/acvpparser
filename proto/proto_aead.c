@@ -52,6 +52,7 @@ static int _proto_aead_tester(struct buffer *in, struct buffer *out,
 	data.assoc.len = AeadDataMsg_recv->assoc.len;
 	data.tag.buf = AeadDataMsg_recv->tag.data;
 	data.tag.len = AeadDataMsg_recv->tag.len;
+	data.taglen = AeadDataMsg_recv->taglen;
 	data.cipher = AeadDataMsg_recv->cipher;
 	data.ptlen = AeadDataMsg_recv->ptlen;
 	data.data.buf = AeadDataMsg_recv->data.data;
@@ -72,9 +73,11 @@ static int _proto_aead_tester(struct buffer *in, struct buffer *out,
 	aead_data_msg__pack(&AeadDataMsg_send, out->buf);
 
 out:
-	free_buf(&data.data);
-	free_buf(&data.iv);
-	free_buf(&data.tag);
+	/* Only the tag is allocated */
+	if (!AeadDataMsg_recv->tag.len)
+		free_buf(&data.tag);
+	if (!AeadDataMsg_recv->iv.len)
+		free_buf(&data.iv);
 
 	if (AeadDataMsg_recv)
 		aead_data_msg__free_unpacked(AeadDataMsg_recv, NULL);

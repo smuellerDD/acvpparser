@@ -43,6 +43,7 @@
 #include "pbkdf.pb-c.h"
 #include "rsa.pb-c.h"
 #include "sha.pb-c.h"
+#include "slh-dsa.pb-c.h"
 #include "sym.pb-c.h"
 
 /******************************************************************************
@@ -673,6 +674,7 @@ out:
 static struct hmac_backend pb_hmac_backend =
 {
 	pb_hmac_generate,	/* hmac_generate */
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(pb_hmac_backend_c)
@@ -2757,4 +2759,160 @@ ACVP_DEFINE_CONSTRUCTOR(pb_eddsa_backend)
 static void pb_eddsa_backend(void)
 {
 	register_eddsa_impl(&pb_eddsa);
+}
+
+/************************************************
+ * SLH-DSA interface functions
+ ************************************************/
+
+static int pb_slh_dsa_keygen(struct slh_dsa_keygen_data *data,
+			     flags_t parsed_flags)
+{
+	pb_header_t header;
+	SlhDsaKeygenDataMsg SlhDsaKeygenDataMsg_send =
+		SLH_DSA_KEYGEN_DATA_MSG__INIT;
+	SlhDsaKeygenDataMsg *SlhDsaKeygenDataMsg_recv = NULL;
+	BUFFER_INIT(send);
+	BUFFER_INIT(received);
+	int ret;
+
+	SlhDsaKeygenDataMsg_send.sk_seed.data = data->sk_seed.buf;
+	SlhDsaKeygenDataMsg_send.sk_seed.len = data->sk_seed.len;
+	SlhDsaKeygenDataMsg_send.sk_prf.data = data->sk_prf.buf;
+	SlhDsaKeygenDataMsg_send.sk_prf.len = data->sk_prf.len;
+	SlhDsaKeygenDataMsg_send.pk_seed.data = data->pk_seed.buf;
+	SlhDsaKeygenDataMsg_send.pk_seed.len = data->pk_seed.len;
+	SlhDsaKeygenDataMsg_send.cipher = data->cipher;
+
+	CKINT(pb_alloc_comm_buf(
+		&send, slh_dsa_keygen_data_msg__get_packed_size(&SlhDsaKeygenDataMsg_send),
+		PB_SLH_DSA_KEYGEN, parsed_flags));
+	slh_dsa_keygen_data_msg__pack(&SlhDsaKeygenDataMsg_send, send.buf);
+
+	/*************************** SEND / RECEIVE ***************************/
+	CKINT(pb_send_receive_data(&send, &received, &header));
+
+	/*********************** Process received data ************************/
+
+	CKINT(pb_received_data_check(&header, PB_SLH_DSA_KEYGEN, parsed_flags));
+	SlhDsaKeygenDataMsg_recv =
+		slh_dsa_keygen_data_msg__unpack(NULL, received.len, received.buf);
+	CKNULL(SlhDsaKeygenDataMsg_recv, -EBADMSG);
+
+	CKINT(pb_alloc_copy(&data->pk, &SlhDsaKeygenDataMsg_recv->pk));
+	CKINT(pb_alloc_copy(&data->sk, &SlhDsaKeygenDataMsg_recv->sk));
+
+out:
+	free_buf(&send);
+	free_buf(&received);
+
+	if (SlhDsaKeygenDataMsg_recv)
+		slh_dsa_keygen_data_msg__free_unpacked(SlhDsaKeygenDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static int pb_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	pb_header_t header;
+	SlhDsaSiggenDataMsg SlhDsaSiggenDataMsg_send =
+		SLH_DSA_SIGGEN_DATA_MSG__INIT;
+	SlhDsaSiggenDataMsg *SlhDsaSiggenDataMsg_recv = NULL;
+	BUFFER_INIT(send);
+	BUFFER_INIT(received);
+	int ret;
+
+	SlhDsaSiggenDataMsg_send.msg.data = data->msg.buf;
+	SlhDsaSiggenDataMsg_send.msg.len = data->msg.len;
+	SlhDsaSiggenDataMsg_send.rnd.data = data->rnd.buf;
+	SlhDsaSiggenDataMsg_send.rnd.len = data->rnd.len;
+	SlhDsaSiggenDataMsg_send.sk.data = data->sk.buf;
+	SlhDsaSiggenDataMsg_send.sk.len = data->sk.len;
+	SlhDsaSiggenDataMsg_send.cipher = data->cipher;
+
+	CKINT(pb_alloc_comm_buf(
+		&send, slh_dsa_siggen_data_msg__get_packed_size(&SlhDsaSiggenDataMsg_send),
+		PB_SLH_DSA_SIGGEN, parsed_flags));
+	slh_dsa_siggen_data_msg__pack(&SlhDsaSiggenDataMsg_send, send.buf);
+
+	/*************************** SEND / RECEIVE ***************************/
+	CKINT(pb_send_receive_data(&send, &received, &header));
+
+	/*********************** Process received data ************************/
+
+	CKINT(pb_received_data_check(&header, PB_SLH_DSA_SIGGEN, parsed_flags));
+	SlhDsaSiggenDataMsg_recv =
+		slh_dsa_siggen_data_msg__unpack(NULL, received.len, received.buf);
+	CKNULL(SlhDsaSiggenDataMsg_recv, -EBADMSG);
+
+	CKINT(pb_alloc_copy(&data->sig, &SlhDsaSiggenDataMsg_recv->sig));
+
+out:
+	free_buf(&send);
+	free_buf(&received);
+
+	if (SlhDsaSiggenDataMsg_recv)
+		slh_dsa_siggen_data_msg__free_unpacked(SlhDsaSiggenDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static int pb_slh_dsa_sigver(struct slh_dsa_sigver_data *data,
+			    flags_t parsed_flags)
+{
+	pb_header_t header;
+	SlhDsaSigverDataMsg SlhDsaSigverDataMsg_send =
+		SLH_DSA_SIGVER_DATA_MSG__INIT;
+	SlhDsaSigverDataMsg *SlhDsaSigverDataMsg_recv = NULL;
+	BUFFER_INIT(send);
+	BUFFER_INIT(received);
+	int ret;
+
+	SlhDsaSigverDataMsg_send.msg.data = data->msg.buf;
+	SlhDsaSigverDataMsg_send.msg.len = data->msg.len;
+	SlhDsaSigverDataMsg_send.sig.data = data->sig.buf;
+	SlhDsaSigverDataMsg_send.sig.len = data->sig.len;
+	SlhDsaSigverDataMsg_send.pk.data = data->pk.buf;
+	SlhDsaSigverDataMsg_send.pk.len = data->pk.len;
+	SlhDsaSigverDataMsg_send.cipher = data->cipher;
+
+	CKINT(pb_alloc_comm_buf(
+		&send, slh_dsa_sigver_data_msg__get_packed_size(&SlhDsaSigverDataMsg_send),
+		PB_SLH_DSA_SIGVER, parsed_flags));
+	slh_dsa_sigver_data_msg__pack(&SlhDsaSigverDataMsg_send, send.buf);
+
+	/*************************** SEND / RECEIVE ***************************/
+	CKINT(pb_send_receive_data(&send, &received, &header));
+
+	/*********************** Process received data ************************/
+
+	CKINT(pb_received_data_check(&header, PB_SLH_DSA_SIGVER, parsed_flags));
+	SlhDsaSigverDataMsg_recv =
+		slh_dsa_sigver_data_msg__unpack(NULL, received.len, received.buf);
+	CKNULL(SlhDsaSigverDataMsg_recv, -EBADMSG);
+
+	data->sigver_success = SlhDsaSigverDataMsg_recv->sigver_success;
+
+out:
+	free_buf(&send);
+	free_buf(&received);
+
+	if (SlhDsaSigverDataMsg_recv)
+		slh_dsa_sigver_data_msg__free_unpacked(SlhDsaSigverDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static struct slh_dsa_backend pb_slh_dsa =
+{
+	pb_slh_dsa_keygen,
+	pb_slh_dsa_siggen,
+	pb_slh_dsa_sigver,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(pb_slh_dsa_backend)
+static void pb_slh_dsa_backend(void)
+{
+	register_slh_dsa_impl(&pb_slh_dsa);
 }

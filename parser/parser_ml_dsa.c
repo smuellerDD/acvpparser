@@ -140,36 +140,70 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 	ML_DSA_DEF_CALLBACK(ml_dsa_sigver,
 			    FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC);
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL);
 
 	const struct json_entry ml_dsa_sigver_testresult_entries[] = {
 		{"testPassed",	{.data.integer = &ml_dsa_sigver_vector.sigver_success, WRITER_BOOL},
 			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 	};
 	const struct json_testresult ml_dsa_sigver_testresult = SET_ARRAY(ml_dsa_sigver_testresult_entries, &ml_dsa_sigver_callbacks);
 
 	const struct json_entry ml_dsa_sigver_test_entries[] = {
+		{"pk",		{.data.buf = &ml_dsa_sigver_vector.pk, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 		{"message",	{.data.buf = &ml_dsa_sigver_vector.msg, PARSER_BIN},
 			        FLAG_OP_AFT |  FLAG_OP_ASYM_TYPE_SIGVER |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 		{"signature",	{.data.buf = &ml_dsa_sigver_vector.sig, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
+		{"context",		{.data.buf = &ml_dsa_sigver_vector.context, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
+		{"hashAlg",		{.data.largeint = &ml_dsa_sigver_vector.hashalg, PARSER_CIPHER},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
 	};
 
 	/* search for empty arrays */
 	const struct json_array ml_dsa_sigver_test = SET_ARRAY(ml_dsa_sigver_test_entries, &ml_dsa_sigver_testresult);
 
 	const struct json_entry ml_dsa_sigver_testgroup_entries[] = {
-		{"parameterSet",	{.data.largeint = &ml_dsa_sigver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER},
-		{"pk",		{.data.buf = &ml_dsa_sigver_vector.pk, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER},
+		{"parameterSet",	{.data.largeint = &ml_dsa_sigver_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
+
+		{"signatureInterface",	{.data.buf = &ml_dsa_sigver_vector.interface, PARSER_STRING},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 
 		{"tests",	{.data.array = &ml_dsa_sigver_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER  |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 	};
 	const struct json_array ml_dsa_sigver_testgroup = SET_ARRAY(ml_dsa_sigver_testgroup_entries, NULL);
 
@@ -180,13 +214,17 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 				   FLAG_OP_GDT | FLAG_OP_AFT |
 				   FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC,
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL,
 				   ml_dsa_siggen_helper);
 
 	const struct json_entry ml_dsa_siggen_testresult_entries[] = {
 		{"signature",		{.data.buf = &ml_dsa_siggen_vector.sig, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC}
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL}
 	};
 	const struct json_testresult ml_dsa_siggen_testresult =
 	SET_ARRAY(ml_dsa_siggen_testresult_entries, &ml_dsa_siggen_callbacks);
@@ -196,12 +234,28 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 		/* canonical and unverifiable G generation */
 		{"message",	{.data.buf = &ml_dsa_siggen_vector.msg, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 		{"rnd",		{.data.buf = &ml_dsa_siggen_vector.rnd, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC | FLAG_OPTIONAL},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
 		{"sk",		{.data.buf = &ml_dsa_siggen_vector.sk, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC | FLAG_OPTIONAL},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
+		{"context",		{.data.buf = &ml_dsa_siggen_vector.context, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
+		{"hashAlg",		{.data.largeint = &ml_dsa_siggen_vector.hashalg, PARSER_CIPHER},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL | FLAG_OPTIONAL},
 	};
 
 	const struct json_array ml_dsa_siggen_test = SET_ARRAY(ml_dsa_siggen_test_entries, &ml_dsa_siggen_testresult);
@@ -209,7 +263,9 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ml_dsa_siggen_testgroup_result_entries[] = {
 		{"pk",		{.data.buf = &ml_dsa_siggen_vector.pk, WRITER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 	};
 	/*
 	 * The NULL for the function callbacks implies that the n and e
@@ -221,11 +277,20 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 		/* L, N are provided for SP800-56A rev 1 / FIPS 186-4 siggen */
 		{"parameterSet",	{.data.largeint = &ml_dsa_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
+		{"signatureInterface",	{.data.buf = &ml_dsa_siggen_vector.interface, PARSER_STRING},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
+				   FLAG_OP_SLH_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 
 		{"tests",	{.data.array = &ml_dsa_siggen_test, PARSER_ARRAY},		FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
-				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC},
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
 	};
 
 	const struct json_array ml_dsa_siggen_testgroup =

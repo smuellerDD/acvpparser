@@ -42,8 +42,7 @@ extern "C"
  * @var mac [out] Message digest of the message in binary form.
  *		    Note, the backend must allocate the buffer of the right
  *		    size before storing data in it. The parser frees the memory.
- * @var verify_result [disregard] Please disregard this variable, it is used
- *				    by the parser.
+ * @var verify_result [out] Result of the CMAC verification operation.
  * @var cipher [in] Cipher specification as defined in cipher_definitions.h
  */
 struct hmac_data {
@@ -65,10 +64,15 @@ struct hmac_data {
  * @var hmac_generate Perform a keyed message digest operation with the given
  *			data. Note, despite the name, HMAC and CMAC is covered
  *			by the callback.
+ * @var cmac_verify Perform a CMAC verification operation with the given data.
+ * 			Note that the parser backend is NOT allowed to perform a
+ * 			verification by generating the tag and comparing it with
+ * 			the expected tag; this MUST be done by the IUT.
  */
 
 struct hmac_backend {
 	int (*hmac_generate)(struct hmac_data *data, flags_t parsed_flags);
+	int (*cmac_verify)(struct hmac_data *data, flags_t parsed_flags);
 };
 
 void register_hmac_impl(struct hmac_backend *implementation);

@@ -304,6 +304,7 @@ static int __init proto_init(void)
 	_init_register_proto_kdf108();
 	_init_register_proto_kmac();
 	_init_register_proto_ml_dsa();
+	_init_register_proto_slh_dsa();
 	_init_register_proto_ml_kem();
 	_init_register_proto_pbkdf();
 	_init_register_proto_rsa();

@@ -77,7 +77,18 @@ struct ml_dsa_keygen_data {
  * @var sk [in] ML-DSA secret key to be used for signature generation as
  *		provided by the ACVP server. NOTE: if this buffer is present,
  *		privkey is not used.
+ * @var context [in] SLH-DSA context to be used. Note, this may also be a NULL
+ *		     buffer as the context is optional.
+ * @var interface [in] Interface type: string of:
+ *		       "external" - external interface
+ *		       "internal" - internal interface
  * @var cipher [in] Cipher specification as defined in cipher_definitions.h
+ *		    This value refers to the SLH-DSA algorithm type /
+ *		    parameter set.
+ * @var hashalg [in] Hash algorith following the cipher specification as defined
+ *		     in cipher_definitions.h - this content is optional and
+ *		     if there is a hash algorithm specified, it implies
+ *		     pre-hashed SLH-DSA
  */
 struct ml_dsa_siggen_data {
 	struct buffer msg;
@@ -85,7 +96,10 @@ struct ml_dsa_siggen_data {
 	struct buffer pk;
 	struct buffer rnd;
 	struct buffer sk;
+	struct buffer context;
+	struct buffer interface;
 	void *privkey;
+	uint64_t hashalg;
 	uint64_t cipher;
 };
 
@@ -97,7 +111,18 @@ struct ml_dsa_siggen_data {
  * @var msg [in] Message to be signed
  * @var sig [in] Signature to be verified
  * @var pk [in] Public key in binary form to be used for the verification op.
+ * @var context [in] SLH-DSA context to be used. Note, this may also be a NULL
+ *		     buffer as the context is optional.
+ * @var interface [in] Interface type: string of:
+ *		       "external" - external interface
+ *		       "internal" - internal interface
  * @var cipher [in] Cipher specification as defined in cipher_definitions.h
+ *		    This value refers to the SLH-DSA algorithm type /
+ *		    parameter set.
+ * @var hashalg [in] Hash algorith following the cipher specification as defined
+ *		     in cipher_definitions.h - this content is optional and
+ *		     if there is a hash algorithm specified, it implies
+ *		     pre-hashed SLH-DSA
  * @var sigver_success [out] Is ML-DSA signature verification with given
  *			     parameters successful (1) or whether it
  *			     failed (0).
@@ -106,7 +131,10 @@ struct ml_dsa_sigver_data {
 	struct buffer msg;
 	struct buffer sig;
 	struct buffer pk;
+	struct buffer context;
+	struct buffer interface;
 	uint64_t cipher;
+	uint64_t hashalg;
 	uint32_t sigver_success;
 };
 

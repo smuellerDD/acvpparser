@@ -60,6 +60,7 @@
 #include "parser_lms.h"
 #include "parser_ml_dsa.h"
 #include "parser_ml_kem.h"
+#include "parser_slh_dsa.h"
 
 #include "safeprimes.h"
 

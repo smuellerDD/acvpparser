@@ -42,6 +42,23 @@
 #include "sha3_avx512.h"
 #include "sha3_c.h"
 #include "sha3_riscv_asm.h"
+
+#include "sha256_arm_ce.h"
+#include "sha256_arm_neon.h"
+#include "sha256_avx2.h"
+#include "sha256_c.h"
+#include "sha256_riscv.h"
+#include "sha256_riscv_zbb.h"
+#include "sha256_shani.h"
+
+#include "sha512_arm_ce.h"
+#include "sha512_arm_neon.h"
+#include "sha512_avx2.h"
+#include "sha512_c.h"
+#include "sha512_riscv.h"
+#include "sha512_riscv_zbb.h"
+#include "sha512_shani.h"
+
 #ifdef __x86_64__
 #include "shake_4x_avx2.h"
 #include "kyber_kem_avx2.h"
@@ -337,15 +354,137 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 {
 	const char *envstr = getenv("LC_SHA3");
 
-	switch (cipher) {
-	case ACVP_HMACSHA2_256:
-	case ACVP_SHA256:
-		*lc_hash = lc_sha256;
-		return 0;
-	case ACVP_HMACSHA2_512:
-	case ACVP_SHA512:
-		*lc_hash = lc_sha512;
-		return 0;
+	if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: C\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_c;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_c;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_c;
+			return 0;
+		}
+#ifdef __amd64
+	} else if (envstr && !strncasecmp(envstr, "AVX2", 4)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: AVX2\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_avx2;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_avx2;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_avx2;
+			return 0;
+		}
+	} else if (envstr && !strncasecmp(envstr, "AESNI", 4)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: SHA-NI\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_shani;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_shani;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_shani;
+			return 0;
+		}
+#elif (defined(__arm__) || defined(__aarch64__))
+	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 8)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM NEON\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_arm_neon;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_arm_neon;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_arm_neon;
+			return 0;
+		}
+	} else if (envstr && !strncasecmp(envstr, "ARM_CE", 6)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: ARM CE\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_arm_ce;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_arm_ce;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_arm_ce;
+			return 0;
+		}
+#endif
+	} else if (envstr && !strncasecmp(envstr, "RISCV64", 7)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: RISC-V 64\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_riscv;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_riscv;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_riscv;
+			return 0;
+		}
+	} else if (envstr && !strncasecmp(envstr, "RISCV64_ZBB", 11)) {
+		logger(LOGGER_VERBOSE, "SHA-2 implementation: RISC-V 64 Zbb assembler\n");
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256_riscv_zbb;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384_riscv_zbb;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512_riscv_zbb;
+			return 0;
+		}
+
+	} else {
+		switch (cipher) {
+		case ACVP_HMACSHA2_256:
+		case ACVP_SHA256:
+			*lc_hash = lc_sha256;
+			return 0;
+		case ACVP_HMACSHA2_384:
+		case ACVP_SHA384:
+			*lc_hash = lc_sha384;
+			return 0;
+		case ACVP_HMACSHA2_512:
+		case ACVP_SHA512:
+			*lc_hash = lc_sha512;
+			return 0;
+		}
 	}
 
 	//printf("Test leancrypto SHA3 %s implementation\n",
@@ -624,6 +763,98 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		}
 #endif
 #endif
+	} else if (envstr && !strncasecmp(envstr, "RISCV64", 7)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: RISC-V 64\n");
+		switch (cipher) {
+		case ACVP_HMACSHA3_224:
+		case ACVP_SHA3_224:
+			*lc_hash = lc_sha3_224_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "RISCV64 assembler SHA3-224");
+			break;
+		case ACVP_HMACSHA3_256:
+		case ACVP_SHA3_256:
+			*lc_hash = lc_sha3_256_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "RISCV64 assembler SHA3-256");
+			break;
+		case ACVP_HMACSHA3_384:
+		case ACVP_SHA3_384:
+			*lc_hash = lc_sha3_384_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "RISCV64 assembler SHA3-384");
+			break;
+		case ACVP_HMACSHA3_512:
+		case ACVP_SHA3_512:
+			*lc_hash = lc_sha3_512_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "RISCV64 assembler SHA3-512");
+			break;
+		case ACVP_SHAKE128:
+			*lc_hash = lc_shake128_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "RISCV64 assembler SHAKE-128");
+			break;
+		case ACVP_SHAKE256:
+			*lc_hash = lc_shake256_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "RISCV64 assembler SHAKE-256");
+			break;
+		case ACVP_KMAC128:
+		case ACVP_CSHAKE128:
+			*lc_hash = lc_cshake128_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "RISCV64 assembler cSHAKE-128");
+			break;
+		case ACVP_KMAC256:
+		case ACVP_CSHAKE256:
+			*lc_hash = lc_cshake256_riscv_asm;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "RISCV64 assembler cSHAKE-256");
+			break;
+		default:
+			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
+			cipher);
+			return -EOPNOTSUPP;
+		}
+	} else if (envstr && !strncasecmp(envstr, "RISCV64_ZBB", 11)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: RISC-V 64 Zbb assembler\n");
+		switch (cipher) {
+		case ACVP_HMACSHA3_224:
+		case ACVP_SHA3_224:
+			*lc_hash = lc_sha3_224_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "RISCV64 Zbb assembler SHA3-224");
+			break;
+		case ACVP_HMACSHA3_256:
+		case ACVP_SHA3_256:
+			*lc_hash = lc_sha3_256_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "RISCV64 Zbb assembler SHA3-256");
+			break;
+		case ACVP_HMACSHA3_384:
+		case ACVP_SHA3_384:
+			*lc_hash = lc_sha3_384_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "RISCV64 Zbb assembler SHA3-384");
+			break;
+		case ACVP_HMACSHA3_512:
+		case ACVP_SHA3_512:
+			*lc_hash = lc_sha3_512_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "RISCV64 Zbb assembler SHA3-512");
+			break;
+		case ACVP_SHAKE128:
+			*lc_hash = lc_shake128_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_shake128_c, "RISCV64 Zbb assembler SHAKE-128");
+			break;
+		case ACVP_SHAKE256:
+			*lc_hash = lc_shake256_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_shake256_c, "RISCV64 Zbb assembler SHAKE-256");
+			break;
+		case ACVP_KMAC128:
+		case ACVP_CSHAKE128:
+			*lc_hash = lc_cshake128_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_cshake128_c, "RISCV64 Zbb assembler cSHAKE-128");
+			break;
+		case ACVP_KMAC256:
+		case ACVP_CSHAKE256:
+			*lc_hash = lc_cshake256_riscv_asm_zbb;
+			lc_hash_check_c(*lc_hash, lc_cshake256_c, "RISCV64 Zbb assembler cSHAKE-256");
+			break;
+		default:
+			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
+			cipher);
+			return -EOPNOTSUPP;
+		}
 	} else {
 		logger(LOGGER_VERBOSE, "SHA-3 implementation: default\n");
 		switch (cipher) {
@@ -664,6 +895,59 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		}
 	}
 
+	return 0;
+}
+
+static int lc_get_common_hash(uint64_t cipher, const struct lc_hash **lc_hash)
+{
+	switch (cipher) {
+	case ACVP_HMACSHA2_256:
+	case ACVP_SHA256:
+		*lc_hash = lc_sha256;
+		return 0;
+	case ACVP_HMACSHA2_384:
+	case ACVP_SHA384:
+		*lc_hash = lc_sha384;
+		return 0;
+	case ACVP_HMACSHA2_512:
+	case ACVP_SHA512:
+		*lc_hash = lc_sha512;
+		return 0;
+	case ACVP_HMACSHA3_224:
+	case ACVP_SHA3_224:
+		*lc_hash = lc_sha3_224;
+		break;
+	case ACVP_HMACSHA3_256:
+	case ACVP_SHA3_256:
+		*lc_hash = lc_sha3_256;
+		break;
+	case ACVP_HMACSHA3_384:
+	case ACVP_SHA3_384:
+		*lc_hash = lc_sha3_384;
+		break;
+	case ACVP_HMACSHA3_512:
+	case ACVP_SHA3_512:
+		*lc_hash = lc_sha3_512;
+		break;
+	case ACVP_SHAKE128:
+		*lc_hash = lc_shake128;
+		break;
+	case ACVP_SHAKE256:
+		*lc_hash = lc_shake256;
+		break;
+	case ACVP_KMAC128:
+	case ACVP_CSHAKE128:
+		*lc_hash = lc_cshake128;
+		break;
+	case ACVP_KMAC256:
+	case ACVP_CSHAKE256:
+		*lc_hash = lc_cshake256;
+		break;
+	default:
+		logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
+		cipher);
+		return -EOPNOTSUPP;
+	}
 	return 0;
 }
 
@@ -939,6 +1223,7 @@ out:
 static struct hmac_backend lc_hmac_backend =
 {
 	lc_hmac_generate,	/* hmac_generate */
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(lc_hmac_backend_c)
@@ -1373,337 +1658,6 @@ static const struct lc_rng lc_static_drng = {
 	.zero = lc_static_rng_zero,
 };
 
-#if 0
-#include <getopt.h>
-
-static int lc_compare(const uint8_t *act, const uint8_t *exp,
-		      const size_t len, const char *info)
-{
-	if (memcmp(act, exp, len)) {
-		unsigned int i;
-
-		printf("Expected %s ", info);
-		for (i = 0; i < len; i++)
-			printf("0x%.2x ", *(exp + i));
-
-		printf("\n");
-
-		printf("Actual %s ", info);
-		for (i = 0; i < len; i++)
-			printf("0x%.2x ", *(act + i));
-
-		printf("\n");
-
-		return 1;
-	}
-
-	return 0;
-}
-
-#include "dilithium_tester_vectors_level2_hex.h"
-static int lc_dilithium_one(const struct dilithium_testvector_hex *vector)
-{
-	struct lc_dilithium_pk d_pk;
-	struct lc_dilithium_sk d_sk;
-	struct lc_dilithium_sig d_sig;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret = 0;
-
-	s_rng_state.seed = vector->seed;
-	s_rng_state.seedlen = sizeof(vector->seed);
-
-	CKINT(lc_dilithium_keypair_c(&d_pk, &d_sk, &s_drng));
-	CKINT(lc_dilithium_sign_c(&d_sig, vector->msg, 8, &d_sk, NULL));
-
-	ret += lc_compare(d_pk.pk, vector->pk, LC_DILITHIUM_PUBLICKEYBYTES,
-			  "Dilithium PK");
-	ret += lc_compare(d_sk.sk, vector->sk, LC_DILITHIUM_SECRETKEYBYTES,
-			  "Dilithium SK");
-	ret += lc_compare(d_sig.sig, vector->sig, LC_DILITHIUM_CRYPTO_BYTES,
-			  "Dilithium Sig");
-
-	if (lc_dilithium_verify_c(&d_sig, vector->msg, 8, &d_pk))
-		printf("Signature verification failed!\n");
-
-out:
-	return ret;
-}
-
-static int lc_dilithium_gen_one(unsigned int err)
-{
-	struct lc_dilithium_pk d_pk;
-	struct lc_dilithium_sk d_sk;
-	struct lc_dilithium_sig d_sig;
-	struct static_rng s_rng_state;
-	uint8_t msg[4096] = { 0 };
-	size_t msg_len;
-	uint8_t seed[32];
-	uint32_t errorlocation = 0;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret = 0;
-
-	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, msg, sizeof(msg)));
-
-	/* msg_len is defined by the first 12 bits of the msg buf */
-	msg_len = (size_t)msg[0];
-	msg_len |= (((size_t)msg[1]) & 7) << 8;
-
-	if (msg_len > sizeof(msg)) {
-		printf("msg_len generation failure %zu %zu\n", msg_len,
-		       sizeof(msg));
-		return -EFAULT;
-	}
-
-	memcpy(&errorlocation, msg, sizeof(errorlocation));
-
-	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, seed, sizeof(seed)));
-	s_rng_state.seed = seed;
-	s_rng_state.seedlen = sizeof(seed);
-
-	CKINT(lc_dilithium_keypair_c(&d_pk, &d_sk, &s_drng));
-	CKINT(lc_dilithium_sign_c(&d_sig, msg, msg_len, &d_sk, NULL));
-
-	switch (err) {
-	case 1:
-		printf("error added: in signature\n");
-		errorlocation &= (sizeof(d_sig.sig) - 1);
-		d_sig.sig[errorlocation] = (d_sig.sig[errorlocation] + 1) & 0xff;
-		break;
-	case 2:
-		printf("error added: in pk\n");
-		errorlocation &= (sizeof(d_pk.pk) - 1);
-		d_pk.pk[errorlocation] = (d_pk.pk[errorlocation] + 1) & 0xff;
-		break;
-	case 3:
-		printf("error added: in sk\n");
-		errorlocation &= (sizeof(d_sk.sk) - 1);
-		d_sk.sk[errorlocation] = (d_sk.sk[errorlocation] + 1) & 0xff;
-		break;
-	default:
-		break;
-	}
-
-#if LC_DILITHIUM_MODE == 2
-	printf("parameter set: ML-DSA-44\n");
-#elif LC_DILITHIUM_MODE == 3
-	printf("parameter set: ML-DSA-65\n");
-#else
-	printf("parameter set: ML-DSA-87\n");
-#endif
-
-	bin2print(seed, sizeof(seed), stdout, "seed");
-	bin2print(d_pk.pk, sizeof(d_pk.pk), stdout, "pk");
-	bin2print(d_sk.sk, sizeof(d_sk.sk), stdout, "sk");
-	printf("deterministic signature: true\n");
-	bin2print(msg, msg_len, stdout, "message");
-	bin2print(d_sig.sig, sizeof(d_sig.sig), stdout, "sig");
-
-	printf("\n");
-
-out:
-	return ret;
-}
-
-static int lc_dilithium_gen_all(void)
-{
-	unsigned int i;
-	int ret = 0;
-
-	for (i = 0; i < 10; i++) {
-		ret += lc_dilithium_gen_one(0);
-	}
-
-	ret += lc_dilithium_gen_one(1);
-	ret += lc_dilithium_gen_one(2);
-	ret += lc_dilithium_gen_one(3);
-
-	return ret;
-}
-
-static int lc_dilithium_all(void)
-{
-	unsigned int i;
-	int ret = 0;
-
-	for (i = 0; i < ARRAY_SIZE(dilithium_testvectors_cavp_data); i++) {
-		ret += lc_dilithium_one(&dilithium_testvectors_cavp_data[i]);
-	}
-
-	return ret;
-}
-
-/************************************************
- * Kyber
- ************************************************/
-
-static int lc_kyber_gen_one(unsigned int err)
-{
-	struct lc_kyber_pk d_pk;
-	struct lc_kyber_sk d_sk;
-	struct lc_kyber_ss d_ss;
-	struct lc_kyber_ct d_ct;
-	struct static_rng s_rng_state;
-	uint8_t seed[32];
-	uint32_t errorlocation = 0;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret = 0;
-
-	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, (void *)&errorlocation,
-			      sizeof(errorlocation)));
-
-	CKINT(lc_rng_generate(lc_seeded_rng, NULL, 0, seed, sizeof(seed)));
-	s_rng_state.seed = seed;
-	s_rng_state.seedlen = sizeof(seed);
-
-	CKINT(lc_kyber_keypair_c(&d_pk, &d_sk, &s_drng));
-	CKINT(lc_kyber_enc_c(&d_ct, &d_ss, &d_pk, &s_drng));
-
-	switch (err) {
-	case 1:
-		printf("error added: in shared secret\n");
-		errorlocation &= (sizeof(d_ss.ss) - 1);
-		d_ss.ss[errorlocation] = (d_ss.ss[errorlocation] + 1) & 0xff;
-		break;
-	case 2:
-		printf("error added: in pk\n");
-		errorlocation &= (sizeof(d_pk.pk) - 1);
-		d_pk.pk[errorlocation] = (d_pk.pk[errorlocation] + 1) & 0xff;
-		break;
-	case 3:
-		printf("error added: in sk\n");
-		errorlocation &= (sizeof(d_sk.sk) - 1);
-		d_sk.sk[errorlocation] = (d_sk.sk[errorlocation] + 1) & 0xff;
-		break;
-	case 4:
-		printf("error added: in ciphertext\n");
-		errorlocation &= (sizeof(d_ct.ct) - 1);
-		d_ct.ct[errorlocation] = (d_ct.ct[errorlocation] + 1) & 0xff;
-		break;
-	default:
-		break;
-	}
-
-#if LC_KYBER_K == 2
-	printf("parameter set: ML-KEM-512\n");
-#elif LC_KYBER_K == 3
-	printf("parameter set: ML-KEM-768\n");
-#else
-	printf("parameter set: ML-KEM-1024\n");
-#endif
-
-	bin2print(seed, sizeof(seed), stdout, "seed");
-	bin2print(d_pk.pk, sizeof(d_pk.pk), stdout, "pk");
-	bin2print(d_sk.sk, sizeof(d_sk.sk), stdout, "sk");
-	bin2print(d_ct.ct, sizeof(d_ct.ct), stdout, "ct");
-	bin2print(d_ss.ss, sizeof(d_ss.ss), stdout, "ss");
-
-	printf("\n");
-
-out:
-	return ret;
-}
-
-static int lc_kyber_gen_all(void)
-{
-	unsigned int i;
-	int ret = 0;
-
-	for (i = 0; i < 10; i++) {
-		ret += lc_kyber_gen_one(0);
-	}
-
-	ret += lc_kyber_gen_one(1);
-	ret += lc_kyber_gen_one(2);
-	ret += lc_kyber_gen_one(3);
-	ret += lc_kyber_gen_one(4);
-
-	return ret;
-}
-
-/************************************************
- * Specific calls
- ************************************************/
-static void lc_fips_usage(void)
-{
-	fprintf(stderr, "Additional options:\n");
-	fprintf(stderr, "\t-t --dilithium_test\tPerform testing\n");
-	fprintf(stderr, "\t-g --dilithium_generate\tGenerate vectors\n");
-}
-
-static int lc_main(int argc, char *argv[])
-{
-	int ret = 0, c = 0;
-
-	optind = 0;
-
-	while (1) {
-		int opt_index = 0;
-		static struct option options[] = {
-			{"dilithium_test",	no_argument,  0, 'd'},
-			{"dilithium_generate",	no_argument,  0, 'g'},
-			{"kyber_test",		no_argument,  0, 'k'},
-			{"kyber_generate",	no_argument,  0, 'i'},
-
-			{0, 0, 0, 0}
-		};
-
-		c = getopt_long(argc, argv, "dgki", options, &opt_index);
-		if (-1 == c)
-			break;
-		switch (c) {
-		case 0:
-			switch (opt_index) {
-			case 0:
-				return lc_dilithium_all();
-			case 1:
-				return lc_dilithium_gen_all();
-
-			case 2:
-				/* TODO */
-				return lc_kyber_gen_all();
-			case 3:
-				return lc_kyber_gen_all();
-
-			default:
-				return -EINVAL;
-			}
-			break;
-
-		case 'd':
-			return lc_dilithium_all();
-		case 'g':
-			return lc_dilithium_gen_all();
-
-		case 'k':
-			/* TODO */
-			return lc_kyber_gen_all();
-		case 'i':
-			return lc_kyber_gen_all();
-
-		default:
-			return -EINVAL;
-		}
-	}
-
-	return ret;
-}
-
-struct main_extension lc_main_extension_def = {
-	lc_main,
-	lc_fips_usage,
-};
-
-ACVP_DEFINE_CONSTRUCTOR(lc_main_extension)
-static void lc_main_extension(void)
-{
-	register_main_extension(&lc_main_extension_def);
-}
-#endif
-
 /************************************************
  * EDDSA interface functions
  ************************************************/
@@ -1882,91 +1836,139 @@ static void lc_eddsa_backend(void)
  * ML-DSA interface functions
  ************************************************/
 
-/******************************** Dilithium 87 ********************************/
-
-struct dilithium_87_funcs {
-	int (*dilithium_keypair_from_seed)(struct lc_dilithium_87_pk *pk,
-					   struct lc_dilithium_87_sk *sk,
-					   const uint8_t *seed, size_t seedlen);
-	int (*dilithium_sign)(struct lc_dilithium_87_sig *sig,
-			      const uint8_t *m, size_t mlen,
-			      const struct lc_dilithium_87_sk *sk,
-			      struct lc_rng_ctx *rng_ctx);
-	int (*dilithium_verify)(const struct lc_dilithium_87_sig *sig,
-				const uint8_t *m, size_t mlen,
-				const struct lc_dilithium_87_pk *pk);
-};
-
-static int lc_get_dilithium_87(struct dilithium_87_funcs *funcs)
-{
+/* TODO roll in */
+#if 0
 	const char *envstr = getenv("LC_DILITHIUM");
 
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
+	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6)) ||
+	    (envstr && !strncasecmp(envstr, "riscv64_rvv", 11))) {
 		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: common\n");
 		funcs->dilithium_keypair_from_seed =
 			lc_dilithium_87_keypair_from_seed;
-		funcs->dilithium_sign = lc_dilithium_87_sign;
-		funcs->dilithium_verify = lc_dilithium_87_verify;
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
-		funcs->dilithium_keypair_from_seed =
-			lc_dilithium_87_keypair_from_seed_c;
-		funcs->dilithium_sign = lc_dilithium_87_sign_c;
-		funcs->dilithium_verify = lc_dilithium_87_verify_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Dilithium-87 implementation %s\n", envstr);
+		funcs->dilithium_sign = lc_dilithium_87_sign_ctx;
+		funcs->dilithium_verify = lc_dilithium_87_verify_ctx;
+	} else if (envstr ||
+		   (envstr && !strncasecmp(envstr, "riscv64_asm", 11))) {
+		logger(LOGGER_VERBOSE,
+		       "Dilithium-87 implementation: RISCV64 ASM\n");
+#endif
+
+extern void lc_cpu_feature_disable(void);
+extern void lc_cpu_feature_enable(void);
+static void lc_ml_set_impl(void)
+{
+	const char *envstr = getenv("LC_DILTHIUM");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_disable();
+}
+
+static void lc_ml_reset_impl(void)
+{
+	const char *envstr = getenv("LC_DILTHIUM");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_enable();
+}
+
+static int lc_ml_type(uint64_t cipher, enum lc_dilithium_type *type)
+{
+	lc_ml_set_impl();
+
+	switch (cipher) {
+	case ACVP_ML_DSA_44:
+		*type = LC_DILITHIUM_44;
+		break;
+	case ACVP_ML_DSA_65:
+		*type = LC_DILITHIUM_65;
+		break;
+	case ACVP_ML_DSA_87:
+		*type = LC_DILITHIUM_87;
+		break;
+	default:
 		return -EOPNOTSUPP;
 	}
 
 	return 0;
 }
 
-static int lc_ml_dsa_87_keygen(struct ml_dsa_keygen_data *data,
-			       flags_t parsed_flags)
+static int lc_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
+			    flags_t parsed_flags)
 {
-	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_87_pk lc_pk;
-	struct lc_dilithium_87_sk lc_sk;
-
+	struct lc_dilithium_pk lc_pk;
+	struct lc_dilithium_sk lc_sk;
+	enum lc_dilithium_type type;
+	size_t len;
+	uint8_t *ptr;
 	int ret;
 
 	(void)parsed_flags;
 
-	CKINT(lc_get_dilithium_87(&funcs));
+	CKINT(lc_ml_type(data->cipher, &type));
 
-	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk, data->seed.buf,
-						data->seed.len));
+	CKINT(lc_dilithium_keypair_from_seed(&lc_pk, &lc_sk, data->seed.buf,
+					     data->seed.len, type));
 
-	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
-	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
+	CKINT(lc_dilithium_pk_ptr(&ptr, &len, &lc_pk));
+	CKINT(alloc_buf(len, &data->pk));
+	memcpy(data->pk.buf, ptr, len);
 
-	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
-	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
+	CKINT(lc_dilithium_sk_ptr(&ptr, &len, &lc_sk));
+	CKINT(alloc_buf(len, &data->sk));
+	memcpy(data->sk.buf, ptr, len);
 
 out:
+	lc_ml_reset_impl();
 	return ret;
 }
 
-static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
-			       flags_t parsed_flags)
+static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
+			    flags_t parsed_flags)
 {
-	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_87_sk sk;
-	struct lc_dilithium_87_sig sig;
+	struct lc_dilithium_sk sk;
+	struct lc_dilithium_sig *sig = NULL;
+	enum lc_dilithium_type type;
+	size_t len;
+	uint8_t *ptr;
+	LC_DILITHIUM_CTX_ON_STACK(ctx);
 	int ret;
 
-	CKINT(lc_get_dilithium_87(&funcs));
+	CKINT(lc_ml_type(data->cipher, &type));
 
-	if (data->sk.len) {
-		if (data->sk.len != sizeof(sk.sk))
-			return -EFAULT;
-		memcpy(sk.sk, data->sk.buf, data->sk.len);
-	} else if (data->privkey) {
-		struct lc_dilithium_87_sk *tmp = data->privkey;
+	CKINT(lc_dilithium_sk_load(&sk, data->sk.buf, data->sk.len));
 
-		memcpy(sk.sk, tmp->sk, lc_dilithium_87_sk_size());
-	} else
-		return -EOPNOTSUPP;
+	CKINT(-posix_memalign((void **)&sig, 8,
+			      sizeof(struct lc_dilithium_sig)));
+
+	/* Set ML-DSA.Sign_internal */
+	if (!strncasecmp((char *)data->interface.buf, "internal", 8))
+		lc_dilithium_ctx_internal(ctx);
+
+	/* This call also covers the NULL buffer */
+	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
+
+	if (data->hashalg) {
+		BUFFER_INIT(tmp);
+		const struct lc_hash *hash_alg;
+
+		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
+		lc_dilithium_ctx_hash(ctx, hash_alg);
+
+		/* Calculate the digest */
+		LC_HASH_CTX_ON_STACK(hash_ctx, hash_alg);
+		lc_hash_init(hash_ctx);
+
+		if (hash_alg == lc_shake256)
+			lc_hash_set_digestsize(hash_ctx, 64);
+
+		CKINT(alloc_buf(lc_hash_digestsize(hash_ctx), &tmp));
+		lc_hash_update(hash_ctx, data->msg.buf, data->msg.len);
+		lc_hash_final(hash_ctx, tmp.buf);
+
+		lc_hash_zero(hash_ctx);
+		free_buf(&data->msg);
+		copy_ptr_buf(&data->msg, &tmp);
+	}
 
 	if (data->rnd.len) {
 		/* random data is provided by test vector */
@@ -1978,23 +1980,24 @@ static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
 		s_rng_state.seed = data->rnd.buf;
 		s_rng_state.seedlen = data->rnd.len;
 
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, &s_drng));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
+					    data->msg.len, &sk, &s_drng));
 	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
 		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
 		/* Module is required to generate random data */
 
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, lc_seeded_rng));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
+					    data->msg.len, &sk, lc_seeded_rng));
 	} else {
 		/* Module is required to perform deterministic operation */
 
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, NULL));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
+					    data->msg.len, &sk, NULL));
 	}
 
-	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
-	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
+	CKINT(lc_dilithium_sig_ptr(&ptr, &len, sig));
+	CKINT(alloc_buf(len, &data->sig));
+	memcpy(data->sig.buf, ptr, len);
 
 #if 0
 	struct lc_dilithium_pk pk;
@@ -2008,508 +2011,120 @@ static int lc_ml_dsa_87_siggen(struct ml_dsa_siggen_data *data,
 #endif
 
 out:
+	if (sig)
+		free(sig);
+	lc_ml_reset_impl();
 	return ret;
-}
-
-static int lc_ml_dsa_87_sigver(struct ml_dsa_sigver_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_87_funcs funcs;
-	struct lc_dilithium_87_pk pk;
-	struct lc_dilithium_87_sig sig;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_dilithium_87(&funcs));
-
-	if (sizeof(pk.pk) != data->pk.len)
-		return -EOPNOTSUPP;
-	memcpy(pk.pk, data->pk.buf, data->pk.len);
-
-	if (sizeof(sig.sig) != data->sig.len)
-		return -EOPNOTSUPP;
-	memcpy(sig.sig, data->sig.buf, data->sig.len);
-
-	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
-
-	if (ret == -EBADMSG) {
-		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
-		data->sigver_success = 0;
-	} else if (!ret) {
-		logger(LOGGER_DEBUG,
-		       "Signature verification: signature good\n");
-		data->sigver_success = 1;
-	} else {
-		/* This can happen when data is wrong */
-		logger(LOGGER_WARN, "Signature verification: general error\n");
-		data->sigver_success = 0;
-	}
-
-	ret = 0;
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_87_keygen_en(uint64_t cipher, struct buffer *pk,
-				  void **sk)
-{
-	struct lc_dilithium_87_pk lc_pk;
-	struct lc_dilithium_87_sk *lc_sk;
-	int ret;
-
-	(void)cipher;
-
-	lc_sk = calloc(1, sizeof(struct lc_dilithium_87_sk));
-	CKNULL(lc_sk, -ENOMEM);
-
-	CKINT(lc_dilithium_87_keypair(&lc_pk, lc_sk, lc_seeded_rng));
-
-	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
-	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
-
-	*sk = lc_sk;
-
-out:
-	return ret;
-}
-
-/******************************** Dilithium 65 ********************************/
-
-struct dilithium_65_funcs {
-	int (*dilithium_keypair_from_seed)(struct lc_dilithium_65_pk *pk,
-					   struct lc_dilithium_65_sk *sk,
-					   const uint8_t *seed, size_t seedlen);
-	int (*dilithium_sign)(struct lc_dilithium_65_sig *sig,
-			      const uint8_t *m, size_t mlen,
-			      const struct lc_dilithium_65_sk *sk,
-			      struct lc_rng_ctx *rng_ctx);
-	int (*dilithium_verify)(const struct lc_dilithium_65_sig *sig,
-				const uint8_t *m, size_t mlen,
-				const struct lc_dilithium_65_pk *pk);
-};
-
-static int lc_get_dilithium_65(struct dilithium_65_funcs *funcs)
-{
-	const char *envstr = getenv("LC_DILITHIUM");
-
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
-		logger(LOGGER_VERBOSE, "Dilithium-65 implementation: common\n");
-		funcs->dilithium_keypair_from_seed =
-			lc_dilithium_65_keypair_from_seed;
-		funcs->dilithium_sign = lc_dilithium_65_sign;
-		funcs->dilithium_verify = lc_dilithium_65_verify;
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Dilithium-87 implementation: C\n");
-		funcs->dilithium_keypair_from_seed =
-			lc_dilithium_65_keypair_from_seed_c;
-		funcs->dilithium_sign = lc_dilithium_65_sign_c;
-		funcs->dilithium_verify = lc_dilithium_65_verify_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Dilithium-65 implementation %s\n", envstr);
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
-static int lc_ml_dsa_65_keygen(struct ml_dsa_keygen_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_65_funcs funcs;
-	struct lc_dilithium_65_pk lc_pk;
-	struct lc_dilithium_65_sk lc_sk;
-
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_dilithium_65(&funcs));
-
-	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk,
-						data->seed.buf, data->seed.len));
-
-	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
-	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
-
-	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
-	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_65_siggen(struct ml_dsa_siggen_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_65_funcs funcs;
-	struct lc_dilithium_65_sk sk;
-	struct lc_dilithium_65_sig sig;
-	int ret;
-
-	CKINT(lc_get_dilithium_65(&funcs));
-
-	if (data->sk.len) {
-		if (data->sk.len != sizeof(sk.sk))
-			return -EFAULT;
-		memcpy(sk.sk, data->sk.buf, data->sk.len);
-	} else if (data->privkey) {
-		struct lc_dilithium_65_sk *tmp = data->privkey;
-
-		memcpy(sk.sk, tmp->sk, lc_dilithium_65_sk_size());
-	} else
-		return -EOPNOTSUPP;
-
-	if (data->rnd.len) {
-		/* random data is provided by test vector */
-
-		struct static_rng s_rng_state;
-		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-					     .rng_state = &s_rng_state };
-
-		s_rng_state.seed = data->rnd.buf;
-		s_rng_state.seedlen = data->rnd.len;
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, &s_drng));
-	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
-		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
-		/* Module is required to generate random data */
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, lc_seeded_rng));
-	} else {
-		/* Module is required to perform deterministic operation */
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, NULL));
-	}
-
-	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
-	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
-
-#if 0
-	struct lc_dilithium_65_pk pk;
-
-	if (sizeof(pk.pk) == data->pk.len) {
-		memcpy(pk.pk, data->pk.buf, data->pk.len);
-
-		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
-					     data->msg.len, &pk));
-	}
-#endif
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_65_sigver(struct ml_dsa_sigver_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_65_funcs funcs;
-	struct lc_dilithium_65_pk pk;
-	struct lc_dilithium_65_sig sig;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_dilithium_65(&funcs));
-
-	if (sizeof(pk.pk) != data->pk.len)
-		return -EOPNOTSUPP;
-	memcpy(pk.pk, data->pk.buf, data->pk.len);
-
-	if (sizeof(sig.sig) != data->sig.len)
-		return -EOPNOTSUPP;
-	memcpy(sig.sig, data->sig.buf, data->sig.len);
-
-	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
-
-	if (ret == -EBADMSG) {
-		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
-		data->sigver_success = 0;
-	} else if (!ret) {
-		logger(LOGGER_DEBUG,
-		       "Signature verification: signature good\n");
-		data->sigver_success = 1;
-	} else {
-		/* This can happen when data is wrong */
-		logger(LOGGER_WARN, "Signature verification: general error\n");
-		data->sigver_success = 0;
-	}
-
-	ret = 0;
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_65_keygen_en(uint64_t cipher, struct buffer *pk,
-				  void **sk)
-{
-	struct lc_dilithium_65_pk lc_pk;
-	struct lc_dilithium_65_sk *lc_sk = NULL;
-	int ret;
-
-	(void)cipher;
-
-	lc_sk = calloc(1, sizeof(struct lc_dilithium_65_sk));
-	CKNULL(lc_sk, -ENOMEM);
-
-	CKINT_LOG(lc_dilithium_65_keypair(&lc_pk, lc_sk, lc_seeded_rng),
-		  "ML-DSA-65 keygen failed %d\n", ret);
-
-	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
-	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
-
-	*sk = lc_sk;
-
-out:
-	return ret;
-}
-
-/******************************** Dilithium 44 ********************************/
-
-struct dilithium_44_funcs {
-	int (*dilithium_keypair_from_seed)(struct lc_dilithium_44_pk *pk,
-					   struct lc_dilithium_44_sk *sk,
-					   const uint8_t *seed, size_t seedlen);
-	int (*dilithium_sign)(struct lc_dilithium_44_sig *sig,
-			      const uint8_t *m, size_t mlen,
-			      const struct lc_dilithium_44_sk *sk,
-			      struct lc_rng_ctx *rng_ctx);
-	int (*dilithium_verify)(const struct lc_dilithium_44_sig *sig,
-				const uint8_t *m, size_t mlen,
-				const struct lc_dilithium_44_pk *pk);
-};
-
-static int lc_get_dilithium_44(struct dilithium_44_funcs *funcs)
-{
-	const char *envstr = getenv("LC_DILITHIUM");
-
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
-		logger(LOGGER_VERBOSE, "Dilithium-44 implementation: common\n");
-		funcs->dilithium_keypair_from_seed =
-			lc_dilithium_44_keypair_from_seed;
-		funcs->dilithium_sign = lc_dilithium_44_sign;
-		funcs->dilithium_verify = lc_dilithium_44_verify;
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Dilithium implementation: C\n");
-		funcs->dilithium_keypair_from_seed =
-			lc_dilithium_44_keypair_from_seed_c;
-		funcs->dilithium_sign = lc_dilithium_44_sign_c;
-		funcs->dilithium_verify = lc_dilithium_44_verify_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Dilithium-44 implementation %s\n", envstr);
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
-static int lc_ml_dsa_44_keygen(struct ml_dsa_keygen_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_44_funcs funcs;
-	struct lc_dilithium_44_pk lc_pk;
-	struct lc_dilithium_44_sk lc_sk;
-
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_dilithium_44(&funcs));
-
-	CKINT(funcs.dilithium_keypair_from_seed(&lc_pk, &lc_sk, data->seed.buf,
-						data->seed.len));
-
-	CKINT(alloc_buf(sizeof(lc_pk.pk), &data->pk));
-	memcpy(data->pk.buf, lc_pk.pk, sizeof(lc_pk.pk));
-
-	CKINT(alloc_buf(sizeof(lc_sk.sk), &data->sk));
-	memcpy(data->sk.buf, lc_sk.sk, sizeof(lc_sk.sk));
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_44_siggen(struct ml_dsa_siggen_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_44_funcs funcs;
-	struct lc_dilithium_44_sk sk;
-	struct lc_dilithium_44_sig sig;
-	int ret;
-
-	CKINT(lc_get_dilithium_44(&funcs));
-
-	if (data->sk.len) {
-		if (data->sk.len != sizeof(sk.sk))
-			return -EFAULT;
-		memcpy(sk.sk, data->sk.buf, data->sk.len);
-	} else if (data->privkey) {
-		struct lc_dilithium_44_sk *tmp = data->privkey;
-
-		memcpy(sk.sk, tmp->sk, lc_dilithium_44_sk_size());
-	} else
-		return -EOPNOTSUPP;
-
-	if (data->rnd.len) {
-		/* random data is provided by test vector */
-
-		struct static_rng s_rng_state;
-		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-					     .rng_state = &s_rng_state };
-
-		s_rng_state.seed = data->rnd.buf;
-		s_rng_state.seedlen = data->rnd.len;
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, &s_drng));
-	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
-		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
-		/* Module is required to generate random data */
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, lc_seeded_rng));
-	} else {
-		/* Module is required to perform deterministic operation */
-
-		CKINT(funcs.dilithium_sign(&sig, data->msg.buf, data->msg.len,
-					   &sk, NULL));
-	}
-
-	CKINT(alloc_buf(sizeof(sig.sig), &data->sig));
-	memcpy(data->sig.buf, sig.sig, sizeof(sig.sig));
-
-#if 0
-	struct lc_dilithium_44_pk pk;
-
-	if (sizeof(pk.pk) == data->pk.len) {
-		memcpy(pk.pk, data->pk.buf, data->pk.len);
-
-		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
-					     data->msg.len, &pk));
-	}
-#endif
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_44_sigver(struct ml_dsa_sigver_data *data,
-			       flags_t parsed_flags)
-{
-	struct dilithium_44_funcs funcs;
-	struct lc_dilithium_44_pk pk;
-	struct lc_dilithium_44_sig sig;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_dilithium_44(&funcs));
-
-	if (sizeof(pk.pk) != data->pk.len)
-		return -EOPNOTSUPP;
-	memcpy(pk.pk, data->pk.buf, data->pk.len);
-
-	if (sizeof(sig.sig) != data->sig.len)
-		return -EOPNOTSUPP;
-	memcpy(sig.sig, data->sig.buf, data->sig.len);
-
-	ret = funcs.dilithium_verify(&sig, data->msg.buf, data->msg.len, &pk);
-
-	if (ret == -EBADMSG) {
-		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
-		data->sigver_success = 0;
-	} else if (!ret) {
-		logger(LOGGER_DEBUG,
-		       "Signature verification: signature good\n");
-		data->sigver_success = 1;
-	} else {
-		/* This can happen when data is wrong */
-		logger(LOGGER_WARN, "Signature verification: general error\n");
-		data->sigver_success = 0;
-	}
-
-	ret = 0;
-
-out:
-	return ret;
-}
-
-static int lc_ml_dsa_44_keygen_en(uint64_t cipher, struct buffer *pk,
-				  void **sk)
-{
-	struct lc_dilithium_44_pk lc_pk;
-	struct lc_dilithium_44_sk *lc_sk = NULL;
-	int ret;
-
-	(void)cipher;
-
-	lc_sk = calloc(1, sizeof(struct lc_dilithium_44_sk));
-	CKNULL(lc_sk, -ENOMEM);
-
-	CKINT(lc_dilithium_44_keypair(&lc_pk, lc_sk, lc_seeded_rng));
-
-	CKINT(alloc_buf(sizeof(lc_pk.pk), pk));
-	memcpy(pk->buf, lc_pk.pk, sizeof(lc_pk.pk));
-
-	*sk = lc_sk;
-
-out:
-	return ret;
-}
-
-/******************************** Common Code *********************************/
-
-static int lc_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
-			       flags_t parsed_flags)
-{
-	if (data->cipher == ACVP_ML_DSA_44)
-		return lc_ml_dsa_44_keygen(data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_65)
-		return lc_ml_dsa_65_keygen (data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_87)
-		return lc_ml_dsa_87_keygen(data, parsed_flags);
-	return -EOPNOTSUPP;
-}
-
-static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
-			       flags_t parsed_flags)
-{
-	if (data->cipher == ACVP_ML_DSA_44)
-		return lc_ml_dsa_44_siggen(data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_65)
-		return lc_ml_dsa_65_siggen (data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_87)
-		return lc_ml_dsa_87_siggen(data, parsed_flags);
-	return -EOPNOTSUPP;
 }
 
 static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 			    flags_t parsed_flags)
 {
-	if (data->cipher == ACVP_ML_DSA_44)
-		return lc_ml_dsa_44_sigver(data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_65)
-		return lc_ml_dsa_65_sigver(data, parsed_flags);
-	if (data->cipher == ACVP_ML_DSA_87)
-		return lc_ml_dsa_87_sigver(data, parsed_flags);
-	return -EOPNOTSUPP;
+	struct lc_dilithium_pk pk;
+	struct lc_dilithium_sig *sig = NULL;
+	enum lc_dilithium_type type;
+	LC_DILITHIUM_CTX_ON_STACK(ctx);
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_type(data->cipher, &type));
+	CKINT(-posix_memalign((void **)&sig, 8,
+			      sizeof(struct lc_dilithium_sig)));
+
+	CKINT(lc_dilithium_pk_load(&pk, data->pk.buf, data->pk.len));
+	ret = lc_dilithium_sig_load(sig, data->sig.buf, data->sig.len);
+	if (ret) {
+		if (ret == -EINVAL) {
+			logger(LOGGER_DEBUG,
+			       "Signature has invalid size (expected %u, actual %zu)\n",
+			       lc_dilithium_sig_size(type), data->sig.len);
+			ret = 0;
+			data->sigver_success = 0;
+		}
+		goto out;
+	}
+
+	/* Set ML-DSA.Sign_internal */
+	if (!strncasecmp((char *)data->interface.buf, "internal", 8))
+		lc_dilithium_ctx_internal(ctx);
+
+	/* This call also covers the NULL buffer */
+	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
+
+	if (data->hashalg) {
+		BUFFER_INIT(tmp);
+		const struct lc_hash *hash_alg;
+
+		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
+		lc_dilithium_ctx_hash(ctx, hash_alg);
+
+		/* Calculate the digest */
+		LC_HASH_CTX_ON_STACK(hash_ctx, hash_alg);
+		lc_hash_init(hash_ctx);
+
+		if (hash_alg == lc_shake256)
+			lc_hash_set_digestsize(hash_ctx, 64);
+
+		CKINT(alloc_buf(lc_hash_digestsize(hash_ctx), &tmp));
+		lc_hash_update(hash_ctx, data->msg.buf, data->msg.len);
+		lc_hash_final(hash_ctx, tmp.buf);
+
+		lc_hash_zero(hash_ctx);
+		free_buf(&data->msg);
+		copy_ptr_buf(&data->msg, &tmp);
+	}
+
+	ret = lc_dilithium_verify_ctx(sig, ctx, data->msg.buf, data->msg.len,
+				      &pk);
+
+	if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (!ret) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+	} else {
+		/* This can happen when data is wrong */
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (sig)
+		free(sig);
+	lc_ml_reset_impl();
+	return ret;
 }
 
 static int lc_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk,
 			       void **sk)
 {
-	if (cipher == ACVP_ML_DSA_44)
-		return lc_ml_dsa_44_keygen_en(cipher, pk, sk);
-	if (cipher == ACVP_ML_DSA_65)
-		return lc_ml_dsa_65_keygen_en(cipher, pk, sk);
-	if (cipher == ACVP_ML_DSA_87)
-		return lc_ml_dsa_87_keygen_en(cipher, pk, sk);
-	return -EOPNOTSUPP;
+	struct lc_dilithium_pk lc_pk;
+	struct lc_dilithium_sk *lc_sk;
+	enum lc_dilithium_type type;
+	uint8_t *ptr;
+	size_t len;
+	int ret;
+
+	CKINT(lc_ml_type(cipher, &type));
+
+	lc_sk = calloc(1, sizeof(struct lc_dilithium_sk));
+	CKNULL(lc_sk, -ENOMEM);
+
+	CKINT(lc_dilithium_keypair(&lc_pk, lc_sk, lc_seeded_rng, type));
+
+	CKINT(lc_dilithium_pk_ptr(&ptr, &len, &lc_pk));
+	CKINT(alloc_buf(len, pk));
+	memcpy(pk->buf, ptr, len);
+
+	*sk = lc_sk;
+
+out:
+	return ret;
 }
 
 static void lc_ml_dsa_free_key(void *privkey)
@@ -3068,6 +2683,325 @@ static void lc_ml_kem_backend(void)
 	register_ml_kem_impl(&lc_ml_kem);
 }
 
+/************************************************
+ * SLH-DSA interface functions
+ ************************************************/
+
+extern void lc_cpu_feature_disable(void);
+extern void lc_cpu_feature_enable(void);
+static void lc_slh_set_impl(void)
+{
+	const char *envstr = getenv("LC_SPHINCS");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_disable();
+}
+
+static void lc_slh_reset_impl(void)
+{
+	const char *envstr = getenv("LC_SPHINCS");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_enable();
+}
+
+
+static int lc_slh_type(uint64_t cipher, enum lc_sphincs_type *type, uint8_t *n)
+{
+	lc_slh_set_impl();
+
+	switch (cipher) {
+	case ACVP_SLH_DSA_SHAKE_128F:
+		*type = LC_SPHINCS_SHAKE_128f;
+		*n = 16;
+		break;
+	case ACVP_SLH_DSA_SHAKE_128S:
+		*type = LC_SPHINCS_SHAKE_128s;
+		*n = 16;
+		break;
+	case ACVP_SLH_DSA_SHAKE_192F:
+		*type = LC_SPHINCS_SHAKE_192f;
+		*n = 24;
+		break;
+	case ACVP_SLH_DSA_SHAKE_192S:
+		*type = LC_SPHINCS_SHAKE_192s;
+		*n = 24;
+		break;
+	case ACVP_SLH_DSA_SHAKE_256F:
+		*type = LC_SPHINCS_SHAKE_256f;
+		*n = 32;
+		break;
+	case ACVP_SLH_DSA_SHAKE_256S:
+		*type = LC_SPHINCS_SHAKE_256s;
+		*n = 32;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int lc_slh_dsa_keygen(struct slh_dsa_keygen_data *data,
+			     flags_t parsed_flags)
+{
+	struct lc_sphincs_pk lc_pk;
+	struct lc_sphincs_sk lc_sk;
+	uint8_t seed[3 * 32], n;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	enum lc_sphincs_type type;
+	size_t len;
+	uint8_t *ptr;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_slh_type(data->cipher, &type, &n));
+
+	if (data->sk_seed.len != n || data->sk_prf.len != n ||
+	    data->pk_seed.len != n) {
+		    logger(LOGGER_ERR, "Input data unexpected\n");
+		    ret = -EOPNOTSUPP;
+		    goto out;
+	}
+
+	memcpy(seed, data->sk_seed.buf, n);
+	memcpy(seed + n, data->sk_prf.buf, n);
+	memcpy(seed + 2 * n, data->pk_seed.buf, n);
+	s_rng_state.seed = seed;
+	s_rng_state.seedlen = 3 * n;
+
+	CKINT(lc_sphincs_keypair(&lc_pk, &lc_sk, &s_drng, type));
+
+	CKINT(lc_sphincs_pk_ptr(&ptr, &len, &lc_pk));
+	CKINT(alloc_buf(len, &data->pk));
+	memcpy(data->pk.buf, ptr, len);
+
+	CKINT(lc_sphincs_sk_ptr(&ptr, &len, &lc_sk));
+	CKINT(alloc_buf(len, &data->sk));
+	memcpy(data->sk.buf, ptr, len);
+
+out:
+	lc_slh_reset_impl();
+	return ret;
+}
+
+static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
+			     flags_t parsed_flags)
+{
+	struct lc_sphincs_sk sk;
+	struct lc_sphincs_sig *sig = NULL;
+	enum lc_sphincs_type type;
+	size_t len;
+	uint8_t *ptr;
+	int ret;
+	uint8_t n;
+	LC_SPHINCS_CTX_ON_STACK(ctx);
+
+	CKINT(lc_slh_type(data->cipher, &type, &n));
+
+	CKINT(lc_sphincs_sk_load(&sk, data->sk.buf, data->sk.len));
+	switch (data->cipher) {
+	case ACVP_SLH_DSA_SHAKE_128F:
+	case ACVP_SLH_DSA_SHAKE_192F:
+	case ACVP_SLH_DSA_SHAKE_256F:
+		lc_sphincs_sk_set_keytype_fast(&sk);
+		break;
+
+	case ACVP_SLH_DSA_SHAKE_128S:
+	case ACVP_SLH_DSA_SHAKE_192S:
+	case ACVP_SLH_DSA_SHAKE_256S:
+		lc_sphincs_sk_set_keytype_small(&sk);
+		break;
+
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	CKINT(-posix_memalign((void **)&sig, 8, sizeof(struct lc_sphincs_sig)));
+
+	/* Set SLH-DSA.Sign_internal */
+	if (!strncasecmp((char *)data->interface.buf, "internal", 8))
+		lc_sphincs_ctx_internal(ctx);
+
+	/* This call also covers the NULL buffer */
+	lc_sphincs_ctx_userctx(ctx, data->context.buf, data->context.len);
+
+	if (data->hashalg) {
+		BUFFER_INIT(tmp);
+		const struct lc_hash *hash_alg;
+
+		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
+		lc_sphincs_ctx_hash(ctx, hash_alg);
+
+		/* Calculate the digest */
+		LC_HASH_CTX_ON_STACK(hash_ctx, hash_alg);
+		lc_hash_init(hash_ctx);
+
+		if (hash_alg == lc_shake256)
+			lc_hash_set_digestsize(hash_ctx, 64);
+
+		CKINT(alloc_buf(lc_hash_digestsize(hash_ctx), &tmp));
+		lc_hash_update(hash_ctx, data->msg.buf, data->msg.len);
+		lc_hash_final(hash_ctx, tmp.buf);
+
+		lc_hash_zero(hash_ctx);
+		free_buf(&data->msg);
+		copy_ptr_buf(&data->msg, &tmp);
+	}
+
+	if (data->rnd.len) {
+		/* random data is provided by test vector */
+
+		struct static_rng s_rng_state;
+		struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+					     .rng_state = &s_rng_state };
+
+		s_rng_state.seed = data->rnd.buf;
+		s_rng_state.seedlen = data->rnd.len;
+
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
+					  data->msg.len, &sk, &s_drng));
+	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
+		/* Module is required to generate random data */
+
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
+					  data->msg.len, &sk, lc_seeded_rng));
+	} else {
+		/* Module is required to perform deterministic operation */
+
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
+					  data->msg.len, &sk, NULL));
+	}
+
+	CKINT(lc_sphincs_sig_ptr(&ptr, &len, sig));
+	CKINT(alloc_buf(len, &data->sig));
+	memcpy(data->sig.buf, ptr, len);
+
+out:
+	if (sig)
+		free(sig);
+	lc_slh_reset_impl();
+	return ret;
+}
+
+static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
+			     flags_t parsed_flags)
+{
+	struct lc_sphincs_pk pk;
+	struct lc_sphincs_sig *sig = NULL;
+	enum lc_sphincs_type type;
+	int ret;
+	uint8_t n;
+	LC_SPHINCS_CTX_ON_STACK(ctx);
+
+	(void)parsed_flags;
+
+	CKINT(lc_slh_type(data->cipher, &type, &n));
+
+	CKINT(-posix_memalign((void **)&sig, 8, sizeof(struct lc_sphincs_sig)));
+
+	CKINT(lc_sphincs_pk_load(&pk, data->pk.buf, data->pk.len));
+	ret = lc_sphincs_sig_load(sig, data->sig.buf, data->sig.len);
+	if (ret) {
+		if (ret == -EINVAL) {
+			logger(LOGGER_DEBUG,
+			       "Signature has invalid size (expected %u, actual %zu)\n",
+			       lc_sphincs_sig_size(type), data->sig.len);
+			ret = 0;
+			data->sigver_success = 0;
+		}
+		goto out;
+	}
+	switch (data->cipher) {
+	case ACVP_SLH_DSA_SHAKE_128F:
+	case ACVP_SLH_DSA_SHAKE_192F:
+	case ACVP_SLH_DSA_SHAKE_256F:
+		lc_sphincs_pk_set_keytype_fast(&pk);
+		break;
+
+	case ACVP_SLH_DSA_SHAKE_128S:
+	case ACVP_SLH_DSA_SHAKE_192S:
+	case ACVP_SLH_DSA_SHAKE_256S:
+		lc_sphincs_pk_set_keytype_small(&pk);
+		break;
+
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	/* Set SLH-DSA.Sign_internal */
+	if (!strncasecmp((char *)data->interface.buf, "internal", 8))
+		lc_sphincs_ctx_internal(ctx);
+
+	/* This call also covers the NULL buffer */
+	lc_sphincs_ctx_userctx(ctx, data->context.buf, data->context.len);
+
+	if (data->hashalg) {
+		BUFFER_INIT(tmp);
+		const struct lc_hash *hash_alg;
+
+		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
+		lc_sphincs_ctx_hash(ctx, hash_alg);
+
+		/* Calculate the digest */
+		LC_HASH_CTX_ON_STACK(hash_ctx, hash_alg);
+		lc_hash_init(hash_ctx);
+
+		if (hash_alg == lc_shake256)
+			lc_hash_set_digestsize(hash_ctx, 64);
+
+		CKINT(alloc_buf(lc_hash_digestsize(hash_ctx), &tmp));
+		lc_hash_update(hash_ctx, data->msg.buf, data->msg.len);
+		lc_hash_final(hash_ctx, tmp.buf);
+
+		lc_hash_zero(hash_ctx);
+		free_buf(&data->msg);
+		copy_ptr_buf(&data->msg, &tmp);
+	}
+
+	ret = lc_sphincs_verify_ctx(sig, ctx, data->msg.buf, data->msg.len,
+				    &pk);
+
+	if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		data->sigver_success = 0;
+	} else if (!ret) {
+		logger(LOGGER_DEBUG,
+		       "Signature verification: signature good\n");
+		data->sigver_success = 1;
+	} else {
+		/* This can happen when data is wrong */
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		data->sigver_success = 0;
+	}
+
+	ret = 0;
+
+out:
+	if (sig)
+		free(sig);
+	lc_slh_reset_impl();
+	return ret;
+}
+
+static struct slh_dsa_backend lc_slh_dsa =
+{
+	lc_slh_dsa_keygen,
+	lc_slh_dsa_siggen,
+	lc_slg_dsa_sigver
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_slh_dsa_backend)
+static void lc_slh_dsa_backend(void)
+{
+	register_slh_dsa_impl(&lc_slh_dsa);
+}
+
+
 #ifdef __KERNEL__
 void __init linux_kernel_constructor(void)
 {
@@ -3083,5 +3017,6 @@ void __init linux_kernel_constructor(void)
 	_init_lc_eddsa_backend();
 	_init_lc_ml_dsa_backend();
 	_init_lc_ml_kem_backend();
+	_init_lc_slh_dsa_backend();
 }
 #endif

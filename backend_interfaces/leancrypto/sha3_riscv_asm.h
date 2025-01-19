@@ -21,8 +21,7 @@
 #define SHA3_RISCV_ASM
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 extern const struct lc_hash *lc_sha3_224_riscv_asm;
@@ -34,6 +33,16 @@ extern const struct lc_hash *lc_shake128_riscv_asm;
 extern const struct lc_hash *lc_shake256_riscv_asm;
 extern const struct lc_hash *lc_cshake128_riscv_asm;
 extern const struct lc_hash *lc_cshake256_riscv_asm;
+
+extern const struct lc_hash *lc_sha3_224_riscv_asm_zbb;
+extern const struct lc_hash *lc_sha3_256_riscv_asm_zbb;
+extern const struct lc_hash *lc_sha3_384_riscv_asm_zbb;
+extern const struct lc_hash *lc_sha3_512_riscv_asm_zbb;
+
+extern const struct lc_hash *lc_shake128_riscv_asm_zbb;
+extern const struct lc_hash *lc_shake256_riscv_asm_zbb;
+extern const struct lc_hash *lc_cshake128_riscv_asm_zbb;
+extern const struct lc_hash *lc_cshake256_riscv_asm_zbb;
 
 #ifdef __cplusplus
 }

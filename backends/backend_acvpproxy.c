@@ -127,6 +127,7 @@ out:
 static struct hmac_backend acvpproxy_mac =
 {
 	acvpproxy_mac_generate,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(acvpproxy_mac_backend)

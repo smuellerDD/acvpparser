@@ -578,7 +578,7 @@ out:
 	return ret;
 }
 
-int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
+int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
 {
 	int nid;
 	char *name;
@@ -657,6 +657,158 @@ int _openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
 	return 0;
 }
 
+int openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
+			 int *out_nid, char **curve_name, char **instance_name)
+{
+	int nid;
+	char *cname;
+	char *iname;
+	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
+
+	switch (curve & ACVP_CURVEMASK) {
+		case ACVP_ED25519:
+			nid = EVP_PKEY_ED25519;
+			cname = "ED25519";
+			iname = prehash ? "Ed25519ph" : "Ed25519";
+			break;
+		case ACVP_ED448:
+			nid = EVP_PKEY_ED448;
+			cname = "ED448";
+			iname = prehash ? "Ed448ph" : "Ed448";
+			break;
+		default:
+			logger(LOGGER_ERR, "Unknown curve\n");
+			return -EINVAL;
+	}
+
+	*out_nid = nid;
+	if (curve_name != NULL) {
+		*curve_name = cname;
+	}
+	if (instance_name != NULL) {
+		*instance_name = iname;
+	}
+	return 0;
+}
+
+static int openssl_set_rsa_padding(EVP_PKEY_CTX *pkey_ctx, flags_t parsed_flags,
+				   uint32_t saltlen)
+{
+	int ret = 0;
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS15) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_PKCS1_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+	}
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_X931_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+	}
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_PKCS1_PSS_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pkey_ctx, saltlen),
+			    "EVP_PKEY_CTX_set_rsa_pss_saltlen failed\n");
+	}
+
+out:
+	return ret;
+}
+
+int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig)
+{
+	int ret = 0;
+	EVP_MD_CTX *md_ctx = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+	size_t sz = EVP_PKEY_size(pkey);
+	CKINT(alloc_buf(sz, sig));
+
+	if (md) {
+		md_ctx = EVP_MD_CTX_new();
+		CKNULL(md_ctx, -EFAULT);
+
+		CKINT_O(EVP_DigestSignInit(md_ctx, &pkey_ctx, md, NULL, pkey));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		CKINT_O(EVP_DigestSign(md_ctx, sig->buf, &sig->len, msg->buf,
+				       msg->len));
+	} else {
+		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+		CKNULL(pkey_ctx, -EFAULT);
+
+		CKINT_O(EVP_PKEY_sign_init(pkey_ctx));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		CKINT_O(EVP_PKEY_sign(pkey_ctx, sig->buf, &sig->len, msg->buf,
+				      msg->len));
+	}
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	else if (pkey_ctx)
+		EVP_PKEY_CTX_free(pkey_ctx);
+	return ret;
+}
+
+int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig,
+		    uint32_t *sig_result)
+{
+	int ret = 0;
+	EVP_MD_CTX *md_ctx = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+
+	if (md) {
+		md_ctx = EVP_MD_CTX_new();
+		CKNULL(md_ctx, -EFAULT);
+
+		CKINT_O(EVP_DigestVerifyInit(md_ctx, &pkey_ctx, md, NULL,
+					     pkey));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		ret = EVP_DigestVerify(md_ctx, sig->buf, sig->len, msg->buf,
+				       msg->len);
+	} else {
+		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+		CKNULL(pkey_ctx, -EFAULT);
+
+		CKINT_O(EVP_PKEY_verify_init(pkey_ctx));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		ret = EVP_PKEY_verify(pkey_ctx, sig->buf, sig->len, msg->buf,
+				      msg->len);
+	}
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		*sig_result = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		*sig_result = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	else if (pkey_ctx)
+		EVP_PKEY_CTX_free(pkey_ctx);
+	return ret;
+}
+
 #ifdef OPENSSL_SHA3
 static int openssl_shake_cb(EVP_MD_CTX *ctx, unsigned char *md, size_t size)
 {
@@ -686,17 +838,12 @@ static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
 	ctx = EVP_CIPHER_CTX_new();
 	CKNULL(ctx, -ENOMEM);
 
-	if (parsed_flags & FLAG_OP_ENC)
-		ret = EVP_EncryptInit_ex(ctx, type, NULL, data->key.buf,
-					 data->iv.buf);
-	else
-		ret = EVP_DecryptInit_ex(ctx, type, NULL, data->key.buf,
-					 data->iv.buf);
-	CKINT_O_LOG(ret, "Cipher init failed\n");
-
-	EVP_CIPHER_CTX_set_padding(ctx, 0);
-
 #ifdef OPENSSL_30X
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+
+	bld = OSSL_PARAM_BLD_new();
+
 	char *cts_mode;
 	switch (data->cipher) {
 		case ACVP_CBC_CS1:
@@ -714,14 +861,38 @@ static int openssl_mct_init(struct sym_data *data, flags_t parsed_flags)
 	}
 
 	if (cts_mode) {
-		OSSL_PARAM params[2];
-		params[0] = OSSL_PARAM_construct_utf8_string(OSSL_CIPHER_PARAM_CTS_MODE,
-							     cts_mode, 0);
-		params[1] = OSSL_PARAM_construct_end();
-		CKINT_O_LOG(EVP_CIPHER_CTX_set_params(ctx, params),
-			    "EVP_CIPHER_CTX_set_params failed\n");
+		OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_CIPHER_PARAM_CTS_MODE,
+						cts_mode, 0);
 	}
+
+# ifdef OSSL_CIPHER_PARAM_FIPS_ENCRYPT_CHECK
+	OSSL_PARAM_BLD_push_int(bld, OSSL_CIPHER_PARAM_FIPS_ENCRYPT_CHECK, 0);
+# endif
+
+	params = OSSL_PARAM_BLD_to_param(bld);
+	if (parsed_flags & FLAG_OP_ENC)
+		ret = EVP_EncryptInit_ex2(ctx, type, data->key.buf,
+					  data->iv.buf, params);
+	else
+		ret = EVP_DecryptInit_ex2(ctx, type, data->key.buf,
+					  data->iv.buf, params);
+
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
+#else
+	if (parsed_flags & FLAG_OP_ENC)
+		ret = EVP_EncryptInit_ex(ctx, type, NULL, data->key.buf,
+					 data->iv.buf);
+	else
+		ret = EVP_DecryptInit_ex(ctx, type, NULL, data->key.buf,
+					 data->iv.buf);
 #endif
+
+	CKINT_O_LOG(ret, "Cipher init failed\n");
+
+	EVP_CIPHER_CTX_set_padding(ctx, 0);
 
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 	logger_binary(LOGGER_DEBUG, data->iv.buf, data->iv.len, "iv");

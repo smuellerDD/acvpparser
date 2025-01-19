@@ -43,6 +43,7 @@ static int proto_rsa_keygen_tester(struct buffer *in, struct buffer *out,
 							    in->buf);
 	CKNULL(RsaKeygenDataMsg_recv, -EBADMSG);
 
+	data.modulus = RsaKeygenDataMsg_recv->modulus;
 	data.e.buf = RsaKeygenDataMsg_recv->e.data;
 	data.e.len = RsaKeygenDataMsg_recv->e.len;
 	data.bitlen_in = RsaKeygenDataMsg_recv->bitlen_in;
@@ -51,6 +52,8 @@ static int proto_rsa_keygen_tester(struct buffer *in, struct buffer *out,
 
 	RsaKeygenDataMsg_send.n.data = data.n.buf;
 	RsaKeygenDataMsg_send.n.len = data.n.len;
+	RsaKeygenDataMsg_send.e.data = data.e.buf;
+	RsaKeygenDataMsg_send.e.len = data.e.len;
 	RsaKeygenDataMsg_send.d.data = data.d.buf;
 	RsaKeygenDataMsg_send.d.len = data.d.len;
 	RsaKeygenDataMsg_send.p.data = data.p.buf;
@@ -90,6 +93,8 @@ static int proto_rsa_keygen_tester(struct buffer *in, struct buffer *out,
 	rsa_keygen_data_msg__pack(&RsaKeygenDataMsg_send, out->buf);
 
 out:
+	if (RsaKeygenDataMsg_recv && !RsaKeygenDataMsg_recv->e.len)
+		free_buf(&data.e);
 	free_buf(&data.n);
 	free_buf(&data.d);
 	free_buf(&data.p);

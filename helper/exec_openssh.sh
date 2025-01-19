@@ -58,12 +58,12 @@ do_test() {
 }
 
 echo "##############################################################################"
-echo "# OpenSSL testing commences"
-build_tool ${TARGET_openssl}
+echo "# OpenSSH testing commences"
+build_tool ${TARGET_openssh}
 do_test
 
 echo "##############################################################################"
-echo "# OpenSSH testing commences"
-build_tool ${TARGET_openssh}
+echo "# OpenSSL testing commences"
+build_tool ${TARGET_openssl}
 do_test
 exit $failures

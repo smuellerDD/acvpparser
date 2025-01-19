@@ -54,6 +54,7 @@ acvp_proto-y += $(PROTODIR)/proto.o			\
 		$(PROTODIR)/proto_pbkdf.o		\
 		$(PROTODIR)/proto_hkdf.o		\
 		$(PROTODIR)/proto_ml-dsa.o		\
+		$(PROTODIR)/proto_slh-dsa.o		\
 		$(PROTODIR)/proto_ml-kem.o		\
 		$(PROTODIR)/proto_eddsa.o
 
@@ -83,6 +84,7 @@ acvp_proto-y += $(PROTODEFDIR)/ecdsa.pb-c.o		\
 		$(PROTODEFDIR)/pbkdf.pb-c.o		\
 		$(PROTODEFDIR)/kda_hkdf.pb-c.o		\
 		$(PROTODEFDIR)/ml-dsa.pb-c.o		\
+		$(PROTODEFDIR)/slh-dsa.pb-c.o		\
 		$(PROTODEFDIR)/ml-kem.pb-c.o		\
 		$(PROTODEFDIR)/eddsa.pb-c.o
 

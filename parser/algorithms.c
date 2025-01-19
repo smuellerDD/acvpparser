@@ -219,6 +219,14 @@ static const struct { char *algo; uint64_t cipher; } conv[] = {
 	{"ML-KEM-512", ACVP_ML_KEM_512},
 	{"ML-KEM-768", ACVP_ML_KEM_768},
 	{"ML-KEM-1024", ACVP_ML_KEM_1024},
+
+	{"SLH-DSA", ACVP_SLH_DSA},
+	{"SLH-DSA-SHAKE-128s", ACVP_SLH_DSA_SHAKE_128S},
+	{"SLH-DSA-SHAKE-128f", ACVP_SLH_DSA_SHAKE_128F},
+	{"SLH-DSA-SHAKE-192s", ACVP_SLH_DSA_SHAKE_192S},
+	{"SLH-DSA-SHAKE-192f", ACVP_SLH_DSA_SHAKE_192F},
+	{"SLH-DSA-SHAKE-256s", ACVP_SLH_DSA_SHAKE_256S},
+	{"SLH-DSA-SHAKE-256f", ACVP_SLH_DSA_SHAKE_256F},
 };
 
 uint64_t convert_algo_cipher(const char *algo, uint64_t cipher)

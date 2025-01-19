@@ -164,7 +164,7 @@ static int sshkdf_cavs(struct kdf_cavs *test)
 {
 	int ret = 0;
 	struct kex kex;
-	BIGNUM *Kbn = NULL;
+	struct sshbuf *shared_secret;
 	int mode = 0;
 	struct newkeys *ctoskeys;
 	struct newkeys *stockeys;
@@ -175,10 +175,9 @@ static int sshkdf_cavs(struct kdf_cavs *test)
 
 	memset(&kex, 0, sizeof(struct kex));
 
-	Kbn = BN_new();
-	BN_bin2bn(test->K, test->Klen, Kbn);
-	if (!Kbn) {
-		printf("cannot convert K into BIGNUM\n");
+	shared_secret = sshbuf_from(test->K, test->Klen);
+	if (!shared_secret) {
+		printf("cannot allocate shared_secret\n");
 		ret = 1;
 		goto out;
 	}
@@ -241,7 +240,7 @@ static int sshkdf_cavs(struct kdf_cavs *test)
 		goto out;
 	}
 	ssh->kex = &kex;
-	kex_derive_keys_bn(ssh, test->H, test->Hlen, Kbn);
+	kex_derive_keys(ssh, test->H, test->Hlen, shared_secret);
 
 	ctoskeys = kex.newkeys[0];
 	stockeys = kex.newkeys[1];
@@ -275,8 +274,8 @@ static int sshkdf_cavs(struct kdf_cavs *test)
 	printf("Integrity key (server to client) = %s\n", hex);
 
 out:
-	if (Kbn)
-		BN_free(Kbn);
+	if (shared_secret)
+		sshbuf_free(shared_secret);
 	if (ssh)
 		ssh_packet_close(ssh);
 	return ret;
@@ -296,14 +295,14 @@ static void usage(void)
 
 /*
  * Test command example:
- * ./ssh-cavs -K 0055d50f2d163cc07cd8a93cc7c3430c30ce786b572c01ad29fec7597000cf8618d664e2ec3dcbc8bb7a1a7eb7ef67f61cdaf291625da879186ac0a5cb27af571b59612d6a6e0627344d846271959fda61c78354aa498773d59762f8ca2d0215ec590d8633de921f920d41e47b3de6ab9a3d0869e1c826d0e4adebf8e3fb646a15dea20a410b44e969f4b791ed6a67f13f1b74234004d5fa5e87eff7abc32d49bbdf44d7b0107e8f10609233b7e2b7eff74a4daf25641de7553975dac6ac1e5117df6f6dbaa1c263d23a6c3e5a3d7d49ae8a828c1e333ac3f85fbbf57b5c1a45be45e43a7be1a4707eac779b8285522d1f531fe23f890fd38a004339932b93eda4 -H d3ab91a850febb417a25d892ec48ed5952c7a5de -s d3ab91a850febb417a25d892ec48ed5952c7a5de -i 8 -e 24 -m 20
+ * ./ssh-cavs -K 0000010100a46eb79792954a188a12b22a19dc964b6803f8b70de5bbc05217de295cb29bd6a43f52c64db1945dd10a9a52106deb26b15f5668a3cdcff634044926f31c232464c297050247abbe6c9b84dddcf0c59c3ed1467fd6ff983c44550ef86f01f956e77742d50929f8f8de2c683c0a144c43fdb828ec730b9ba798a12ffb4089ebd5d78ff12934c25467beb98b72a731de73504f825ad6d0e5d9a077985e91b6b2699f106de8879c927f13febd58e43c1e3000c0b1f2f38be5457879c6c74168667b126faec662de33024175e5bc165d52663ed9c7f732c4d94ed7d0c7bb9fd4f5f9bbd4b637a25d0ac7b7e4b7cdd9bc153f34659b36622150c9a751236ca6ebe7f9 -H 4d00a8bf7b45aaae6a2d3db64e0130301cd57c630f46930e49c4352a8e7d414d08bb8548df432888237a257630014990651afcb4964f1ad3488702a3cdcd2890 -s 3a6ab9ac6d5f38f4f2c9e8f9982839e9438c4b1cfecaa6f5a39c62331cb0f993668949f080e012130f526c8417ae27520cc06adee221b7845a3a8c7f7248465f -i 8 -e 24 -m 64
  *
- * Initial IV (client to server) = 4bb320d1679dfd3a
- * Initial IV (server to client) = 43dea6fdf263a308
- * Encryption key (client to server) = 13048cc600b9d3cf9095aa6cf8e2ff9cf1c54ca0520c89ed
- * Encryption key (server to client) = 1e483c5134e901aa11fc4e0a524e7ec7b75556148a222bb0
- * Integrity key (client to server) = ecef63a092b0dcc585bdc757e01b2740af57d640
- * Integrity key (server to client) = 7424b05f3c44a72b4ebd281fb71f9cbe7b64d479
+ * Initial IV (client to server) = b10a8d8f987285c6
+ * Initial IV (server to client) = b853e1612c3bec23
+ * Encryption key (client to server) = 0cd987771f42504fad8cf3e4daad9cd5789b0b5ee6375b15
+ * Encryption key (server to client) = 0977d9ee59ddd8765e92cbc23456eb4cb382c98d00d6dae5
+ * Integrity key (client to server) = 4c97b347723b8f667fd0c587b7fca79fba6c22e3ee2476173388139431b04b1be675a18cf031251456002e77aa5065561063dc200214a878ab53f715120d8e37
+ * Integrity key (server to client) = f17d06a98695d3a557e8a9aba586e921cb59994718750aa11d5ce36f00c76b78a198617ffa7681d2127cfd6a119f4a9f69df5116be62743c5fa9e0bd4cc1b79d
  */
 int main(int argc, char *argv[])
 {
@@ -317,14 +316,6 @@ int main(int argc, char *argv[])
 		size_t len = 0;
 		switch(opt)
 		{
-			/*
-			 * CAVS K is MPINT
-			 * we want a hex (i.e. the caller must ensure the
-			 * following transformations already happened):
-			 * 	1. cut off first four bytes
-			 * 	2. if most significant bit of value is
-			 *	   1, prepend 0 byte
-			 */
 			case 'K':
 				len = strlen(optarg);
 				ret = hex2bin_alloc(optarg, len,

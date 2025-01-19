@@ -93,127 +93,6 @@ out:
 	return ret;
 }
 
-static int openssl_set_rsa_padding(EVP_PKEY_CTX *pkey_ctx, flags_t parsed_flags,
-				   uint32_t saltlen)
-{
-	int ret = 0;
-
-	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS15) {
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
-							 RSA_PKCS1_PADDING),
-			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
-	}
-	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
-							 RSA_X931_PADDING),
-			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
-	}
-	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
-							 RSA_PKCS1_PSS_PADDING),
-			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
-		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pkey_ctx, saltlen),
-			    "EVP_PKEY_CTX_set_rsa_pss_saltlen failed\n");
-	}
-
-out:
-	return ret;
-}
-
-static int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md,
-			   flags_t parsed_flags, uint32_t saltlen,
-			   struct buffer *msg, struct buffer *sig)
-{
-	int ret = 0;
-	EVP_MD_CTX *md_ctx = NULL;
-	EVP_PKEY_CTX *pkey_ctx = NULL;
-	size_t sz = EVP_PKEY_size(pkey);
-	CKINT(alloc_buf(sz, sig));
-
-	if (md) {
-		md_ctx = EVP_MD_CTX_new();
-		CKNULL(md_ctx, -EFAULT);
-
-		CKINT_O(EVP_DigestSignInit(md_ctx, NULL, md, NULL, pkey));
-
-		CKINT(openssl_set_rsa_padding(EVP_MD_CTX_get_pkey_ctx(md_ctx),
-					      parsed_flags, saltlen));
-
-		CKINT_O(EVP_DigestSign(md_ctx, sig->buf, &sig->len, msg->buf,
-				       msg->len));
-	} else {
-		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
-		CKNULL(pkey_ctx, -EFAULT);
-
-		CKINT_O(EVP_PKEY_sign_init(pkey_ctx));
-
-		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
-
-		CKINT_O(EVP_PKEY_sign(pkey_ctx, sig->buf, &sig->len, msg->buf,
-				      msg->len));
-	}
-
-out:
-	if (md_ctx)
-		EVP_MD_CTX_free(md_ctx);
-	if (pkey_ctx)
-		EVP_PKEY_CTX_free(pkey_ctx);
-	return ret;
-}
-
-static int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md,
-			   flags_t parsed_flags, uint32_t saltlen,
-			   struct buffer *msg, struct buffer *sig,
-			   uint32_t *sig_result)
-{
-	int ret = 0;
-	EVP_MD_CTX *md_ctx = NULL;
-	EVP_PKEY_CTX *pkey_ctx = NULL;
-
-	if (md) {
-		md_ctx = EVP_MD_CTX_new();
-		CKNULL(md_ctx, -EFAULT);
-
-		CKINT_O(EVP_DigestVerifyInit(md_ctx, NULL, md, NULL, pkey));
-
-		CKINT(openssl_set_rsa_padding(EVP_MD_CTX_get_pkey_ctx(md_ctx),
-					      parsed_flags, saltlen));
-
-		ret = EVP_DigestVerify(md_ctx, sig->buf, sig->len, msg->buf,
-				       msg->len);
-	} else {
-		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
-		CKNULL(pkey_ctx, -EFAULT);
-
-		CKINT_O(EVP_PKEY_verify_init(pkey_ctx));
-
-		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
-
-		ret = EVP_PKEY_verify(pkey_ctx, sig->buf, sig->len, msg->buf,
-				      msg->len);
-	}
-
-	if (!ret) {
-		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
-		*sig_result = 0;
-	} else if (ret == 1) {
-		logger(LOGGER_DEBUG,
-			"Signature verification: signature good\n");
-		*sig_result = 1;
-		ret = 0;
-	} else {
-		logger(LOGGER_WARN, "Signature verification: general error\n");
-		ret = -EFAULT;
-	}
-
-out:
-	if (md_ctx)
-		EVP_MD_CTX_free(md_ctx);
-	if (pkey_ctx)
-		EVP_PKEY_CTX_free(pkey_ctx);
-	return ret;
-}
-
 static int openssl_get_safeprime_group(uint64_t safeprime, const char **group)
 {
 	int ret = 0;
@@ -385,7 +264,8 @@ static int openssl_mac_generate_helper(struct hmac_data *data, char *mac_algo,
 {
 	EVP_MAC_CTX *ctx = NULL;
 	EVP_MAC *mac = NULL;
-	OSSL_PARAM params[3], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
 	mac = EVP_MAC_fetch(NULL, mac_algo, NULL);
@@ -393,11 +273,15 @@ static int openssl_mac_generate_helper(struct hmac_data *data, char *mac_algo,
 	ctx = EVP_MAC_CTX_new(mac);
 	CKNULL(ctx, -EFAULT);
 
-	p = params;
+	bld = OSSL_PARAM_BLD_new();
 	// OpenSSL wants us to use the cipher name here...
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_KEY, data->key.buf, data->key.len);
-	*p++ = OSSL_PARAM_construct_utf8_string(param_name, param_val, 0);
-	*p = OSSL_PARAM_construct_end();
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_MAC_PARAM_KEY,
+						 data->key.buf, data->key.len));
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, param_name, param_val, 0));
+#ifdef OSSL_CIPHER_PARAM_FIPS_ENCRYPT_CHECK
+	OSSL_PARAM_BLD_push_int(bld, OSSL_CIPHER_PARAM_FIPS_ENCRYPT_CHECK, 0);
+#endif
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT_O_LOG(EVP_MAC_CTX_set_params(ctx, params),
 			"EVP_MAC_CTX_set_params failed\n");
@@ -417,6 +301,10 @@ static int openssl_mac_generate_helper(struct hmac_data *data, char *mac_algo,
 	ret = 0;
 
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (mac)
 		EVP_MAC_free(mac);
 	if (ctx)
@@ -498,6 +386,7 @@ static int openssl_mac_generate(struct hmac_data *data, flags_t parsed_flags)
 static struct hmac_backend openssl_mac =
 {
 	openssl_mac_generate,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_mac_backend)
@@ -513,10 +402,10 @@ static int openssl_kmac_generate(struct kmac_data *data, flags_t parsed_flags)
 {
 	EVP_MAC_CTX *ctx = NULL;
 	EVP_MAC *mac = NULL;
-	OSSL_PARAM params[4], *p;
-	int blocklen = (int) data->maclen / 8;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	size_t blocklen = data->maclen / 8;
 	int ret = 0;
-	int xof_enabled = 0;
 	const char *algo;
 
 	(void)parsed_flags;
@@ -532,39 +421,41 @@ static int openssl_kmac_generate(struct kmac_data *data, flags_t parsed_flags)
 	ctx = EVP_MAC_CTX_new(mac);
 	CKNULL(ctx, -EFAULT);
 
-	p = params;
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_KEY,
-						 data->key.buf, data->key.len);
-	if (data->customization.buf != NULL && data->customization.len != 0)
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_CUSTOM,
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_MAC_PARAM_KEY,
+						 data->key.buf, data->key.len));
+	if (data->customization.buf != NULL && data->customization.len != 0) {
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_MAC_PARAM_CUSTOM,
 							 data->customization.buf,
-							 data->customization.len);
-	*p = OSSL_PARAM_construct_end();
+							 data->customization.len));
+	}
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_MAC_PARAM_XOF,
+					data->xof_enabled));
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_MAC_PARAM_SIZE,
+					blocklen));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_MAC_PARAM_KEY,
+						 data->key.buf, data->key.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT_O_LOG(EVP_MAC_CTX_set_params(ctx, params),
 		    "EVP_MAC_CTX_set_params failed\n");
 	CKINT_O_LOG(EVP_MAC_init(ctx, NULL, 0, NULL), "EVP_MAC_init failed\n");
-
-	xof_enabled = (int)data->xof_enabled;
-
-	p = params;
-	*p++ = OSSL_PARAM_construct_int(OSSL_MAC_PARAM_XOF, &xof_enabled);
-	*p++ = OSSL_PARAM_construct_int(OSSL_MAC_PARAM_SIZE, &blocklen);
-	*p = OSSL_PARAM_construct_end();
-
-	CKINT_O_LOG(EVP_MAC_CTX_set_params(ctx, params),
-		    "EVP_MAC_CTX_set_params failed\n");
-
 	CKINT_O_LOG(EVP_MAC_update(ctx, data->msg.buf, data->msg.len),
 		    "EVP_MAC_update failed\n");
-	CKINT_LOG(alloc_buf((size_t)blocklen, &data->mac),
+	CKINT_LOG(alloc_buf(blocklen, &data->mac),
 		  "KMAC buffer cannot be allocated\n");
 	CKINT_O_LOG(EVP_MAC_final(ctx, data->mac.buf, &data->mac.len, blocklen),
 		    "EVP_MAC_final failed\n");
 
 	logger(LOGGER_DEBUG, "taglen = %zu\n", data->mac.len);
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "KMAC");
+
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (mac)
 		EVP_MAC_free(mac);
 	if (ctx)
@@ -576,59 +467,61 @@ static int openssl_kmac_ver(struct kmac_data *data, flags_t parsed_flags)
 {
 	EVP_MAC_CTX *ctx = NULL;
 	EVP_MAC *mac = NULL;
-	OSSL_PARAM params[4], *p;
-	BUFFER_INIT(kmac);
-	int blocklen = (int) data->maclen/8;
-	size_t maclen =0;
-	int ret =0;
-	int xof_enabled =0;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	BUFFER_INIT(mac_tag);
+	size_t blocklen = data->maclen / 8;
+	int ret = 0;
 	const char *algo;
+
 	(void)parsed_flags;
 
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 
-	convert_cipher_algo(data->cipher & ACVP_KMACMASK, ACVP_CIPHERTYPE_KMAC, &algo);
+	convert_cipher_algo(data->cipher & ACVP_KMACMASK, ACVP_CIPHERTYPE_KMAC,
+			    &algo);
 
 	mac = EVP_MAC_fetch(NULL, algo, NULL);
 	CKNULL(mac, -EFAULT);
 	ctx = EVP_MAC_CTX_new(mac);
 	CKNULL(ctx, -EFAULT);
-	if(mac)
-		EVP_MAC_free(mac);
 
-	p=params;
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_KEY, data->key.buf, data->key.len);
-	if (data->customization.buf != NULL && data->customization.len != 0)
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_MAC_PARAM_CUSTOM, data->customization.buf, data->customization.len);
-	*p = OSSL_PARAM_construct_end();
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_MAC_PARAM_KEY,
+						 data->key.buf, data->key.len));
+	if (data->customization.buf != NULL && data->customization.len != 0) {
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_MAC_PARAM_CUSTOM,
+							 data->customization.buf,
+							 data->customization.len));
+	}
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_MAC_PARAM_XOF,
+					data->xof_enabled));
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_MAC_PARAM_SIZE,
+					blocklen));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_MAC_PARAM_KEY,
+						 data->key.buf, data->key.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT_O_LOG(EVP_MAC_CTX_set_params(ctx, params),
 			"EVP_MAC_CTX_set_params failed\n");
 	CKINT_O_LOG(EVP_MAC_init(ctx,NULL,0,NULL),
 			"EVP_MAC_init failed\n");
-
-	xof_enabled =(int)data->xof_enabled;
-
-	p = params;
-	*p++ = OSSL_PARAM_construct_int(OSSL_MAC_PARAM_XOF, &xof_enabled);
-	*p++ = OSSL_PARAM_construct_int(OSSL_MAC_PARAM_SIZE, &blocklen);
-	*p = OSSL_PARAM_construct_end();
-
 	CKINT_O_LOG(EVP_MAC_CTX_set_params(ctx, params),
 			"EVP_MAC_CTX_set_params failed\n");
 	CKINT_O_LOG(EVP_MAC_update(ctx, data->msg.buf, data->msg.len),
 			"EVP_MAC_update failed\n");
-	CKINT_LOG(alloc_buf((size_t)blocklen, &kmac),
+	CKINT_LOG(alloc_buf(blocklen, &mac_tag),
 			"KMAC buffer cannot be allocated\n");
-	CKINT_O_LOG(EVP_MAC_final(ctx, kmac.buf, &maclen, blocklen),
-			"EVP_MAC_update failed\n");
+	CKINT_O_LOG(EVP_MAC_final(ctx, mac_tag.buf, &mac_tag.len, blocklen),
+			"EVP_MAC_final failed\n");
 
-	logger(LOGGER_DEBUG, "taglen = %zu\n", maclen);
-	logger_binary(LOGGER_DEBUG, kmac.buf, maclen, "Generated KMAC");
-	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "Input KMAC");
+	logger(LOGGER_DEBUG, "taglen = %zu\n", data->mac.len);
+	logger_binary(LOGGER_DEBUG, mac_tag.buf, mac_tag.len, "Generated tag");
+	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, "Input tag");
 
-	if(memcmp(data->mac.buf,kmac.buf,data->mac.len))
+	if (memcmp(data->mac.buf, mac_tag.buf, data->mac.len))
 		data->verify_result = 0;
 	else
 		data->verify_result = 1;
@@ -636,9 +529,15 @@ static int openssl_kmac_ver(struct kmac_data *data, flags_t parsed_flags)
 	logger(LOGGER_DEBUG, "Generated result= %" PRIu32 "\n",data->verify_result);
 
 out:
-	if(ctx)
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
+	if (mac)
+		EVP_MAC_free(mac);
+	if (ctx)
 		EVP_MAC_CTX_free(ctx);
-	free_buf(&kmac);
+	free_buf(&mac_tag);
 	return 0;
 }
 
@@ -894,7 +793,7 @@ openssl_ecdh_ss_common(uint64_t cipher,
 
 	bld = OSSL_PARAM_BLD_new();
 
-	CKINT_LOG(_openssl_ecdsa_curves(cipher, &nid, &curve_name),
+	CKINT_LOG(openssl_ecdsa_curves(cipher, &nid, &curve_name),
 			"Conversion of curve failed\n");
 	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME,
 					curve_name, 0);
@@ -1129,8 +1028,8 @@ static int openssl_get_drbg_name(struct drbg_data *data, char *cipher,
 
 static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 {
-
-	OSSL_PARAM params[4], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	char cipher[50];
 	char drbg_name[50];
 	EVP_RAND *rand = NULL;
@@ -1154,9 +1053,12 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	EVP_RAND_free(rand);
 	rand = NULL;
 
-	params[0] = OSSL_PARAM_construct_uint(OSSL_RAND_PARAM_STRENGTH, &strength);
-	params[1] = OSSL_PARAM_construct_end();
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_uint(bld, OSSL_RAND_PARAM_STRENGTH,
+					 strength));
+	params = OSSL_PARAM_BLD_to_param(bld);
 	CKINT(EVP_RAND_CTX_set_params(parent, params));
+
 	/* Get the DRBG */
 	rand = EVP_RAND_fetch(NULL, drbg_name, NULL);
 	CKNULL(rand, -ENOMEM);
@@ -1164,42 +1066,56 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	CKNULL(ctx, -ENOMEM);
 	/* Set the DRBG up */
 	strength = EVP_RAND_get_strength(ctx);
-	params[0] = OSSL_PARAM_construct_int(OSSL_DRBG_PARAM_USE_DF,
-			(int *)(&df));
-	if(!strcmp(drbg_name,"CTR-DRBG")){
-		params[1] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_CIPHER,
-				(char *)cipher, 0);
-	}
-	else {
-		params[1] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_DIGEST,
-				(char *)cipher, strlen(cipher));
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_DRBG_PARAM_USE_DF, df));
+	if (!strcmp(drbg_name, "CTR-DRBG")) {
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_DRBG_PARAM_CIPHER,
+							cipher, 0));
+	} else {
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_DRBG_PARAM_DIGEST,
+							cipher, 0));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_DRBG_PARAM_MAC,
+							"HMAC", 0));
 	}
 
-	params[2] = OSSL_PARAM_construct_utf8_string(OSSL_DRBG_PARAM_MAC, "HMAC", 0);
-	params[3] = OSSL_PARAM_construct_end();
-
+	/*
+	 * OpenSSL 3.4 blocked the truncated hash-based DRBGs by default to
+	 * comply with IG D.R. However, by the time OpenSSL 3.4 was released,
+	 * IG D.R was already withdrawn and moved to W.2. In other words, these
+	 * DRBGs are approved again.
+	 * Rather than making a mess with different proxy implementations, and
+	 * OpenSSL 3.5+ potentially adding them back again, we just disable the
+	 * hard error (this will revert back to a service indicator).
+	 */
+#ifdef OSSL_DRBG_PARAM_FIPS_DIGEST_CHECK
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_DRBG_PARAM_FIPS_DIGEST_CHECK,
+					0));
+#endif
+	params = OSSL_PARAM_BLD_to_param(bld);
 	CKINT(EVP_RAND_CTX_set_params(ctx, params));
 
 	/* Feed in the entropy and nonce */
-	p = params;
 	if (data->entropy.buf && data->entropy.len) {
 		logger_binary(LOGGER_DEBUG, data->entropy.buf,
 			      data->entropy.len, "entropy");
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_ENTROPY,
-							 (void *)data->entropy.buf,
-							 data->entropy.len);
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_RAND_PARAM_TEST_ENTROPY,
+							 data->entropy.buf,
+							 data->entropy.len));
 	}
 	if (data->nonce.buf && data->nonce.len) {
 		logger_binary(LOGGER_DEBUG, data->nonce.buf,
 			      data->nonce.len, "nonce");
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_RAND_PARAM_TEST_NONCE,
-							 (void *)data->nonce.buf,
-							 data->nonce.len);
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_RAND_PARAM_TEST_NONCE,
+							 data->nonce.buf,
+							 data->nonce.len));
 	}
-	*p++ = OSSL_PARAM_construct_end();
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	if (!EVP_RAND_instantiate(parent, strength, 0, NULL, 0, params)) {
-		EVP_RAND_CTX_free(ctx);
 		goto out;
 	}
 	/*
@@ -1214,7 +1130,6 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	if (!EVP_RAND_instantiate(ctx, strength, data->pr, z, data->pers.len, NULL)) {
 		logger(LOGGER_DEBUG, "DRBG instantiation failed: %s\n",
 				ERR_error_string(ERR_get_error(), NULL));
-		EVP_RAND_CTX_free(ctx);
 		goto out;
 	}
 
@@ -1224,10 +1139,11 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 				data->entropy_reseed.buffers[0].len,
 				"entropy reseed");
 
-		params[0] = OSSL_PARAM_construct_octet_string
-			(OSSL_RAND_PARAM_TEST_ENTROPY, data->entropy_reseed.buffers[0].buf,
-			 data->entropy_reseed.buffers[0].len);
-		params[1] = OSSL_PARAM_construct_end();
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_RAND_PARAM_TEST_ENTROPY,
+							 data->entropy_reseed.buffers[0].buf,
+							 data->entropy_reseed.buffers[0].len));
+		params = OSSL_PARAM_BLD_to_param(bld);
 		CKINT(EVP_RAND_CTX_set_params(parent, params));
 		if (data->addtl_reseed.buffers[0].len) {
 			logger_binary(LOGGER_DEBUG,
@@ -1245,11 +1161,12 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 				data->entropy_generate.buffers[0].buf,
 				data->entropy_generate.buffers[0].len,
 				"entropy generate 1");
-		params[0] = OSSL_PARAM_construct_octet_string
-			(OSSL_RAND_PARAM_TEST_ENTROPY,
-			 data->entropy_generate.buffers[0].buf,
-			 data->entropy_generate.buffers[0].len);
-		params[1] = OSSL_PARAM_construct_end();
+
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_RAND_PARAM_TEST_ENTROPY,
+							 data->entropy_generate.buffers[0].buf,
+							 data->entropy_generate.buffers[0].len));
+		params = OSSL_PARAM_BLD_to_param(bld);
 		CKINT(EVP_RAND_CTX_set_params(parent, params));
 	}
 
@@ -1266,12 +1183,13 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	if (data->entropy_generate.buffers[1].len) {
 		logger_binary(LOGGER_DEBUG, data->entropy_generate.buffers[1].buf,
 				data->entropy_generate.buffers[1].len,
-				"entropy generate 1");
-		params[0] = OSSL_PARAM_construct_octet_string
-			(OSSL_RAND_PARAM_TEST_ENTROPY,
-			 data->entropy_generate.buffers[1].buf,
-			 data->entropy_generate.buffers[1].len);
-		params[1] = OSSL_PARAM_construct_end();
+				"entropy generate 2");
+
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_RAND_PARAM_TEST_ENTROPY,
+							 data->entropy_generate.buffers[1].buf,
+							 data->entropy_generate.buffers[1].len));
+		params = OSSL_PARAM_BLD_to_param(bld);
 		CKINT(EVP_RAND_CTX_set_params(parent, params));
 	}
 
@@ -1288,15 +1206,19 @@ static int openssl_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 	/* Verify the output */
 	res = 0;
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (ctx) {
 		EVP_RAND_uninstantiate(ctx);
 		EVP_RAND_CTX_free(ctx);
 	}
-	if(parent) {
+	if (parent) {
 		EVP_RAND_uninstantiate(parent);
 		EVP_RAND_CTX_free(parent);
 	}
-	if(rand)
+	if (rand)
 		EVP_RAND_free(rand);
 	return res;
 }
@@ -1322,7 +1244,8 @@ static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
 {
 	EVP_KDF *kdf = NULL;
 	EVP_KDF_CTX *ctx = NULL;
-	OSSL_PARAM params[6], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
 	kdf = EVP_KDF_fetch(NULL, "SSHKDF", NULL);
@@ -1330,23 +1253,29 @@ static int openssl_kdf_ssh_internal(struct kdf_ssh_data *data,
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate SSHv2 PRF\n");
 
-	p = params;
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-						(char *)EVP_MD_name(md), 0);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
-						 data->k.buf, data->k.len);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SSHKDF_XCGHASH,
-						 data->h.buf, data->h.len);
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_SSHKDF_TYPE,
-						(char *) &id, 1);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SSHKDF_SESSION_ID,
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_DIGEST,
+						EVP_MD_name(md), 0));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_KEY,
+						 data->k.buf, data->k.len));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+						 OSSL_KDF_PARAM_SSHKDF_XCGHASH,
+						 data->h.buf, data->h.len));
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_SSHKDF_TYPE,
+						&id, 1));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+						 OSSL_KDF_PARAM_SSHKDF_SESSION_ID,
 						 data->session_id.buf,
-						 data->session_id.len);
-	*p = OSSL_PARAM_construct_end();
+						 data->session_id.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT_O(EVP_KDF_derive(ctx, out->buf, out->len, params));
 
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)
@@ -1444,7 +1373,6 @@ static void openssl_kdf_ssh_backend(void)
 	register_kdf_ssh_impl(&openssl_kdf);
 }
 
-#ifdef OPENSSL_KBKDF
 /************************************************
  * SP 800-108 KBKDF interface functions
  ************************************************/
@@ -1453,9 +1381,10 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 {
 	EVP_KDF *kdf = NULL;
 	EVP_KDF_CTX *ctx = NULL;
-	OSSL_PARAM params[8], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	const EVP_MD *md = NULL;
-	const EVP_CIPHER *type = NULL;
+	const EVP_CIPHER *cipher = NULL;
 	uint32_t derived_key_bytes = data->derived_key_length / 8;
 	uint32_t l = be32(data->derived_key_length);
 	BUFFER_INIT(label);
@@ -1481,35 +1410,36 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate KBKDF context\n");
 
-	p = params;
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MODE,
-				(data->kdfmode == ACVP_KDF_108_COUNTER) ?
-				"counter" : "feedback", 0);
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MODE,
+						(data->kdfmode == ACVP_KDF_108_COUNTER) ?
+						"counter" : "feedback", 0));
 
 	logger(LOGGER_VERBOSE, "data->mac = %" PRIu64 "\n", data->mac);
 	if (data->mac & ACVP_CIPHERTYPE_HMAC) {
 		CKINT(openssl_md_convert(data->mac, &md));
 		CKNULL(md, -ENOMEM);
 
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-						(char *)EVP_MD_name(md), 0);
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
-							"HMAC", 0);
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_KDF_PARAM_DIGEST,
+							EVP_MD_name(md), 0));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MAC,
+							"HMAC", 0));
 	} else if (data->mac & ACVP_CIPHERTYPE_CMAC) {
 		CKINT(openssl_cipher(data->mac == ACVP_AESCMAC ? ACVP_AESCMAC :
-				     ACVP_TDESCMAC, data->key.len, &type));
-		CKNULL(type, -ENOMEM);
+				     ACVP_TDESCMAC, data->key.len, &cipher));
+		CKNULL(cipher, -ENOMEM);
 
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CIPHER,
-						(char *)EVP_CIPHER_name(type),
-						0);
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
-							"CMAC", 0);
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_KDF_PARAM_CIPHER,
+							EVP_CIPHER_name(cipher), 0));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MAC,
+							"CMAC", 0));
 	}
 
 	logger_binary(LOGGER_VERBOSE, data->key.buf, data->key.len, "data->key");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
-						 data->key.buf, data->key.len);
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_KEY,
+						 data->key.buf, data->key.len));
 
 	logger(LOGGER_VERBOSE, "L = %u\n", derived_key_bytes);
 	logger_binary(LOGGER_VERBOSE, (unsigned char *)&l, sizeof(l), "[L]_2");
@@ -1556,22 +1486,22 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
 	}
 
 	logger_binary(LOGGER_VERBOSE, context.buf, context.len, "context");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
-						 context.buf, context.len);
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_INFO,
+						 context.buf, context.len));
 
 	logger_binary(LOGGER_VERBOSE, label.buf, label.len, "label");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT, label.buf,
-						 label.len);
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_SALT,
+						 label.buf, label.len));
 
 	if (data->iv.len) {
 		logger_binary(LOGGER_VERBOSE, data->iv.buf, data->iv.len,
 			      "data->iv");
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SEED,
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_SEED,
 							 data->iv.buf,
-							 data->iv.len);
+							 data->iv.len));
 	}
 
-	*p = OSSL_PARAM_construct_end();
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
 	CKINT_O_LOG(EVP_KDF_derive(ctx, data->derived_key.buf,
@@ -1581,6 +1511,10 @@ static int openssl_kdf108(struct kdf_108_data *data, flags_t parsed_flags)
                       data->derived_key.len, "data->derived_key");
 
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)
@@ -1605,7 +1539,8 @@ static int openssl_kdf108_kmac(struct kdf_108_kmac_data *data,
 #else
 	EVP_KDF *kdf = NULL;
 	EVP_KDF_CTX *ctx = NULL;
-	OSSL_PARAM params[5], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	uint32_t derived_key_bytes = data->derived_key_length / 8;
 	const char *mac_alg;
 	int ret = 0;
@@ -1616,33 +1551,33 @@ static int openssl_kdf108_kmac(struct kdf_108_kmac_data *data,
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate KBKDF context\n");
 
-	p = params;
+	bld = OSSL_PARAM_BLD_new();
 
 	CKINT(convert_cipher_algo(data->mac & ACVP_KMACMASK,
 				  ACVP_CIPHERTYPE_KMAC, &mac_alg));
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
-						(char *)mac_alg,
-						strlen(mac_alg));
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MAC,
+						mac_alg, 0));
 
 	logger_binary(LOGGER_VERBOSE, data->key.buf, data->key.len, "data->key");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
-						 data->key.buf, data->key.len);
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_KEY,
+						 data->key.buf, data->key.len));
 
 	logger_binary(LOGGER_VERBOSE, data->context.buf, data->context.len,
 		      "context");
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_INFO,
 						 data->context.buf,
-						 data->context.len);
+						 data->context.len));
 
 	if (data->label.buf && data->label.len) {
 		logger_binary(LOGGER_VERBOSE, data->label.buf, data->label.len,
 			      "label");
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+							 OSSL_KDF_PARAM_SALT,
 							 data->label.buf,
-							 data->label.len);
+							 data->label.len));
 	}
 
-	*p = OSSL_PARAM_construct_end();
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
 	CKINT_O_LOG(EVP_KDF_derive(ctx, data->derived_key.buf,
@@ -1651,6 +1586,10 @@ static int openssl_kdf108_kmac(struct kdf_108_kmac_data *data,
 	logger_binary(LOGGER_VERBOSE, data->derived_key.buf,
                       data->derived_key.len, "data->derived_key");
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)
@@ -1670,7 +1609,6 @@ static void openssl_kdf_108_backend(void)
 {
 	register_kdf_108_impl(&openssl_kdf108_backend);
 }
-#endif
 
 /************************************************
  * DSA interface functions
@@ -2128,16 +2066,15 @@ static int _openssl_ecdsa_keygen(uint64_t curve, EVP_PKEY **key)
 	char *curve_name;
 	int ret = 0;
 
-	CKINT_LOG(_openssl_ecdsa_curves(curve, &nid , &curve_name),
+	CKINT_LOG(openssl_ecdsa_curves(curve, &nid , &curve_name),
 		  "Conversion of curve failed\n");
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
 	CKNULL(ctx, -ENOMEM);
 	CKINT_O(EVP_PKEY_keygen_init(ctx));
 	CKINT_O_LOG(EVP_PKEY_CTX_set_group_name(ctx, curve_name),
-		   "EC_KEY_new_by_curve_name() failed\n");
-	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key),
-		   "EC_KEY_generate_key() failed\n");
+		   "EVP_PKEY_CTX_set_group_name() failed\n");
+	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key), "EVP_PKEY_keygen() failed\n");
 
 out:
 	if (ctx)
@@ -2183,7 +2120,7 @@ static int openssl_ecdsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
 	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
-	CKINT(_openssl_ecdsa_curves(cipher, &nid, &curve_name));
+	CKINT(openssl_ecdsa_curves(cipher, &nid, &curve_name));
 
 	CKINT(alloc_buf(Qx->len + Qy->len + 1, &pub));
 
@@ -2386,50 +2323,20 @@ static void openssl_ecdsa_backend(void)
 /************************************************
  * EdDSA cipher interface functions
  ************************************************/
-int _openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
-			  char **out_curve_name, char **out_instance_name)
-{
-	char *curve_name;
-	char *instance_name;
-	logger(LOGGER_DEBUG, "curve : %" PRIu64 "\n", curve);
-
-	switch (curve & ACVP_CURVEMASK) {
-		case ACVP_ED25519:
-			curve_name = "ED25519";
-			instance_name = prehash ? "Ed25519ph" : "Ed25519";
-			break;
-		case ACVP_ED448:
-			curve_name = "ED448";
-			instance_name = prehash ? "Ed448ph" : "Ed448";
-			break;
-		default:
-			logger(LOGGER_ERR, "Unknown curve\n");
-			return -EINVAL;
-	}
-
-	if (out_curve_name) {
-		*out_curve_name = curve_name;
-	}
-	if (out_instance_name) {
-		*out_instance_name = instance_name;
-	}
-	return 0;
-}
-
 static int _openssl_eddsa_keygen(uint64_t curve, EVP_PKEY **key)
 {
 	EVP_PKEY_CTX *ctx = NULL;
+	int nid = 0;
 	char *curve_name;
 	int ret = 0;
 
-	CKINT_LOG(_openssl_eddsa_curves(curve, 0, &curve_name , NULL),
+	CKINT_LOG(openssl_eddsa_curves(curve, 0,  &nid, &curve_name , NULL),
 		  "Conversion of curve failed\n");
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
 	CKNULL(ctx, -ENOMEM);
 	CKINT_O(EVP_PKEY_keygen_init(ctx));
-	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key),
-		   "EC_KEY_generate_key() failed\n");
+	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key), "EVP_PKEY_keygen() failed\n");
 
 out:
 	if (ctx)
@@ -2464,13 +2371,14 @@ out:
 static int openssl_eddsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
 				     struct buffer *q)
 {
+	int nid = 0;
 	char *curve_name;
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
-	CKINT(_openssl_eddsa_curves(cipher, 0, &curve_name, NULL));
+	CKINT(openssl_eddsa_curves(cipher, 0, &nid, &curve_name, NULL));
 
 	logger_binary(LOGGER_DEBUG, q->buf, q->len, "Q");
 
@@ -2501,6 +2409,7 @@ static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
 	EVP_MD_CTX *md_ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
+	int nid = 0;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -2521,8 +2430,8 @@ static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L
 	char *instance_name;
 
-	CKINT(_openssl_eddsa_curves(data->cipher, data->prehash, NULL,
-				    &instance_name));
+	CKINT(openssl_eddsa_curves(data->cipher, data->prehash, &nid, NULL,
+				   &instance_name));
 	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_SIGNATURE_PARAM_INSTANCE,
 					instance_name, 0);
 	OSSL_PARAM_BLD_push_octet_string(bld,
@@ -2562,6 +2471,7 @@ static int openssl_eddsa_sigver(struct eddsa_sigver_data *data,
 	EVP_MD_CTX *md_ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
+	int nid = 0;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -2575,8 +2485,8 @@ static int openssl_eddsa_sigver(struct eddsa_sigver_data *data,
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L
 	char *instance_name;
 
-	CKINT(_openssl_eddsa_curves(data->cipher, data->prehash, NULL,
-				    &instance_name));
+	CKINT(openssl_eddsa_curves(data->cipher, data->prehash, &nid, NULL,
+				   &instance_name));
 	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_SIGNATURE_PARAM_INSTANCE,
 					instance_name, 0);
 #else
@@ -3617,10 +3527,10 @@ static int openssl_ansi_x942_kdf(struct ansi_x942_data *data,
 	// At most 2 (prefix) + 256 (data) bytes for each parameter
 	unsigned char acvp_info[2 + 256 + 2 + 256 + 2 + 256 + 2 + 256];
 	size_t ptr;
-	int use_keybits = 0;
 	EVP_KDF *kdf = NULL;
 	EVP_KDF_CTX *ctx = NULL;
-	OSSL_PARAM params[6], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -3683,24 +3593,30 @@ static int openssl_ansi_x942_kdf(struct ansi_x942_data *data,
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate ANSI X9.42 KDF context\n");
 
-	p = params;
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-						(char *)EVP_MD_name(md), 0);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SECRET,
-						 data->zz.buf, data->zz.len);
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_CEK_ALG,
-						(char *)cekalg, 0);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_X942_ACVPINFO,
-						 acvp_info, ptr);
-	*p++ = OSSL_PARAM_construct_int(OSSL_KDF_PARAM_X942_USE_KEYBITS,
-					&use_keybits);
-	*p = OSSL_PARAM_construct_end();
+
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_DIGEST,
+						EVP_MD_name(md), 0));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_SECRET,
+						 data->zz.buf, data->zz.len));
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_CEK_ALG,
+						cekalg, 0));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+						 OSSL_KDF_PARAM_X942_ACVPINFO,
+						 acvp_info, ptr));
+	CKINT_O(OSSL_PARAM_BLD_push_int(bld, OSSL_KDF_PARAM_X942_USE_KEYBITS,
+					0));
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT(alloc_buf(data->key_len / 8, &data->derived_key));
 	CKINT_O(EVP_KDF_derive(ctx, data->derived_key.buf,
 			       data->derived_key.len, params));
 
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)
@@ -3730,7 +3646,8 @@ static int openssl_ansi_x963_kdf(struct ansi_x963_data *data,
 	const EVP_MD *md;
 	EVP_KDF *kdf = NULL;
 	EVP_KDF_CTX *ctx = NULL;
-	OSSL_PARAM params[4], *p;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -3742,21 +3659,26 @@ static int openssl_ansi_x963_kdf(struct ansi_x963_data *data,
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate ANSI X9.63 KDF context\n");
 
-	p = params;
-	*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-						(char *)EVP_MD_name(md), 0);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SECRET,
-						 data->z.buf, data->z.len);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_DIGEST,
+						EVP_MD_name(md), 0));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_SECRET,
+						 data->z.buf, data->z.len));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_INFO,
 						 data->shared_info.buf,
-						 data->shared_info.len);
-	*p = OSSL_PARAM_construct_end();
+						 data->shared_info.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	CKINT(alloc_buf(data->key_data_len / 8, &data->key_data));
 	CKINT_O(EVP_KDF_derive(ctx, data->key_data.buf,
 			       data->key_data.len, params));
 
 out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)
@@ -3787,7 +3709,8 @@ static int openssl_kda_onestep_kdf(struct kda_onestep_data *data,
 	EVP_KDF_CTX *ctx = NULL;
 	const char *mac_alg;
 	const EVP_MD *md = NULL;
-	OSSL_PARAM params[6], *p = params;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
 	uint32_t derived_key_bytes = data->dkmlen / 8;
 	int ret = 0;
 
@@ -3804,43 +3727,41 @@ static int openssl_kda_onestep_kdf(struct kda_onestep_data *data,
 	ctx = EVP_KDF_CTX_new(kdf);
 	CKNULL_LOG(ctx, -EFAULT, "Cannot allocate OneStep KDF context\n");
 
+	bld = OSSL_PARAM_BLD_new();
+
 	if (data->aux_function & ACVP_CIPHERTYPE_KMAC) {
 		CKINT(convert_cipher_algo(data->aux_function & ACVP_KMACMASK,
 					  ACVP_CIPHERTYPE_KMAC, &mac_alg));
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
-							(char *)mac_alg,
-							strlen(mac_alg));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MAC,
+							mac_alg, 0));
 	} else if (data->aux_function & ACVP_CIPHERTYPE_HMAC) {
-		mac_alg = "HMAC";
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_MAC,
-							(char *)mac_alg,
-							strlen(mac_alg));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_KDF_PARAM_MAC,
+							"HMAC", 0));
 
 		CKINT(openssl_md_convert(data->aux_function, &md));
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-							(char *)EVP_MD_name(md),
-							0);
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_KDF_PARAM_DIGEST,
+							EVP_MD_name(md), 0));
 	} else {
-		CKINT(openssl_md_convert(data->aux_function,  &md));
-		*p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
-							(char *)EVP_MD_name(md),
-							0);
+		CKINT(openssl_md_convert(data->aux_function, &md));
+		CKINT_O(OSSL_PARAM_BLD_push_utf8_string(bld,
+							OSSL_KDF_PARAM_DIGEST,
+							EVP_MD_name(md), 0));
 	}
 
 	if (data->salt.buf && data->salt.len) {
-		*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_SALT,
+		CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_SALT,
 							 data->salt.buf,
-							 data->salt.len);
+							 data->salt.len));
 	}
 
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY,
-						 data->z.buf,
-						 data->z.len);
-	*p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO,
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_KEY,
+						 data->z.buf, data->z.len));
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld, OSSL_KDF_PARAM_INFO,
 						 data->info.buf,
-						 data->info.len);
+						 data->info.len));
 
-	*p = OSSL_PARAM_construct_end();
+	params = OSSL_PARAM_BLD_to_param(bld);
 
 	if (local_dkm.buf && local_dkm.len) {
 		CKINT_O(EVP_KDF_derive(ctx, local_dkm.buf, local_dkm.len,
@@ -3862,6 +3783,10 @@ static int openssl_kda_onestep_kdf(struct kda_onestep_data *data,
 out:
 	free_buf(&local_dkm);
 
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
 	if (kdf)
 		EVP_KDF_free(kdf);
 	if (ctx)

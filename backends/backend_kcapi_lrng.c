@@ -419,6 +419,7 @@ out:
 static struct hmac_backend kcapi_hmac =
 {
 	kcapi_hmac_generate,	/* hmac_generate */
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(kcapi_hmac_backend)

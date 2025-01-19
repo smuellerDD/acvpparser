@@ -509,6 +509,7 @@ static int ippcp_mac_generate(struct hmac_data *data, flags_t parsed_flags)
 static struct hmac_backend ippcp_mac =
 {
 	ippcp_mac_generate,
+	NULL,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(ippcp_mac_backend)

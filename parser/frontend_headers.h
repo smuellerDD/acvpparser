@@ -63,6 +63,7 @@ void _init_register_proto_hmac(void);
 void _init_register_proto_kdf108(void);
 void _init_register_proto_kmac(void);
 void _init_register_proto_ml_dsa(void);
+void _init_register_proto_slh_dsa(void);
 void _init_register_proto_ml_kem(void);
 void _init_register_proto_pbkdf(void);
 void _init_register_proto_rsa(void);
