@@ -34,7 +34,6 @@
 #include "aes_riscv64.h"
 
 #include "dilithium_signature_c.h"
-#include "kyber_kem_c.h"
 #include "sha3_arm_asm.h"
 #include "sha3_arm_ce.h"
 #include "sha3_arm_neon.h"
@@ -61,11 +60,9 @@
 
 #ifdef __x86_64__
 #include "shake_4x_avx2.h"
-#include "kyber_kem_avx2.h"
 #endif
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include "shake_2x_armv8.h"
-#include "kyber_kem_armv8.h"
 #endif
 
 /************************************************
@@ -2151,523 +2148,149 @@ static void lc_ml_dsa_backend(void)
 /************************************************
  * ML-KEM interface functions
  ************************************************/
-
-/********************************* Kyber 1024 *********************************/
-
-struct kyber_1024_funcs {
-	int (*kyber_keypair_from_seed)(struct lc_kyber_1024_pk *pk,
-				       struct lc_kyber_1024_sk *sk,
-				       const uint8_t *seed, size_t seedlen);
-	int (*kyber_enc_int)(struct lc_kyber_1024_ct *ct,
-			     struct lc_kyber_1024_ss *ss,
-			     const struct lc_kyber_1024_pk *pk,
-			     struct lc_rng_ctx *rng_ctx);
-	int (*kyber_dec)(struct lc_kyber_1024_ss *ss,
-			 const struct lc_kyber_1024_ct *ct,
-			 const struct lc_kyber_1024_sk *sk);
-};
-
-static int lc_get_kyber(struct kyber_1024_funcs *funcs)
+static void lc_ml_kem_set_impl(void)
 {
 	const char *envstr = getenv("LC_KYBER");
 
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
-		logger(LOGGER_VERBOSE, "Kyber-1024 implementation: common\n");
-#ifdef __x86_64__
-		funcs->kyber_keypair_from_seed =
-			lc_kyber_1024_keypair_from_seed_avx;
-		funcs->kyber_enc_int = lc_kyber_1024_enc_avx;
-		funcs->kyber_dec = lc_kyber_1024_dec_avx;
-#elif defined(__aarch64__) || defined(_M_ARM64)
-		funcs->kyber_keypair_from_seed = lc_kyber_1024_keypair_from_seed_armv8;
-		funcs->kyber_enc_int = lc_kyber_1024_enc_armv8;
-		funcs->kyber_dec = lc_kyber_1024_dec_armv8;
-#else
-		funcs->kyber_keypair_from_seed = lc_kyber_1024_keypair_from_seed;
-		funcs->kyber_enc_int = lc_kyber_1024_enc_c;
-		funcs->kyber_dec = lc_kyber_1024_dec;
-#endif
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_disable();
+}
 
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Kyber implementation: C\n");
-		funcs->kyber_keypair_from_seed =
-			lc_kyber_1024_keypair_from_seed_c;
-		funcs->kyber_enc_int = lc_kyber_1024_enc_c;
-		funcs->kyber_dec = lc_kyber_1024_dec_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
+static void lc_ml_kem_reset_impl(void)
+{
+	const char *envstr = getenv("LC_KYBER");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_enable();
+}
+
+static int lc_ml_kem_type(uint64_t cipher, enum lc_kyber_type *type)
+{
+	lc_ml_kem_set_impl();
+
+	switch (cipher) {
+	case ACVP_ML_KEM_1024:
+		*type = LC_KYBER_1024;
+		break;
+	case ACVP_ML_KEM_768:
+		*type = LC_KYBER_768;
+		break;
+	case ACVP_ML_KEM_512:
+		*type = LC_KYBER_512;
+		break;
+	default:
 		return -EOPNOTSUPP;
 	}
 
 	return 0;
 }
-
-static int lc_ml_kem_1024_keygen(struct ml_kem_keygen_data *data,
-				 flags_t parsed_flags)
-{
-	struct kyber_1024_funcs funcs;
-	struct lc_kyber_1024_pk pk;
-	struct lc_kyber_1024_sk sk;
-	uint8_t buf[64];
-	int ret;
-
-	(void)parsed_flags;
-
-	if (data->d.len + data->z.len != sizeof(buf))
-		return -EINVAL;
-	memcpy(buf, data->d.buf, data->d.len);
-	memcpy(buf + data->d.len, data->z.buf, data->z.len);
-
-	CKINT(lc_get_kyber(&funcs));
-
-	CKINT(funcs.kyber_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
-
-	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
-	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
-
-	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
-	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_1024_encapsulation(struct ml_kem_encapsulation_data *data,
-					flags_t parsed_flags)
-{
-	struct kyber_1024_funcs funcs;
-	struct lc_kyber_1024_pk pk;
-	struct lc_kyber_1024_ct ct;
-	struct lc_kyber_1024_ss ss;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber(&funcs));
-
-	if (sizeof(pk.pk) != data->ek.len) {
-		logger(LOGGER_ERR,
-		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(pk.pk), data->ek.len);
-		return -EOPNOTSUPP;
-	}
-	memcpy(pk.pk, data->ek.buf, data->ek.len);
-
-	s_rng_state.seed = data->msg.buf;
-	s_rng_state.seedlen = data->msg.len;
-
-	if (funcs.kyber_enc_int) {
-		CKINT(funcs.kyber_enc_int(&ct, &ss, &pk, &s_drng));
-	} else {
-		ret = -EOPNOTSUPP;
-		goto out;
-	}
-
-	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
-	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_1024_decapsulation(struct ml_kem_decapsulation_data *data,
-					flags_t parsed_flags)
-{
-	struct kyber_1024_funcs funcs;
-	struct lc_kyber_1024_sk sk;
-	struct lc_kyber_1024_ct ct;
-	struct lc_kyber_1024_ss ss;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber(&funcs));
-
-	if (sizeof(sk.sk) != data->dk.len) {
-		logger(LOGGER_ERR,
-		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(sk.sk), data->dk.len);
-		return -EFAULT;
-	}
-	memcpy(sk.sk, data->dk.buf, data->dk.len);
-
-	if (sizeof(ct.ct) != data->c.len) {
-		logger(LOGGER_ERR,
-		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(ct.ct), data->c.len);
-		return -EFAULT;
-	}
-	memcpy(ct.ct, data->c.buf, data->c.len);
-
-	CKINT(funcs.kyber_dec(&ss, &ct, &sk));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-/********************************* Kyber 768 **********************************/
-
-struct kyber_768_funcs {
-	int (*kyber_768_keypair_from_seed)(struct lc_kyber_768_pk *pk,
-					   struct lc_kyber_768_sk *sk,
-					   const uint8_t *seed, size_t seedlen);
-	int (*kyber_768_enc_int)(struct lc_kyber_768_ct *ct,
-			     struct lc_kyber_768_ss *ss,
-			     const struct lc_kyber_768_pk *pk,
-			     struct lc_rng_ctx *rng_ctx);
-	int (*kyber_768_dec)(struct lc_kyber_768_ss *ss,
-			 const struct lc_kyber_768_ct *ct,
-			 const struct lc_kyber_768_sk *sk);
-};
-
-static int lc_get_kyber_768(struct kyber_768_funcs *funcs)
-{
-	const char *envstr = getenv("LC_KYBER");
-
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
-		logger(LOGGER_VERBOSE, "Kyber-768 implementation: common\n");
-#ifdef __x86_64__
-		funcs->kyber_768_keypair_from_seed =
-			lc_kyber_768_keypair_from_seed_avx;
-		funcs->kyber_768_enc_int = lc_kyber_768_enc_avx;
-		funcs->kyber_768_dec = lc_kyber_768_dec_avx;
-#elif defined(__aarch64__) || defined(_M_ARM64)
-		funcs->kyber_768_keypair_from_seed =
-			lc_kyber_768_keypair_from_seed_armv8;
-		funcs->kyber_768_enc_int = lc_kyber_768_enc_armv8;
-		funcs->kyber_768_dec = lc_kyber_768_dec_armv8;
-#else
-		funcs->kyber_768_keypair_from_seed =
-			lc_kyber_768_keypair_from_seed_c;
-		funcs->kyber_768_enc_int = lc_kyber_768_enc_c;
-		funcs->kyber_768_dec = lc_kyber_768_dec_c;
-#endif
-
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Kyber-768 implementation: C\n");
-		funcs->kyber_768_keypair_from_seed =
-			lc_kyber_768_keypair_from_seed_c;
-		funcs->kyber_768_enc_int = lc_kyber_768_enc_c;
-		funcs->kyber_768_dec = lc_kyber_768_dec_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
-static int lc_ml_kem_768_keygen(struct ml_kem_keygen_data *data,
-				 flags_t parsed_flags)
-{
-	struct kyber_768_funcs funcs;
-	struct lc_kyber_768_pk pk;
-	struct lc_kyber_768_sk sk;
-	uint8_t buf[64];
-	int ret;
-
-	(void)parsed_flags;
-
-	if (data->d.len + data->z.len != sizeof(buf))
-		return -EINVAL;
-	memcpy(buf, data->d.buf, data->d.len);
-	memcpy(buf + data->d.len, data->z.buf, data->z.len);
-
-	CKINT(lc_get_kyber_768(&funcs));
-
-	CKINT(funcs.kyber_768_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
-
-	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
-	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
-
-	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
-	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_768_encapsulation(struct ml_kem_encapsulation_data *data,
-				       flags_t parsed_flags)
-{
-	struct kyber_768_funcs funcs;
-	struct lc_kyber_768_pk pk;
-	struct lc_kyber_768_ct ct;
-	struct lc_kyber_768_ss ss;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber_768(&funcs));
-
-	if (sizeof(pk.pk) != data->ek.len) {
-		logger(LOGGER_ERR,
-		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(pk.pk), data->ek.len);
-		return -EOPNOTSUPP;
-	}
-	memcpy(pk.pk, data->ek.buf, data->ek.len);
-
-	s_rng_state.seed = data->msg.buf;
-	s_rng_state.seedlen = data->msg.len;
-
-	if (funcs.kyber_768_enc_int) {
-		CKINT(funcs.kyber_768_enc_int(&ct, &ss, &pk, &s_drng));
-	} else {
-		ret = -EOPNOTSUPP;
-		goto out;
-	}
-
-	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
-	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_768_decapsulation(struct ml_kem_decapsulation_data *data,
-				       flags_t parsed_flags)
-{
-	struct kyber_768_funcs funcs;
-	struct lc_kyber_768_sk sk;
-	struct lc_kyber_768_ct ct;
-	struct lc_kyber_768_ss ss;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber_768(&funcs));
-
-	if (sizeof(sk.sk) != data->dk.len) {
-		logger(LOGGER_ERR,
-		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(sk.sk), data->dk.len);
-		return -EFAULT;
-	}
-	memcpy(sk.sk, data->dk.buf, data->dk.len);
-
-	if (sizeof(ct.ct) != data->c.len) {
-		logger(LOGGER_ERR,
-		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(ct.ct), data->c.len);
-		return -EFAULT;
-	}
-	memcpy(ct.ct, data->c.buf, data->c.len);
-
-	CKINT(funcs.kyber_768_dec(&ss, &ct, &sk));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-/********************************* Kyber 512 **********************************/
-
-struct kyber_512_funcs {
-	int (*kyber_512_keypair_from_seed)(struct lc_kyber_512_pk *pk,
-					   struct lc_kyber_512_sk *sk,
-					   const uint8_t *seed, size_t seedlen);
-	int (*kyber_512_enc_int)(struct lc_kyber_512_ct *ct,
-			     struct lc_kyber_512_ss *ss,
-			     const struct lc_kyber_512_pk *pk,
-			     struct lc_rng_ctx *rng_ctx);
-	int (*kyber_512_dec)(struct lc_kyber_512_ss *ss,
-			 const struct lc_kyber_512_ct *ct,
-			 const struct lc_kyber_512_sk *sk);
-};
-
-static int lc_get_kyber_512(struct kyber_512_funcs *funcs)
-{
-	const char *envstr = getenv("LC_KYBER");
-
-	if (!envstr || (envstr && !strncasecmp(envstr, "common", 6))) {
-		logger(LOGGER_VERBOSE, "Kyber-512 implementation: common, but using C\n");
-		funcs->kyber_512_keypair_from_seed =
-			lc_kyber_512_keypair_from_seed_c;
-		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
-		funcs->kyber_512_dec = lc_kyber_512_dec_c;
-	} else if (envstr && !strncasecmp(envstr, "C", 1)) {
-		logger(LOGGER_VERBOSE, "Kyber-512 implementation: C\n");
-		funcs->kyber_512_keypair_from_seed =
-			lc_kyber_512_keypair_from_seed_c;
-		funcs->kyber_512_enc_int = lc_kyber_512_enc_c;
-		funcs->kyber_512_dec = lc_kyber_512_dec_c;
-	} else {
-		logger(LOGGER_ERR, "Unknown Kyber implementation %s\n", envstr);
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
-static int lc_ml_kem_512_keygen(struct ml_kem_keygen_data *data,
-				flags_t parsed_flags)
-{
-	struct kyber_512_funcs funcs;
-	struct lc_kyber_512_pk pk;
-	struct lc_kyber_512_sk sk;
-	uint8_t buf[64];
-	int ret;
-
-	(void)parsed_flags;
-
-	if (data->d.len + data->z.len != sizeof(buf))
-		return -EINVAL;
-	memcpy(buf, data->d.buf, data->d.len);
-	memcpy(buf + data->d.len, data->z.buf, data->z.len);
-
-	CKINT(lc_get_kyber_512(&funcs));
-
-	CKINT(funcs.kyber_512_keypair_from_seed(&pk, &sk, buf, sizeof(buf)));
-
-	CKINT(alloc_buf(sizeof(pk.pk), &data->ek));
-	memcpy(data->ek.buf, pk.pk, sizeof(pk.pk));
-
-	CKINT(alloc_buf(sizeof(sk.sk), &data->dk));
-	memcpy(data->dk.buf, sk.sk, sizeof(sk.sk));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_512_encapsulation(struct ml_kem_encapsulation_data *data,
-				       flags_t parsed_flags)
-{
-	struct kyber_512_funcs funcs;
-	struct lc_kyber_512_pk pk;
-	struct lc_kyber_512_ct ct;
-	struct lc_kyber_512_ss ss;
-	struct static_rng s_rng_state;
-	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
-				     .rng_state = &s_rng_state };
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber_512(&funcs));
-
-	if (sizeof(pk.pk) != data->ek.len) {
-		logger(LOGGER_ERR,
-		       "Kyber EK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(pk.pk), data->ek.len);
-		return -EOPNOTSUPP;
-	}
-	memcpy(pk.pk, data->ek.buf, data->ek.len);
-
-	s_rng_state.seed = data->msg.buf;
-	s_rng_state.seedlen = data->msg.len;
-
-	if (funcs.kyber_512_enc_int) {
-		CKINT(funcs.kyber_512_enc_int(&ct, &ss, &pk, &s_drng));
-	} else {
-		ret = -EOPNOTSUPP;
-		goto out;
-	}
-
-	CKINT(alloc_buf(sizeof(ct.ct), &data->c));
-	memcpy(data->c.buf, ct.ct, sizeof(ct.ct));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-static int lc_ml_kem_512_decapsulation(struct ml_kem_decapsulation_data *data,
-				       flags_t parsed_flags)
-{
-	struct kyber_512_funcs funcs;
-	struct lc_kyber_512_sk sk;
-	struct lc_kyber_512_ct ct;
-	struct lc_kyber_512_ss ss;
-	int ret;
-
-	(void)parsed_flags;
-
-	CKINT(lc_get_kyber_512(&funcs));
-
-	if (sizeof(sk.sk) != data->dk.len) {
-		logger(LOGGER_ERR,
-		       "Kyber DK does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(sk.sk), data->dk.len);
-		return -EFAULT;
-	}
-	memcpy(sk.sk, data->dk.buf, data->dk.len);
-
-	if (sizeof(ct.ct) != data->c.len) {
-		logger(LOGGER_ERR,
-		       "Kyber CT does not match expected size (expected %zu, actual %zu)\n",
-		       sizeof(ct.ct), data->c.len);
-		return -EFAULT;
-	}
-	memcpy(ct.ct, data->c.buf, data->c.len);
-
-	CKINT(funcs.kyber_512_dec(&ss, &ct, &sk));
-
-	CKINT(alloc_buf(sizeof(ss.ss), &data->ss));
-	memcpy(data->ss.buf, ss.ss, sizeof(ss.ss));
-
-out:
-	return ret;
-}
-
-/******************************** Common Code *********************************/
 
 static int lc_ml_kem_keygen(struct ml_kem_keygen_data *data,
 			    flags_t parsed_flags)
 {
-	if (data->cipher == ACVP_ML_KEM_512)
-		return lc_ml_kem_512_keygen(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_768)
-		return lc_ml_kem_768_keygen(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_1024)
-		return lc_ml_kem_1024_keygen(data, parsed_flags);
-	else
-		return -EOPNOTSUPP;
+	struct lc_kyber_pk pk;
+	struct lc_kyber_sk sk;
+	enum lc_kyber_type type;
+	uint8_t buf[64];
+	size_t len;
+	uint8_t *ptr;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_kem_type(data->cipher, &type));
+
+	if (data->d.len + data->z.len != sizeof(buf))
+		return -EINVAL;
+	memcpy(buf, data->d.buf, data->d.len);
+	memcpy(buf + data->d.len, data->z.buf, data->z.len);
+
+	CKINT(lc_kyber_keypair_from_seed(&pk, &sk, buf, sizeof(buf), type));
+
+	CKINT(lc_kyber_pk_ptr(&ptr, &len, &pk));
+	CKINT(alloc_buf(len, &data->ek));
+	memcpy(data->ek.buf, ptr, len);
+
+	CKINT(lc_kyber_sk_ptr(&ptr, &len, &sk));
+	CKINT(alloc_buf(len, &data->dk));
+	memcpy(data->dk.buf, ptr, len);
+
+out:
+	lc_ml_kem_reset_impl();
+	return ret;
 }
 
 static int lc_ml_kem_encapsulation(struct ml_kem_encapsulation_data *data,
 				   flags_t parsed_flags)
 {
-	if (data->cipher == ACVP_ML_KEM_512)
-		return lc_ml_kem_512_encapsulation(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_768)
-		return lc_ml_kem_768_encapsulation(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_1024)
-		return lc_ml_kem_1024_encapsulation(data, parsed_flags);
-	else
-		return -EOPNOTSUPP;
+	struct lc_kyber_pk pk;
+	struct lc_kyber_ct ct;
+	struct lc_kyber_ss ss;
+	enum lc_kyber_type type;
+	struct static_rng s_rng_state;
+	struct lc_rng_ctx s_drng = { .rng = &lc_static_drng,
+				     .rng_state = &s_rng_state };
+	size_t len;
+	uint8_t *ptr;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_kem_type(data->cipher, &type));
+
+	CKINT(lc_kyber_pk_load(&pk, data->ek.buf, data->ek.len));
+
+	s_rng_state.seed = data->msg.buf;
+	s_rng_state.seedlen = data->msg.len;
+
+	/* Set seeded RNG with the pre-defined seed data */
+	CKINT(lc_rng_set_seeded(&s_drng));
+
+	CKINT(lc_kyber_enc(&ct, &ss, &pk));
+
+	/* Unset seeded RNG using the standard seeded RNG */
+	CKINT(lc_rng_set_seeded(NULL));
+
+	CKINT(lc_kyber_ct_ptr(&ptr, &len, &ct));
+	CKINT(alloc_buf(len, &data->c));
+	memcpy(data->c.buf, ptr, len);
+
+	CKINT(lc_kyber_ss_ptr(&ptr, &len, &ss));
+	CKINT(alloc_buf(len, &data->ss));
+	memcpy(data->ss.buf, ptr, len);
+
+out:
+	lc_ml_kem_reset_impl();
+	return ret;
 }
 
 static int lc_ml_kem_decapsulation(struct ml_kem_decapsulation_data *data,
 				   flags_t parsed_flags)
 {
-	if (data->cipher == ACVP_ML_KEM_512)
-		return lc_ml_kem_512_decapsulation(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_768)
-		return lc_ml_kem_768_decapsulation(data, parsed_flags);
-	else if (data->cipher == ACVP_ML_KEM_1024)
-		return lc_ml_kem_1024_decapsulation(data, parsed_flags);
-	else
-		return -EOPNOTSUPP;
+	struct lc_kyber_sk sk;
+	struct lc_kyber_ct ct;
+	struct lc_kyber_ss ss;
+	enum lc_kyber_type type;
+	size_t len;
+	uint8_t *ptr;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_kem_type(data->cipher, &type));
+
+	CKINT(lc_kyber_sk_load(&sk, data->dk.buf, data->dk.len));
+	CKINT(lc_kyber_ct_load(&ct, data->c.buf, data->c.len));
+
+	CKINT(lc_kyber_dec(&ss, &ct, &sk));
+
+	CKINT(lc_kyber_ss_ptr(&ptr, &len, &ss));
+	CKINT(alloc_buf(len, &data->ss));
+	memcpy(data->ss.buf, ptr, len);
+
+out:
+	lc_ml_kem_reset_impl();
+	return ret;
 }
 
 static struct ml_kem_backend lc_ml_kem =
