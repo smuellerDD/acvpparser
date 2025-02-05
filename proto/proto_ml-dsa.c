@@ -111,6 +111,10 @@ static int proto_ml_dsa_siggen_tester(struct buffer *in, struct buffer *out,
 	data.rnd.len = MlDsaSiggenDataMsg_recv->rnd.len;
 	data.sk.buf = MlDsaSiggenDataMsg_recv->sk.data;
 	data.sk.len = MlDsaSiggenDataMsg_recv->sk.len;
+	data.context.buf = MlDsaSiggenDataMsg_recv->context.data;
+	data.context.len = MlDsaSiggenDataMsg_recv->context.len;
+	data.interface.buf = MlDsaSiggenDataMsg_recv->interface.data;
+	data.interface.len = MlDsaSiggenDataMsg_recv->interface.len;
 	data.cipher = MlDsaSiggenDataMsg_recv->cipher;
 	data.privkey = proto_ml_dsa_privkey.privkey;
 
@@ -163,6 +167,10 @@ static int proto_ml_dsa_sigver_tester(struct buffer *in, struct buffer *out,
 	data.sig.len = MlDsaSigverDataMsg_recv->sig.len;
 	data.pk.buf = MlDsaSigverDataMsg_recv->pk.data;
 	data.pk.len = MlDsaSigverDataMsg_recv->pk.len;
+	data.context.buf = MlDsaSigverDataMsg_recv->context.data;
+	data.context.len = MlDsaSigverDataMsg_recv->context.len;
+	data.interface.buf = MlDsaSigverDataMsg_recv->interface.data;
+	data.interface.len = MlDsaSigverDataMsg_recv->interface.len;
 	data.cipher = MlDsaSigverDataMsg_recv->cipher;
 
 	CKINT(ml_dsa_backend->ml_dsa_sigver(&data, parsed_flags));

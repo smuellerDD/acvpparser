@@ -33,16 +33,20 @@ message MlDsaSiggenDataMsg {
 	bytes pk = 3;
 	bytes rnd = 4;
 	bytes sk = 5;
-	uint32 privkey = 6;
-	uint64 cipher = 7;
+	bytes context = 6;
+	bytes interface = 7;
+	uint32 privkey = 8;
+	uint64 cipher = 9;
 }
 
 message MlDsaSigverDataMsg {
 	bytes msg = 1;
 	bytes sig = 2;
 	bytes pk = 3;
-	uint64 cipher = 4;
-	uint32 sigver_success = 5;
+	bytes context = 4;
+	bytes interface = 5;
+	uint64 cipher = 6;
+	uint32 sigver_success = 7;
 }
 
 message MlDsaKeygenEnMsg {

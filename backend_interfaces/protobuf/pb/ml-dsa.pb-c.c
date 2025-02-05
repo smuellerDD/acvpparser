@@ -309,7 +309,7 @@ const ProtobufCMessageDescriptor ml_dsa_keygen_data_msg__descriptor =
   (ProtobufCMessageInit) ml_dsa_keygen_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[7] =
+static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[9] =
 {
   {
     "msg",
@@ -372,8 +372,32 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "privkey",
+    "context",
     6,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSiggenDataMsg, context),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "interface",
+    7,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSiggenDataMsg, interface),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "privkey",
+    8,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT32,
     0,   /* quantifier_offset */
@@ -385,7 +409,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "cipher",
-    7,
+    9,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT64,
     0,   /* quantifier_offset */
@@ -397,10 +421,12 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
 };
 static const unsigned ml_dsa_siggen_data_msg__field_indices_by_name[] = {
-  6,   /* field[6] = cipher */
+  8,   /* field[8] = cipher */
+  5,   /* field[5] = context */
+  6,   /* field[6] = interface */
   0,   /* field[0] = msg */
   2,   /* field[2] = pk */
-  5,   /* field[5] = privkey */
+  7,   /* field[7] = privkey */
   3,   /* field[3] = rnd */
   1,   /* field[1] = sig */
   4,   /* field[4] = sk */
@@ -408,7 +434,7 @@ static const unsigned ml_dsa_siggen_data_msg__field_indices_by_name[] = {
 static const ProtobufCIntRange ml_dsa_siggen_data_msg__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 7 }
+  { 0, 9 }
 };
 const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
 {
@@ -418,14 +444,14 @@ const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
   "MlDsaSiggenDataMsg",
   "",
   sizeof(MlDsaSiggenDataMsg),
-  7,
+  9,
   ml_dsa_siggen_data_msg__field_descriptors,
   ml_dsa_siggen_data_msg__field_indices_by_name,
   1,  ml_dsa_siggen_data_msg__number_ranges,
   (ProtobufCMessageInit) ml_dsa_siggen_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[5] =
+static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[7] =
 {
   {
     "msg",
@@ -464,8 +490,32 @@ static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "cipher",
+    "context",
     4,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSigverDataMsg, context),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "interface",
+    5,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSigverDataMsg, interface),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "cipher",
+    6,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT64,
     0,   /* quantifier_offset */
@@ -477,7 +527,7 @@ static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[
   },
   {
     "sigver_success",
-    5,
+    7,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT32,
     0,   /* quantifier_offset */
@@ -489,16 +539,18 @@ static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[
   },
 };
 static const unsigned ml_dsa_sigver_data_msg__field_indices_by_name[] = {
-  3,   /* field[3] = cipher */
+  5,   /* field[5] = cipher */
+  3,   /* field[3] = context */
+  4,   /* field[4] = interface */
   0,   /* field[0] = msg */
   2,   /* field[2] = pk */
   1,   /* field[1] = sig */
-  4,   /* field[4] = sigver_success */
+  6,   /* field[6] = sigver_success */
 };
 static const ProtobufCIntRange ml_dsa_sigver_data_msg__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 5 }
+  { 0, 7 }
 };
 const ProtobufCMessageDescriptor ml_dsa_sigver_data_msg__descriptor =
 {
@@ -508,7 +560,7 @@ const ProtobufCMessageDescriptor ml_dsa_sigver_data_msg__descriptor =
   "MlDsaSigverDataMsg",
   "",
   sizeof(MlDsaSigverDataMsg),
-  5,
+  7,
   ml_dsa_sigver_data_msg__field_descriptors,
   ml_dsa_sigver_data_msg__field_indices_by_name,
   1,  ml_dsa_sigver_data_msg__number_ranges,

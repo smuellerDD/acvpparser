@@ -369,7 +369,7 @@ endif
 
 PROTOFILE += sha.proto sym.proto aead.proto cshake.proto hmac.proto kmac.proto
 PROTOFILE += rsa.proto drbg.proto ecdh.proto ecdsa.proto kbkdf.proto pbkdf.proto
-PROTOFILE += kda_hkdf.proto ml-dsa.proto ml-kem.proto eddsa.proto
+PROTOFILE += kda_hkdf.proto ml-dsa.proto ml-kem.proto eddsa.proto slh-dsa.proto
 PROTOFILE_C += $(foreach profile,$(PROTOFILE),$(PROTODEFDIR)/$(profile:.proto=.pb-c.c))
 PROTODEFDIR := backend_interfaces/protobuf/pb
 
@@ -398,6 +398,7 @@ ifeq (mbedtls,$(firstword $(MAKECMDGOALS)))
 	# The protobuf parser code is dead-code-stripped.
 	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*ml-kem*.c), $(C_SRCS))
 	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*ml-dsa*.c), $(C_SRCS))
+	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*slh-dsa*.c), $(C_SRCS))
 	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*pbkdf*.c), $(C_SRCS))
 	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*sym*.c), $(C_SRCS))
 	C_SRCS := $(filter-out $(wildcard $(PROTODIR)/*kmac*.c), $(C_SRCS))

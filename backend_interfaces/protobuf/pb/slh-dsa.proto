@@ -33,14 +33,18 @@ message SlhDsaSiggenDataMsg {
 	bytes msg = 1;
 	bytes sig = 2;
 	bytes rnd = 3;
-	bytes sk = 4;
-	uint64 cipher = 5;
+	bytes context = 4;
+	bytes interface = 5;
+	bytes sk = 6;
+	uint64 cipher = 7;
 }
 
 message SlhDsaSigverDataMsg {
 	bytes msg = 1;
 	bytes sig = 2;
 	bytes pk = 3;
-	uint64 cipher = 4;
-	uint32 sigver_success = 5;
+	bytes context = 4;
+	bytes interface = 5;
+	uint64 cipher = 6;
+	uint32 sigver_success = 7;
 }
