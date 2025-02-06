@@ -37,6 +37,7 @@ message SlhDsaSiggenDataMsg {
 	bytes interface = 5;
 	bytes sk = 6;
 	uint64 cipher = 7;
+	uint64 hashalg = 8;
 }
 
 message SlhDsaSigverDataMsg {
@@ -46,5 +47,6 @@ message SlhDsaSigverDataMsg {
 	bytes context = 4;
 	bytes interface = 5;
 	uint64 cipher = 6;
-	uint32 sigver_success = 7;
+	uint64 hashalg = 7;
+	uint32 sigver_success = 8;
 }

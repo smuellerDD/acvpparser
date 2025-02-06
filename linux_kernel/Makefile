@@ -27,7 +27,7 @@ ccflags-y += -I$(PWD)/$(ROOTDIR)/backend_interfaces/leancrypto
 ccflags-y += -Wframe-larger-than=10240
 
 # Specify the leancrypto Linux kernel symbols file
-ADDITIONALSYMBOLS := /home/sm/tmp/leancrypto/linux_kernel/Module.symvers
+ADDITIONALSYMBOLS := /home/sm/tmp/leancrypto-1.2.0/linux_kernel/Module.symvers
 
 ################################################################################
 # End of backend setting

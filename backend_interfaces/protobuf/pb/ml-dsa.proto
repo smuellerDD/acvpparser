@@ -37,6 +37,7 @@ message MlDsaSiggenDataMsg {
 	bytes interface = 7;
 	uint32 privkey = 8;
 	uint64 cipher = 9;
+	uint64 hashalg = 10;
 }
 
 message MlDsaSigverDataMsg {
@@ -46,7 +47,8 @@ message MlDsaSigverDataMsg {
 	bytes context = 4;
 	bytes interface = 5;
 	uint64 cipher = 6;
-	uint32 sigver_success = 7;
+	uint64 hashalg = 7;
+	uint32 sigver_success = 8;
 }
 
 message MlDsaKeygenEnMsg {

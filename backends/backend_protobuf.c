@@ -2146,6 +2146,7 @@ static int pb_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	MlDsaSiggenDataMsg_send.interface.data = data->interface.buf;
 	MlDsaSiggenDataMsg_send.interface.len = data->interface.len;
 	MlDsaSiggenDataMsg_send.cipher = data->cipher;
+	MlDsaSiggenDataMsg_send.hashalg = data->hashalg;
 	if (data->privkey) {
 		struct pb_privkey_buf *priv = data->privkey;
 
@@ -2201,6 +2202,7 @@ static int pb_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	MlDsaSigverDataMsg_send.pk.data = data->pk.buf;
 	MlDsaSigverDataMsg_send.pk.len = data->pk.len;
 	MlDsaSigverDataMsg_send.cipher = data->cipher;
+	MlDsaSigverDataMsg_send.hashalg = data->hashalg;
 
 	CKINT(pb_alloc_comm_buf(
 		&send, ml_dsa_sigver_data_msg__get_packed_size(&MlDsaSigverDataMsg_send),
@@ -2842,6 +2844,7 @@ static int pb_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 	SlhDsaSiggenDataMsg_send.interface.data = data->interface.buf;
 	SlhDsaSiggenDataMsg_send.interface.len = data->interface.len;
 	SlhDsaSiggenDataMsg_send.cipher = data->cipher;
+	SlhDsaSiggenDataMsg_send.hashalg = data->hashalg;
 
 	CKINT(pb_alloc_comm_buf(
 		&send, slh_dsa_siggen_data_msg__get_packed_size(&SlhDsaSiggenDataMsg_send),
@@ -2892,6 +2895,7 @@ static int pb_slh_dsa_sigver(struct slh_dsa_sigver_data *data,
 	SlhDsaSigverDataMsg_send.interface.data = data->interface.buf;
 	SlhDsaSigverDataMsg_send.interface.len = data->interface.len;
 	SlhDsaSigverDataMsg_send.cipher = data->cipher;
+	SlhDsaSigverDataMsg_send.hashalg = data->hashalg;
 
 	CKINT(pb_alloc_comm_buf(
 		&send, slh_dsa_sigver_data_msg__get_packed_size(&SlhDsaSigverDataMsg_send),

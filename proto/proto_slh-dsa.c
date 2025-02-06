@@ -108,6 +108,7 @@ static int proto_slh_dsa_siggen_tester(struct buffer *in, struct buffer *out,
 	data.interface.buf = SlhDsaSiggenDataMsg_recv->interface.data;
 	data.interface.len = SlhDsaSiggenDataMsg_recv->interface.len;
 	data.cipher = SlhDsaSiggenDataMsg_recv->cipher;
+	data.hashalg = SlhDsaSiggenDataMsg_recv->hashalg;
 
 	CKINT(slh_dsa_backend->slh_dsa_siggen(&data, parsed_flags));
 
@@ -163,6 +164,7 @@ static int proto_slh_dsa_sigver_tester(struct buffer *in, struct buffer *out,
 	data.interface.buf = SlhDsaSigverDataMsg_recv->interface.data;
 	data.interface.len = SlhDsaSigverDataMsg_recv->interface.len;
 	data.cipher = SlhDsaSigverDataMsg_recv->cipher;
+	data.hashalg = SlhDsaSigverDataMsg_recv->hashalg;
 
 	CKINT(slh_dsa_backend->slh_dsa_sigver(&data, parsed_flags));
 

@@ -1927,6 +1927,8 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	enum lc_dilithium_type type;
 	size_t len;
 	uint8_t *ptr;
+	struct buffer *msg_ptr;
+	BUFFER_INIT(tmp);
 	LC_DILITHIUM_CTX_ON_STACK(ctx);
 	int ret;
 
@@ -1941,11 +1943,12 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	if (!strncasecmp((char *)data->interface.buf, "internal", 8))
 		lc_dilithium_ctx_internal(ctx);
 
+	msg_ptr = &data->msg;
+
 	/* This call also covers the NULL buffer */
 	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
 
 	if (data->hashalg) {
-		BUFFER_INIT(tmp);
 		const struct lc_hash *hash_alg;
 
 		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
@@ -1963,8 +1966,8 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 		lc_hash_final(hash_ctx, tmp.buf);
 
 		lc_hash_zero(hash_ctx);
-		free_buf(&data->msg);
-		copy_ptr_buf(&data->msg, &tmp);
+
+		msg_ptr = &tmp;
 	}
 
 	if (data->rnd.len) {
@@ -1977,19 +1980,19 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 		s_rng_state.seed = data->rnd.buf;
 		s_rng_state.seedlen = data->rnd.len;
 
-		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
-					    data->msg.len, &sk, &s_drng));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, msg_ptr->buf,
+					    msg_ptr->len, &sk, &s_drng));
 	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
 		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
 		/* Module is required to generate random data */
 
-		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
-					    data->msg.len, &sk, lc_seeded_rng));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, msg_ptr->buf,
+					    msg_ptr->len, &sk, lc_seeded_rng));
 	} else {
 		/* Module is required to perform deterministic operation */
 
-		CKINT(lc_dilithium_sign_ctx(sig, ctx, data->msg.buf,
-					    data->msg.len, &sk, NULL));
+		CKINT(lc_dilithium_sign_ctx(sig, ctx, msg_ptr->buf,
+					    msg_ptr->len, &sk, NULL));
 	}
 
 	CKINT(lc_dilithium_sig_ptr(&ptr, &len, sig));
@@ -2002,12 +2005,13 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	if (sizeof(pk.pk) == data->pk.len) {
 		memcpy(pk.pk, data->pk.buf, data->pk.len);
 
-		CKINT(funcs.dilithium_verify(&sig, data->msg.buf,
-					     data->msg.len, &pk));
+		CKINT(funcs.dilithium_verify(&sig, msg_ptr->buf,
+					     msg_ptr->len, &pk));
 	}
 #endif
 
 out:
+	free_buf(&tmp);
 	if (sig)
 		free(sig);
 	lc_ml_reset_impl();
@@ -2020,6 +2024,8 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	struct lc_dilithium_pk pk;
 	struct lc_dilithium_sig *sig = NULL;
 	enum lc_dilithium_type type;
+	struct buffer *msg_ptr;
+	BUFFER_INIT(tmp);
 	LC_DILITHIUM_CTX_ON_STACK(ctx);
 	int ret;
 
@@ -2049,8 +2055,9 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	/* This call also covers the NULL buffer */
 	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
 
+	msg_ptr = &data->msg;
+
 	if (data->hashalg) {
-		BUFFER_INIT(tmp);
 		const struct lc_hash *hash_alg;
 
 		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
@@ -2068,11 +2075,11 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 		lc_hash_final(hash_ctx, tmp.buf);
 
 		lc_hash_zero(hash_ctx);
-		free_buf(&data->msg);
-		copy_ptr_buf(&data->msg, &tmp);
+
+		msg_ptr = &tmp;
 	}
 
-	ret = lc_dilithium_verify_ctx(sig, ctx, data->msg.buf, data->msg.len,
+	ret = lc_dilithium_verify_ctx(sig, ctx, msg_ptr->buf, msg_ptr->len,
 				      &pk);
 
 	if (ret == -EBADMSG) {
@@ -2093,6 +2100,7 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 out:
 	if (sig)
 		free(sig);
+	free_buf(&tmp);
 	lc_ml_reset_impl();
 	return ret;
 }
@@ -2421,6 +2429,8 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 	uint8_t *ptr;
 	int ret;
 	uint8_t n;
+	struct buffer *msg_ptr;
+	BUFFER_INIT(tmp);
 	LC_SPHINCS_CTX_ON_STACK(ctx);
 
 	CKINT(lc_slh_type(data->cipher, &type, &n));
@@ -2452,8 +2462,8 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 	/* This call also covers the NULL buffer */
 	lc_sphincs_ctx_userctx(ctx, data->context.buf, data->context.len);
 
+	msg_ptr = &data->msg;
 	if (data->hashalg) {
-		BUFFER_INIT(tmp);
 		const struct lc_hash *hash_alg;
 
 		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
@@ -2471,8 +2481,8 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 		lc_hash_final(hash_ctx, tmp.buf);
 
 		lc_hash_zero(hash_ctx);
-		free_buf(&data->msg);
-		copy_ptr_buf(&data->msg, &tmp);
+
+		msg_ptr = &tmp;
 	}
 
 	if (data->rnd.len) {
@@ -2485,19 +2495,19 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 		s_rng_state.seed = data->rnd.buf;
 		s_rng_state.seedlen = data->rnd.len;
 
-		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
-					  data->msg.len, &sk, &s_drng));
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, msg_ptr->buf,
+					  msg_ptr->len, &sk, &s_drng));
 	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
 		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
 		/* Module is required to generate random data */
 
-		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
-					  data->msg.len, &sk, lc_seeded_rng));
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, msg_ptr->buf,
+					  msg_ptr->len, &sk, lc_seeded_rng));
 	} else {
 		/* Module is required to perform deterministic operation */
 
-		CKINT(lc_sphincs_sign_ctx(sig, ctx, data->msg.buf,
-					  data->msg.len, &sk, NULL));
+		CKINT(lc_sphincs_sign_ctx(sig, ctx, msg_ptr->buf,
+					  msg_ptr->len, &sk, NULL));
 	}
 
 	CKINT(lc_sphincs_sig_ptr(&ptr, &len, sig));
@@ -2507,6 +2517,7 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 out:
 	if (sig)
 		free(sig);
+	free_buf(&tmp);;
 	lc_slh_reset_impl();
 	return ret;
 }
@@ -2519,6 +2530,8 @@ static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
 	enum lc_sphincs_type type;
 	int ret;
 	uint8_t n;
+	struct buffer *msg_ptr;
+	BUFFER_INIT(tmp);
 	LC_SPHINCS_CTX_ON_STACK(ctx);
 
 	(void)parsed_flags;
@@ -2563,8 +2576,8 @@ static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
 	/* This call also covers the NULL buffer */
 	lc_sphincs_ctx_userctx(ctx, data->context.buf, data->context.len);
 
+	msg_ptr = &data->msg;
 	if (data->hashalg) {
-		BUFFER_INIT(tmp);
 		const struct lc_hash *hash_alg;
 
 		CKINT(lc_get_common_hash(data->hashalg, &hash_alg));
@@ -2582,11 +2595,11 @@ static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
 		lc_hash_final(hash_ctx, tmp.buf);
 
 		lc_hash_zero(hash_ctx);
-		free_buf(&data->msg);
-		copy_ptr_buf(&data->msg, &tmp);
+
+		msg_ptr = &tmp;
 	}
 
-	ret = lc_sphincs_verify_ctx(sig, ctx, data->msg.buf, data->msg.len,
+	ret = lc_sphincs_verify_ctx(sig, ctx, msg_ptr->buf, msg_ptr->len,
 				    &pk);
 
 	if (ret == -EBADMSG) {
@@ -2607,6 +2620,7 @@ static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
 out:
 	if (sig)
 		free(sig);
+	free_buf(&tmp);
 	lc_slh_reset_impl();
 	return ret;
 }
