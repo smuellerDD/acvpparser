@@ -58,13 +58,13 @@
  * This interface writes the test vector data on STDOUT and reads the response
  * from STDIN
  */
-#define PROTOBUF_BACKEND_EXIM_STDIN_STDOUT
+#undef PROTOBUF_BACKEND_EXIM_STDIN_STDOUT
 
 /*
  * Linux Kernel interface corresponding to the implementation found in the
  * `linux_kernel` directory.
  */
-#undef PROTOBUF_BACKEND_EXIM_DEBUGFS
+#define PROTOBUF_BACKEND_EXIM_DEBUGFS
 
 static int pb_alloc_comm_buf(struct buffer *outbuf, size_t datalen,
 			     enum pb_message_type type,
@@ -2141,6 +2141,10 @@ static int pb_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	MlDsaSiggenDataMsg_send.rnd.len = data->rnd.len;
 	MlDsaSiggenDataMsg_send.sk.data = data->sk.buf;
 	MlDsaSiggenDataMsg_send.sk.len = data->sk.len;
+	MlDsaSiggenDataMsg_send.context.data = data->context.buf;
+	MlDsaSiggenDataMsg_send.context.len = data->context.len;
+	MlDsaSiggenDataMsg_send.interface.data = data->interface.buf;
+	MlDsaSiggenDataMsg_send.interface.len = data->interface.len;
 	MlDsaSiggenDataMsg_send.cipher = data->cipher;
 	if (data->privkey) {
 		struct pb_privkey_buf *priv = data->privkey;
@@ -2190,6 +2194,10 @@ static int pb_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	MlDsaSigverDataMsg_send.msg.len = data->msg.len;
 	MlDsaSigverDataMsg_send.sig.data = data->sig.buf;
 	MlDsaSigverDataMsg_send.sig.len = data->sig.len;
+	MlDsaSigverDataMsg_send.context.data = data->context.buf;
+	MlDsaSigverDataMsg_send.context.len = data->context.len;
+	MlDsaSigverDataMsg_send.interface.data = data->interface.buf;
+	MlDsaSigverDataMsg_send.interface.len = data->interface.len;
 	MlDsaSigverDataMsg_send.pk.data = data->pk.buf;
 	MlDsaSigverDataMsg_send.pk.len = data->pk.len;
 	MlDsaSigverDataMsg_send.cipher = data->cipher;
@@ -2829,6 +2837,10 @@ static int pb_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 	SlhDsaSiggenDataMsg_send.rnd.len = data->rnd.len;
 	SlhDsaSiggenDataMsg_send.sk.data = data->sk.buf;
 	SlhDsaSiggenDataMsg_send.sk.len = data->sk.len;
+	SlhDsaSiggenDataMsg_send.context.data = data->context.buf;
+	SlhDsaSiggenDataMsg_send.context.len = data->context.len;
+	SlhDsaSiggenDataMsg_send.interface.data = data->interface.buf;
+	SlhDsaSiggenDataMsg_send.interface.len = data->interface.len;
 	SlhDsaSiggenDataMsg_send.cipher = data->cipher;
 
 	CKINT(pb_alloc_comm_buf(
@@ -2875,6 +2887,10 @@ static int pb_slh_dsa_sigver(struct slh_dsa_sigver_data *data,
 	SlhDsaSigverDataMsg_send.sig.len = data->sig.len;
 	SlhDsaSigverDataMsg_send.pk.data = data->pk.buf;
 	SlhDsaSigverDataMsg_send.pk.len = data->pk.len;
+	SlhDsaSigverDataMsg_send.context.data = data->context.buf;
+	SlhDsaSigverDataMsg_send.context.len = data->context.len;
+	SlhDsaSigverDataMsg_send.interface.data = data->interface.buf;
+	SlhDsaSigverDataMsg_send.interface.len = data->interface.len;
 	SlhDsaSigverDataMsg_send.cipher = data->cipher;
 
 	CKINT(pb_alloc_comm_buf(
