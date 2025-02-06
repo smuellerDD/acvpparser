@@ -309,7 +309,7 @@ const ProtobufCMessageDescriptor ml_dsa_keygen_data_msg__descriptor =
   (ProtobufCMessageInit) ml_dsa_keygen_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[9] =
+static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[10] =
 {
   {
     "msg",
@@ -419,10 +419,23 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "hashalg",
+    10,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT64,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSiggenDataMsg, hashalg),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned ml_dsa_siggen_data_msg__field_indices_by_name[] = {
   8,   /* field[8] = cipher */
   5,   /* field[5] = context */
+  9,   /* field[9] = hashalg */
   6,   /* field[6] = interface */
   0,   /* field[0] = msg */
   2,   /* field[2] = pk */
@@ -434,7 +447,7 @@ static const unsigned ml_dsa_siggen_data_msg__field_indices_by_name[] = {
 static const ProtobufCIntRange ml_dsa_siggen_data_msg__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 9 }
+  { 0, 10 }
 };
 const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
 {
@@ -444,14 +457,14 @@ const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
   "MlDsaSiggenDataMsg",
   "",
   sizeof(MlDsaSiggenDataMsg),
-  9,
+  10,
   ml_dsa_siggen_data_msg__field_descriptors,
   ml_dsa_siggen_data_msg__field_indices_by_name,
   1,  ml_dsa_siggen_data_msg__number_ranges,
   (ProtobufCMessageInit) ml_dsa_siggen_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[7] =
+static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[8] =
 {
   {
     "msg",
@@ -526,8 +539,20 @@ static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "sigver_success",
+    "hashalg",
     7,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT64,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSigverDataMsg, hashalg),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "sigver_success",
+    8,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT32,
     0,   /* quantifier_offset */
@@ -541,16 +566,17 @@ static const ProtobufCFieldDescriptor ml_dsa_sigver_data_msg__field_descriptors[
 static const unsigned ml_dsa_sigver_data_msg__field_indices_by_name[] = {
   5,   /* field[5] = cipher */
   3,   /* field[3] = context */
+  6,   /* field[6] = hashalg */
   4,   /* field[4] = interface */
   0,   /* field[0] = msg */
   2,   /* field[2] = pk */
   1,   /* field[1] = sig */
-  6,   /* field[6] = sigver_success */
+  7,   /* field[7] = sigver_success */
 };
 static const ProtobufCIntRange ml_dsa_sigver_data_msg__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 7 }
+  { 0, 8 }
 };
 const ProtobufCMessageDescriptor ml_dsa_sigver_data_msg__descriptor =
 {
@@ -560,7 +586,7 @@ const ProtobufCMessageDescriptor ml_dsa_sigver_data_msg__descriptor =
   "MlDsaSigverDataMsg",
   "",
   sizeof(MlDsaSigverDataMsg),
-  7,
+  8,
   ml_dsa_sigver_data_msg__field_descriptors,
   ml_dsa_sigver_data_msg__field_indices_by_name,
   1,  ml_dsa_sigver_data_msg__number_ranges,

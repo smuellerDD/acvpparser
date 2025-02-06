@@ -52,10 +52,11 @@ struct  MlDsaSiggenDataMsg
   ProtobufCBinaryData interface;
   uint32_t privkey;
   uint64_t cipher;
+  uint64_t hashalg;
 };
 #define ML_DSA_SIGGEN_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_siggen_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0 }
+, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
 
 
 struct  MlDsaSigverDataMsg
@@ -67,11 +68,12 @@ struct  MlDsaSigverDataMsg
   ProtobufCBinaryData context;
   ProtobufCBinaryData interface;
   uint64_t cipher;
+  uint64_t hashalg;
   uint32_t sigver_success;
 };
 #define ML_DSA_SIGVER_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_sigver_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0 }
+, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
 
 
 struct  MlDsaKeygenEnMsg

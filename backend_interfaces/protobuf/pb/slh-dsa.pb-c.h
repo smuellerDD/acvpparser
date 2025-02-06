@@ -50,10 +50,11 @@ struct  SlhDsaSiggenDataMsg
   ProtobufCBinaryData interface;
   ProtobufCBinaryData sk;
   uint64_t cipher;
+  uint64_t hashalg;
 };
 #define SLH_DSA_SIGGEN_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&slh_dsa_siggen_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0 }
+, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0 }
 
 
 struct  SlhDsaSigverDataMsg
@@ -65,11 +66,12 @@ struct  SlhDsaSigverDataMsg
   ProtobufCBinaryData context;
   ProtobufCBinaryData interface;
   uint64_t cipher;
+  uint64_t hashalg;
   uint32_t sigver_success;
 };
 #define SLH_DSA_SIGVER_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&slh_dsa_sigver_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0 }
+, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
 
 
 /* SlhDsaKeygenDataMsg methods */
