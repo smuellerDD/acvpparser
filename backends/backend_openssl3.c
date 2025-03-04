@@ -2409,7 +2409,6 @@ static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
 	EVP_MD_CTX *md_ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
-	int nid = 0;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -2428,6 +2427,7 @@ static int openssl_eddsa_siggen(struct eddsa_siggen_data *data,
 
 	bld = OSSL_PARAM_BLD_new();
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L
+	int nid = 0;
 	char *instance_name;
 
 	CKINT(openssl_eddsa_curves(data->cipher, data->prehash, &nid, NULL,
@@ -2471,7 +2471,6 @@ static int openssl_eddsa_sigver(struct eddsa_sigver_data *data,
 	EVP_MD_CTX *md_ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
-	int nid = 0;
 	int ret = 0;
 
 	(void)parsed_flags;
@@ -2483,6 +2482,7 @@ static int openssl_eddsa_sigver(struct eddsa_sigver_data *data,
 
 	bld = OSSL_PARAM_BLD_new();
 #if OPENSSL_VERSION_NUMBER >= 0x30200000L
+	int nid = 0;
 	char *instance_name;
 
 	CKINT(openssl_eddsa_curves(data->cipher, data->prehash, &nid, NULL,
