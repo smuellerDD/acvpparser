@@ -36,7 +36,7 @@ static inline void free_buf(struct buffer *buf)
 	if (!buf)
 		return;
 	if (buf->buf) {
-		free(buf->buf);
+		acvp_free(buf->buf);
 		buf->buf = NULL;
 	}
 	if (buf->len)
@@ -52,7 +52,7 @@ static inline int alloc_buf(size_t size, struct buffer *buf)
 	if (!size)
 		return 0;
 
-	buf->buf = calloc(1, size);
+	buf->buf = acvp_calloc(1, size);
 	if (!buf->buf)
 		return -ENOMEM;
 

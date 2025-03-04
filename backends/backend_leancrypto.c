@@ -1015,11 +1015,11 @@ static int lc_shake4x_generate(struct sha_data *data)
 
 out:
 	if (outbuf1)
-		free(outbuf1);
+		acvp_free(outbuf1);
 	if (outbuf2)
-		free(outbuf2);
+		acvp_free(outbuf2);
 	if (outbuf3)
-		free(outbuf3);
+		acvp_free(outbuf3);
 	return ret;
 }
 #else
@@ -1074,7 +1074,7 @@ static int lc_shake_armv8_2x_generate(struct sha_data *data)
 
 out:
 	if (outbuf1)
-		free(outbuf1);
+		acvp_free(outbuf1);
 	return ret;
 }
 #else
@@ -1704,7 +1704,7 @@ static int lc_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
 
 	CKINT(alloc_buf(LC_ED25519_PUBLICKEYBYTES, qbuf));
 
-	sk = calloc(1, sizeof(struct lc_ed25519_sk));
+	sk = acvp_calloc(1, sizeof(struct lc_ed25519_sk));
 	CKNULL(sk, -ENOMEM);
 
 	CKINT(lc_ed25519_keypair(&pk, sk, lc_seeded_rng));
@@ -1714,14 +1714,14 @@ static int lc_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
 
 out:
 	if (ret && sk)
-		free(sk);
+		acvp_free(sk);
 	return ret;
 }
 
 static void lc_eddsa_free_key(void *privkey)
 {
 	if (privkey)
-		free(privkey);
+		acvp_free(privkey);
 }
 
 static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
@@ -2013,7 +2013,7 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 out:
 	free_buf(&tmp);
 	if (sig)
-		free(sig);
+		acvp_free(sig);
 	lc_ml_reset_impl();
 	return ret;
 }
@@ -2099,7 +2099,7 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 
 out:
 	if (sig)
-		free(sig);
+		acvp_free(sig);
 	free_buf(&tmp);
 	lc_ml_reset_impl();
 	return ret;
@@ -2117,7 +2117,7 @@ static int lc_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk,
 
 	CKINT(lc_ml_type(cipher, &type));
 
-	lc_sk = calloc(1, sizeof(struct lc_dilithium_sk));
+	lc_sk = acvp_calloc(1, sizeof(struct lc_dilithium_sk));
 	CKNULL(lc_sk, -ENOMEM);
 
 	CKINT(lc_dilithium_keypair(&lc_pk, lc_sk, lc_seeded_rng, type));
@@ -2135,7 +2135,7 @@ out:
 static void lc_ml_dsa_free_key(void *privkey)
 {
 	if (privkey)
-		free(privkey);
+		acvp_free(privkey);
 }
 
 static struct ml_dsa_backend lc_ml_dsa =
@@ -2516,7 +2516,7 @@ static int lc_slh_dsa_siggen(struct slh_dsa_siggen_data *data,
 
 out:
 	if (sig)
-		free(sig);
+		acvp_free(sig);
 	free_buf(&tmp);;
 	lc_slh_reset_impl();
 	return ret;
@@ -2619,7 +2619,7 @@ static int lc_slg_dsa_sigver(struct slh_dsa_sigver_data *data,
 
 out:
 	if (sig)
-		free(sig);
+		acvp_free(sig);
 	free_buf(&tmp);
 	lc_slh_reset_impl();
 	return ret;

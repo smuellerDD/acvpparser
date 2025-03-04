@@ -165,13 +165,13 @@ uint32_t protobuf_c_version_number(void)
 static void *system_alloc(void *allocator_data, size_t size)
 {
 	(void)allocator_data;
-	return malloc(size);
+	return acvp_malloc(size);
 }
 
 static void system_free(void *allocator_data, void *data)
 {
 	(void)allocator_data;
-	free(data);
+	acvp_free(data);
 }
 
 static inline void *do_alloc(ProtobufCAllocator *allocator, size_t size)

@@ -95,6 +95,18 @@ Note, the ACVP-Proto is implemented such that it can be compiled with any backen
 
 Also note that with the ability to use the same unchanged backends for both, the ACVP-Parser and ACVP-Proto, it is possible that new backends can be developed in user space with ACVP-Parser. Only when the actual testing shall be performed, the newly created backend may be wrapped by the ACVP-Proto.
 
+## Integration of ACVP Proto into other Environments
+
+The ACVP Proto implementation does not have any external dependencies except for several POSIX calls. Specifically, see the "frontend_headers.h" file for POSIX calls that may need replacement. Further, the ACVP Proto depends on the presence of the "constructor" logic of the underlying linker. If the constructor is not offered, make sure you create a wrapper C file calling the constructor functions during initialization of the ACVP Proto (see frontend_header.h / linux_kernel/proto_frontend_linux_kernel.c:proto_init for examples).
+
+If the intended compilation environment does not provide POSIX functions, the following approach is permissible to provide such functions without changing the ACVP Parser / Proto code base:
+
+1. Create a header file "external_frontend_header.h" which contains the replacement code.
+
+2. Make sure the compiler can find this header file with proper CFLAGS options (e.g. the `-I` option)
+
+3. Set the following macro definition during compilation `__EXTERNAL_FRONTEND_HEADER__` which pulls in your `external_frontend_header.h`.
+
 ## Local Test
 
 The local test can be achieved by the following after having the ACVP-Parser and ACVP-Proxy compiled with the STDIN/STDOUT ex/import:

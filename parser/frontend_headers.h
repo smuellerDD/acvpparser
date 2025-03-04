@@ -39,10 +39,12 @@ const char *getenv(const char *name);
 #define _logger_binary(severity, bin, binlen, str, file, func, line)
 #define free kfree
 
-#define calloc(nmemb, size)						\
+#define acvp_calloc(nmemb, size)					\
 	kmalloc(nmemb * size, __GFP_ZERO | GFP_KERNEL)
-#define malloc(size)							\
+#define acvp_malloc(size)						\
 	kmalloc(size, GFP_KERNEL)
+#define acvp_free(ptr)							\
+	free(ptr)
 
 #define exit(n)		WARN_ON(n)
 #ifndef assert
@@ -70,6 +72,11 @@ void _init_register_proto_rsa(void);
 void _init_register_proto_sha(void);
 void _init_register_proto_sym(void);
 
+#elif defined(__EXTERNAL_FRONTEND_HEADER__)
+//#elif (defined(__has_include) && __has_include("external_frontend_header.h"))
+
+#include "external_frontend_header.h"
+
 #else /* __KERNEL__ */
 
 #include <assert.h>
@@ -84,6 +91,13 @@ void _init_register_proto_sym(void);
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+
+#define acvp_calloc(nmemb, size)					\
+	calloc(nmemb, size)
+#define acvp_malloc(size)						\
+	malloc(size)
+#define acvp_free(ptr)							\
+	free(ptr)
 
 #endif /* __KERNEL__ */
 
