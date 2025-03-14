@@ -23,12 +23,17 @@
 #include "backend_openssl_common.h"
 #include <openssl/provider.h>
 
+// The fips module is loaded by default.  To use the default provider,
+// build with CFLAGS+="-DOPENSSL3_BACKEND_USE_DEFAULT_PROVIDER".
+#ifndef OPENSSL3_BACKEND_USE_DEFAULT_PROVIDER
 OSSL_PROVIDER *fips;
 OSSL_PROVIDER *base;
+#endif
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_backend_init)
 static void openssl_backend_init(void)
 {
+#ifndef OPENSSL3_BACKEND_USE_DEFAULT_PROVIDER
 	/* Explicitly load the FIPS provider as per fips_module(7) */
 	fips = OSSL_PROVIDER_load(NULL, "fips");
 	if (fips == NULL) {
@@ -46,14 +51,17 @@ static void openssl_backend_init(void)
 		printf("Failed to enable FIPS mode\n");
 		exit(-EFAULT);
 	}
+#endif
 }
 
 ACVP_DEFINE_DESTRUCTOR(openssl_backend_fini)
 static void openssl_backend_fini(void)
 {
+#ifndef OPENSSL3_BACKEND_USE_DEFAULT_PROVIDER
 	#pragma message "Deliberate memleak required for OpenSSL 3 - OpenSSL cleans itself using atexit"
 	//OSSL_PROVIDER_unload(base);
 	//OSSL_PROVIDER_unload(fips);
+#endif
 }
 
 /************************************************
