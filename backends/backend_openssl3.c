@@ -562,6 +562,116 @@ static void openssl_kmac_backend(void)
 }
 
 /************************************************
+ * SP800-132 PBKDF cipher interface functions
+ ************************************************/
+static int openssl_pbkdf_generate(struct pbkdf_data *data,
+				  flags_t parsed_flags)
+{
+	OSSL_PARAM_BLD *pbld = NULL;
+	OSSL_PARAM *params = NULL;
+	EVP_KDF *kdf = NULL;
+	EVP_KDF_CTX *kctx = NULL;
+	uint32_t derived_key_bytes = data->derived_key_length / 8;
+	const char *str;
+	int ret;
+
+	(void)parsed_flags;
+
+	switch (data->hash & ACVP_HASHMASK) {
+	case ACVP_SHA1:
+		str = "SHA-1";
+		break;
+	case ACVP_SHA224:
+		str = "SHA2-224";
+		break;
+	case ACVP_SHA256:
+		str = "SHA2-256";
+		break;
+	case ACVP_SHA384:
+		str = "SHA2-384";
+		break;
+	case ACVP_SHA512:
+		str = "SHA2-512";
+		break;
+	case ACVP_SHA512224:
+		str = "SHA2-512/224";
+		break;
+	case ACVP_SHA512256:
+		str = "SHA2-512/256";
+		break;
+	case ACVP_SHA3_224:
+		str = "SHA3-224";
+		break;
+	case ACVP_SHA3_256:
+		str = "SHA3-256";
+		break;
+	case ACVP_SHA3_384:
+		str = "SHA3-384";
+		break;
+	case ACVP_SHA3_512:
+		str = "SHA3-512";
+		break;
+	case ACVP_SHAKE128:
+		str = "SHAKE-128";
+		break;
+	case ACVP_SHAKE256:
+		str = "SHAKE-256";
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	kdf = EVP_KDF_fetch(NULL, "PBKDF2", NULL);
+	kctx = EVP_KDF_CTX_new(kdf);
+	CKNULL(kctx, -EFAULT);
+
+	pbld = OSSL_PARAM_BLD_new();
+	CKNULL(pbld, -EFAULT);
+
+	OSSL_PARAM_BLD_push_octet_string(pbld, OSSL_KDF_PARAM_PASSWORD,
+					 data->password.buf,
+					 data->password.len);
+	OSSL_PARAM_BLD_push_octet_string(pbld, OSSL_KDF_PARAM_SALT,
+					 data->salt.buf, data->salt.len);
+	OSSL_PARAM_BLD_push_utf8_string(pbld, OSSL_KDF_PARAM_DIGEST, str, 0);
+	OSSL_PARAM_BLD_push_uint(pbld, OSSL_KDF_PARAM_ITER,
+				 data->iteration_count);
+	/* disables compliance checks, dont want limit checks for ACVP tests */
+	OSSL_PARAM_BLD_push_int(pbld, OSSL_KDF_PARAM_PKCS5, 1);
+	params = OSSL_PARAM_BLD_to_param(pbld);
+	CKNULL(params, -EFAULT);
+
+	CKINT(alloc_buf(derived_key_bytes, &data->derived_key));
+
+	CKINT_O_LOG(EVP_KDF_derive(kctx, data->derived_key.buf,
+				   data->derived_key.len, params),
+		    "PBKDF failed\n");
+
+out:
+
+	if (pbld)
+		OSSL_PARAM_BLD_free(pbld);
+	if (params)
+		OSSL_PARAM_free(params);
+	if (kdf)
+		EVP_KDF_free(kdf);
+	if (kctx)
+		EVP_KDF_CTX_free(kctx);
+	return ret;
+}
+
+static struct pbkdf_backend openssl_pbkdf =
+{
+	openssl_pbkdf_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_pbkdf_backend)
+static void openssl_pbkdf_backend(void)
+{
+	register_pbkdf_impl(&openssl_pbkdf);
+}
+
+/************************************************
  * DH interface functions
  ************************************************/
 static int _openssl_dh_keygen(uint64_t safeprime, EVP_PKEY **key)
