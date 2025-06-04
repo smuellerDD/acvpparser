@@ -2137,6 +2137,8 @@ static int pb_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 
 	MlDsaSiggenDataMsg_send.msg.data = data->msg.buf;
 	MlDsaSiggenDataMsg_send.msg.len = data->msg.len;
+	MlDsaSiggenDataMsg_send.mu.data = data->mu.buf;
+	MlDsaSiggenDataMsg_send.mu.len = data->mu.len;
 	MlDsaSiggenDataMsg_send.rnd.data = data->rnd.buf;
 	MlDsaSiggenDataMsg_send.rnd.len = data->rnd.len;
 	MlDsaSiggenDataMsg_send.sk.data = data->sk.buf;

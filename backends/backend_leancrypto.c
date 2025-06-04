@@ -33,6 +33,10 @@
 #include "aes_c.h"
 #include "aes_riscv64.h"
 
+#include "ascon_arm_neon.h"
+#include "ascon_avx512.h"
+#include "ascon_c.h"
+
 #include "dilithium_signature_c.h"
 #include "sha3_arm_asm.h"
 #include "sha3_arm_ce.h"
@@ -346,7 +350,6 @@ lc_hash_check_c(const struct lc_hash *selected, const struct lc_hash *c,
 		       "Hash selection %s uses C implementation!\n", log);
 }
 
-
 static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 {
 	const char *envstr = getenv("LC_SHA3");
@@ -493,37 +496,33 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_c;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_c;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_c;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_c;
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_c;
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_c;
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_c;
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_c;
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 #ifdef __amd64
 	} else if (envstr && !strncasecmp(envstr, "AVX2", 4)) {
@@ -533,44 +532,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_avx2;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "AVX2 SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_avx2;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "AVX2 SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_avx2;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "AVX2 SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_avx2;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "AVX2 SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_avx2;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "AVX2 SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_avx2;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "AVX2 SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_avx2;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "AVX2 cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_avx2;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "AVX2 cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 	} else if (envstr && !strncasecmp(envstr, "AVX512", 6)) {
 		logger(LOGGER_VERBOSE, "SHA-3 implementation: AVX-512\n");
@@ -579,44 +574,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_avx512;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "AVX512 SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_avx512;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "AVX512 SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_avx512;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "AVX512 SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_avx512;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "AVX512 SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_avx512;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "AVX512 SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_avx512;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "AVX512 SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_avx512;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "AVX512 cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_avx512;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "AVX512 cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 #elif (defined(__arm__) || defined(__aarch64__))
 	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 8)) {
@@ -626,44 +617,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM NEON SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM NEON SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM NEON SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM NEON SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM NEON SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM NEON SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM NEON cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_arm_neon;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM NEON cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 #ifdef __aarch64__
 	} else if (envstr && !strncasecmp(envstr, "ARM_ASM", 6)) {
@@ -673,44 +660,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM assembler SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM assembler SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM assembler SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM assembler SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM assembler SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM assembler SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM assembler cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_arm_asm;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM assembler cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 	} else if (envstr && !strncasecmp(envstr, "ARM_CE", 6)) {
 		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM CE\n");
@@ -719,44 +702,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "ARM CE SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "ARM CE SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "ARM CE SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "ARM CE SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "ARM CE SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "ARM CE SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "ARM CE cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_arm_ce;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "ARM CE cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 #endif
 #endif
@@ -767,44 +746,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "RISCV64 assembler SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "RISCV64 assembler SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "RISCV64 assembler SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "RISCV64 assembler SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "RISCV64 assembler SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "RISCV64 assembler SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "RISCV64 assembler cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_riscv_asm;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "RISCV64 assembler cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 	} else if (envstr && !strncasecmp(envstr, "RISCV64_ZBB", 11)) {
 		logger(LOGGER_VERBOSE, "SHA-3 implementation: RISC-V 64 Zbb assembler\n");
@@ -813,44 +788,40 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_sha3_224_c, "RISCV64 Zbb assembler SHA3-224");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_sha3_256_c, "RISCV64 Zbb assembler SHA3-256");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_sha3_384_c, "RISCV64 Zbb assembler SHA3-384");
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_sha3_512_c, "RISCV64 Zbb assembler SHA3-512");
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_shake128_c, "RISCV64 Zbb assembler SHAKE-128");
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_shake256_c, "RISCV64 Zbb assembler SHAKE-256");
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_cshake128_c, "RISCV64 Zbb assembler cSHAKE-128");
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256_riscv_asm_zbb;
 			lc_hash_check_c(*lc_hash, lc_cshake256_c, "RISCV64 Zbb assembler cSHAKE-256");
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 	} else {
 		logger(LOGGER_VERBOSE, "SHA-3 implementation: default\n");
@@ -858,41 +829,83 @@ static int lc_get_hash(uint64_t cipher, const struct lc_hash **lc_hash)
 		case ACVP_HMACSHA3_224:
 		case ACVP_SHA3_224:
 			*lc_hash = lc_sha3_224;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_256:
 		case ACVP_SHA3_256:
 			*lc_hash = lc_sha3_256;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_384:
 		case ACVP_SHA3_384:
 			*lc_hash = lc_sha3_384;
-			break;
+			return 0;
 		case ACVP_HMACSHA3_512:
 		case ACVP_SHA3_512:
 			*lc_hash = lc_sha3_512;
-			break;
+			return 0;
 		case ACVP_SHAKE128:
 			*lc_hash = lc_shake128;
-			break;
+			return 0;
 		case ACVP_SHAKE256:
 			*lc_hash = lc_shake256;
-			break;
+			return 0;
 		case ACVP_KMAC128:
 		case ACVP_CSHAKE128:
 			*lc_hash = lc_cshake128;
-			break;
+			return 0;
 		case ACVP_KMAC256:
 		case ACVP_CSHAKE256:
 			*lc_hash = lc_cshake256;
-			break;
-		default:
-			logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n",
-			cipher);
-			return -EOPNOTSUPP;
+			return 0;
 		}
 	}
 
-	return 0;
+	if (envstr && !strncasecmp(envstr, "C", 1)) {
+		logger(LOGGER_VERBOSE, "Ascon implementation: C\n");
+		switch (cipher) {
+		case ACVP_ASCON_HASH_256:
+			*lc_hash = lc_ascon_256_c;
+			return 0;
+		case ACVP_ASCON_XOF_128:
+			*lc_hash = lc_ascon_xof_c;
+			return 0;
+		}
+#ifdef __amd64
+	} else if (envstr && !strncasecmp(envstr, "AVX512", 6)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: AVX-512\n");
+		switch (cipher) {
+		case ACVP_ASCON_HASH_256:
+			*lc_hash = lc_ascon_256_avx512;
+			return 0;
+		case ACVP_ASCON_XOF_128:
+			*lc_hash = lc_ascon_xof_avx512;
+			return 0;
+		}
+#elif (defined(__arm__) || defined(__aarch64__))
+	} else if (envstr && !strncasecmp(envstr, "ARM_NEON", 8)) {
+		logger(LOGGER_VERBOSE, "SHA-3 implementation: ARM NEON\n");
+		switch (cipher) {
+		case ACVP_ASCON_HASH_256:
+			*lc_hash = lc_ascon_256_arm_neon;
+			return 0;
+		case ACVP_ASCON_XOF_128:
+			*lc_hash = lc_ascon_xof_arm_neon;
+			return 0;
+		}
+#endif
+	} else {
+		logger(LOGGER_VERBOSE, "Ascon implementation: default\n");
+		switch (cipher) {
+		case ACVP_ASCON_HASH_256:
+			*lc_hash = lc_ascon_256;
+			return 0;
+		case ACVP_ASCON_XOF_128:
+			*lc_hash = lc_ascon_xof;
+			return 0;
+		}
+	}
+
+	logger(LOGGER_ERR, "Cipher %" PRIu64 " not implemented\n", cipher);
+	return -EOPNOTSUPP;
 }
 
 static int lc_get_common_hash(uint64_t cipher, const struct lc_hash **lc_hash)
@@ -1091,8 +1104,14 @@ static int lc_hash_generate(struct sha_data *data, flags_t parsed_flags)
 	const struct lc_hash *lc_hash;
 	BUFFER_INIT(msg_p);
 	int ret;
+	int is_xof = 0;
 
 	(void)parsed_flags;
+
+	if (data->cipher & ACVP_SHAKEMASK)
+		is_xof = 1;
+	if (data->cipher & ACVP_ASCON_XOF_128)
+		is_xof = 1;
 
 	/* Special handling */
 	if (envstr && !strncasecmp(envstr, "AVX2-4X", 7))
@@ -1108,7 +1127,7 @@ static int lc_hash_generate(struct sha_data *data, flags_t parsed_flags)
 
 	CKINT(sha_ldt_helper(data, &msg_p));
 
-	if (data->cipher & ACVP_SHAKEMASK) {
+	if (is_xof) {
 		CKINT_LOG(alloc_buf(data->outlen / 8, &data->mac),
 			  "SHA buffer cannot be allocated\n");
 	} else {
@@ -1117,7 +1136,7 @@ static int lc_hash_generate(struct sha_data *data, flags_t parsed_flags)
 	}
 
 	lc_hash_init(hash);
-	if (data->cipher & ACVP_SHAKEMASK)
+	if (is_xof)
 		lc_hash_set_digestsize(hash, data->mac.len);
 	lc_hash_update(hash, msg_p.buf, msg_p.len);
 	lc_hash_final(hash, data->mac.buf);
@@ -1945,6 +1964,9 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 
 	msg_ptr = &data->msg;
 
+	if (data->mu.len)
+		lc_dilithium_ctx_external_mu(ctx, data->mu.buf, data->mu.len);
+
 	/* This call also covers the NULL buffer */
 	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
 
@@ -2056,6 +2078,9 @@ static int lc_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	lc_dilithium_ctx_userctx(ctx, data->context.buf, data->context.len);
 
 	msg_ptr = &data->msg;
+
+	if (data->mu.len)
+		lc_dilithium_ctx_external_mu(ctx, data->mu.buf, data->mu.len);
 
 	if (data->hashalg) {
 		const struct lc_hash *hash_alg;
@@ -2638,6 +2663,68 @@ static void lc_slh_dsa_backend(void)
 	register_slh_dsa_impl(&lc_slh_dsa);
 }
 
+/************************************************
+ * AEAD cipher interface functions
+ ************************************************/
+static int lc_acvp_aead_encrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	uint32_t taglen = data->taglen / 8;
+	int ret = 0;
+	LC_AL_CTX_ON_STACK(al);
+
+	(void)parsed_flags;
+
+	CKINT_LOG(lc_aead_setkey(al, data->key.buf, data->key.len,
+			         data->iv.buf, data->iv.len),
+		  "Cannot set Ascon AEAD key\n");
+
+	CKINT(alloc_buf(taglen, &data->tag));
+        CKINT(lc_aead_encrypt(al, data->data.buf, data->data.buf,
+			      data->data.len, data->assoc.buf, data->assoc.len,
+			      data->tag.buf, data->tag.len));
+
+out:
+	 lc_aead_zero(al);
+	return ret;
+}
+
+static int lc_acvp_aead_decrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	int ret;
+	LC_AL_CTX_ON_STACK(al);
+
+	(void)parsed_flags;
+
+	CKINT_LOG(lc_aead_setkey(al, data->key.buf, data->key.len,
+				 data->iv.buf, data->iv.len),
+		  "Cannot set Ascon AEAD key\n");
+
+	data->integrity_error = 0;
+	ret = lc_aead_decrypt(al, data->data.buf, data->data.buf,
+			      data->data.len, data->assoc.buf, data->assoc.len,
+			      data->tag.buf, data->tag.len);
+	if (ret == -EBADMSG) {
+		data->integrity_error = 1;
+		ret = 0;
+	}
+
+out:
+	return ret;
+}
+
+static struct aead_backend lc_aead =
+{
+	lc_acvp_aead_encrypt,    /* gcm_encrypt */
+	lc_acvp_aead_decrypt,    /* gcm_decrypt */
+	NULL,    /* ccm_encrypt */
+	NULL,    /* ccm_decrypt */
+};
+
+ACVP_DEFINE_CONSTRUCTOR(lc_aead_backend)
+static void lc_aead_backend(void)
+{
+	register_aead_impl(&lc_aead);
+}
 
 #ifdef __KERNEL__
 void __init linux_kernel_constructor(void)
@@ -2655,5 +2742,6 @@ void __init linux_kernel_constructor(void)
 	_init_lc_ml_dsa_backend();
 	_init_lc_ml_kem_backend();
 	_init_lc_slh_dsa_backend();
+	_init_lc_aead_backend();
 }
 #endif

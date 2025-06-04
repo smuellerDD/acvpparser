@@ -463,7 +463,7 @@ bouncycastle: $(NAME)
 	$(BC_JAVAC) -cp $(BC_LIB_FILE):$(BC_BACKEND_DIR)/ $(BC_BACKEND_DIR)/bc_acvp.java
 
 %.pb-c.c : %.proto
-	protoc-c --c_out . $<
+	protoc --c_out . $<
 
 $(SHLIB_NAME_STATIC): $(OBJS)
 	ar -crs $(SHLIB_NAME).a $(OBJS)

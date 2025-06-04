@@ -107,6 +107,8 @@ static int proto_ml_dsa_siggen_tester(struct buffer *in, struct buffer *out,
 
 	data.msg.buf = MlDsaSiggenDataMsg_recv->msg.data;
 	data.msg.len = MlDsaSiggenDataMsg_recv->msg.len;
+	data.mu.buf = MlDsaSiggenDataMsg_recv->mu.data;
+	data.mu.len = MlDsaSiggenDataMsg_recv->mu.len;
 	data.rnd.buf = MlDsaSiggenDataMsg_recv->rnd.data;
 	data.rnd.len = MlDsaSiggenDataMsg_recv->rnd.len;
 	data.sk.buf = MlDsaSiggenDataMsg_recv->sk.data;

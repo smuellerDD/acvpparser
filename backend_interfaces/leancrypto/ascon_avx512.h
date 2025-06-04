@@ -1,6 +1,5 @@
-/* Protobuf protocol for the export and import of cSHAKE
- *
- * Copyright (C) 2024, Stephan Mueller <smueller@chronox.de>
+/*
+ * Copyright (C) 2024 - 2025, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -18,46 +17,19 @@
  * DAMAGE.
  */
 
-syntax = "proto3";
+#ifndef ASCON_AVX512
+#define ASCON_AVX512
 
-message MlDsaKeygenDataMsg {
-	bytes seed = 1;
-	bytes pk = 2;
-	bytes sk = 3;
-	uint64 cipher = 4;
-}
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-message MlDsaSiggenDataMsg {
-	bytes msg = 1;
-	bytes mu = 2;
-	bytes sig = 3;
-	bytes pk = 4;
-	bytes rnd = 5;
-	bytes sk = 6;
-	bytes context = 7;
-	bytes interface = 8;
-	uint32 privkey = 9;
-	uint64 cipher = 10;
-	uint64 hashalg = 11;
-}
+extern const struct lc_hash *lc_ascon_256_avx512;
+extern const struct lc_hash *lc_ascon_128a_avx512;
+extern const struct lc_hash *lc_ascon_xof_avx512;
 
-message MlDsaSigverDataMsg {
-	bytes msg = 1;
-	bytes sig = 2;
-	bytes pk = 3;
-	bytes context = 4;
-	bytes interface = 5;
-	uint64 cipher = 6;
-	uint64 hashalg = 7;
-	uint32 sigver_success = 8;
+#ifdef __cplusplus
 }
+#endif
 
-message MlDsaKeygenEnMsg {
-	uint64 cipher = 1;
-	bytes pk = 2;
-	uint32 privkey = 3;
-}
-
-message MlDsaFreeKeyMsg {
-	uint32 privkey = 1;
-}
+#endif /* ASCON_AVX512 */

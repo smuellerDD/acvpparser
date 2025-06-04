@@ -309,7 +309,7 @@ const ProtobufCMessageDescriptor ml_dsa_keygen_data_msg__descriptor =
   (ProtobufCMessageInit) ml_dsa_keygen_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[10] =
+static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[11] =
 {
   {
     "msg",
@@ -324,8 +324,20 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
   {
-    "sig",
+    "mu",
     2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlDsaSiggenDataMsg, mu),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "sig",
+    3,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -337,7 +349,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "pk",
-    3,
+    4,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -349,7 +361,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "rnd",
-    4,
+    5,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -361,7 +373,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "sk",
-    5,
+    6,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -373,7 +385,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "context",
-    6,
+    7,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -385,7 +397,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "interface",
-    7,
+    8,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_BYTES,
     0,   /* quantifier_offset */
@@ -397,7 +409,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "privkey",
-    8,
+    9,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT32,
     0,   /* quantifier_offset */
@@ -409,7 +421,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "cipher",
-    9,
+    10,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT64,
     0,   /* quantifier_offset */
@@ -421,7 +433,7 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
   {
     "hashalg",
-    10,
+    11,
     PROTOBUF_C_LABEL_NONE,
     PROTOBUF_C_TYPE_UINT64,
     0,   /* quantifier_offset */
@@ -433,21 +445,22 @@ static const ProtobufCFieldDescriptor ml_dsa_siggen_data_msg__field_descriptors[
   },
 };
 static const unsigned ml_dsa_siggen_data_msg__field_indices_by_name[] = {
-  8,   /* field[8] = cipher */
-  5,   /* field[5] = context */
-  9,   /* field[9] = hashalg */
-  6,   /* field[6] = interface */
+  9,   /* field[9] = cipher */
+  6,   /* field[6] = context */
+  10,   /* field[10] = hashalg */
+  7,   /* field[7] = interface */
   0,   /* field[0] = msg */
-  2,   /* field[2] = pk */
-  7,   /* field[7] = privkey */
-  3,   /* field[3] = rnd */
-  1,   /* field[1] = sig */
-  4,   /* field[4] = sk */
+  1,   /* field[1] = mu */
+  3,   /* field[3] = pk */
+  8,   /* field[8] = privkey */
+  4,   /* field[4] = rnd */
+  2,   /* field[2] = sig */
+  5,   /* field[5] = sk */
 };
 static const ProtobufCIntRange ml_dsa_siggen_data_msg__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 10 }
+  { 0, 11 }
 };
 const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
 {
@@ -457,7 +470,7 @@ const ProtobufCMessageDescriptor ml_dsa_siggen_data_msg__descriptor =
   "MlDsaSiggenDataMsg",
   "",
   sizeof(MlDsaSiggenDataMsg),
-  10,
+  11,
   ml_dsa_siggen_data_msg__field_descriptors,
   ml_dsa_siggen_data_msg__field_indices_by_name,
   1,  ml_dsa_siggen_data_msg__number_ranges,
