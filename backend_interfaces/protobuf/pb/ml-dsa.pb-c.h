@@ -37,7 +37,7 @@ struct  MlDsaKeygenDataMsg
 };
 #define ML_DSA_KEYGEN_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_keygen_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, 0 }
+    , {0,NULL}, {0,NULL}, {0,NULL}, 0 }
 
 
 struct  MlDsaSiggenDataMsg
@@ -57,13 +57,14 @@ struct  MlDsaSiggenDataMsg
 };
 #define ML_DSA_SIGGEN_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_siggen_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
+    , {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
 
 
 struct  MlDsaSigverDataMsg
 {
   ProtobufCMessage base;
   ProtobufCBinaryData msg;
+  ProtobufCBinaryData mu;
   ProtobufCBinaryData sig;
   ProtobufCBinaryData pk;
   ProtobufCBinaryData context;
@@ -74,7 +75,7 @@ struct  MlDsaSigverDataMsg
 };
 #define ML_DSA_SIGVER_DATA_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_sigver_data_msg__descriptor) \
-, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
+    , {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, {0,NULL}, 0, 0, 0 }
 
 
 struct  MlDsaKeygenEnMsg
@@ -86,7 +87,7 @@ struct  MlDsaKeygenEnMsg
 };
 #define ML_DSA_KEYGEN_EN_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_keygen_en_msg__descriptor) \
-, 0, {0,NULL}, 0 }
+    , 0, {0,NULL}, 0 }
 
 
 struct  MlDsaFreeKeyMsg
@@ -96,7 +97,7 @@ struct  MlDsaFreeKeyMsg
 };
 #define ML_DSA_FREE_KEY_MSG__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&ml_dsa_free_key_msg__descriptor) \
-, 0 }
+    , 0 }
 
 
 /* MlDsaKeygenDataMsg methods */

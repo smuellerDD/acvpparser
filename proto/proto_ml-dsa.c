@@ -166,6 +166,8 @@ static int proto_ml_dsa_sigver_tester(struct buffer *in, struct buffer *out,
 
 	data.msg.buf = MlDsaSigverDataMsg_recv->msg.data;
 	data.msg.len = MlDsaSigverDataMsg_recv->msg.len;
+	data.mu.buf = MlDsaSigverDataMsg_recv->mu.data;
+	data.mu.len = MlDsaSigverDataMsg_recv->mu.len;
 	data.sig.buf = MlDsaSigverDataMsg_recv->sig.data;
 	data.sig.len = MlDsaSigverDataMsg_recv->sig.len;
 	data.pk.buf = MlDsaSigverDataMsg_recv->pk.data;

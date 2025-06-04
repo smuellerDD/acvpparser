@@ -2195,6 +2195,8 @@ static int pb_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 
 	MlDsaSigverDataMsg_send.msg.data = data->msg.buf;
 	MlDsaSigverDataMsg_send.msg.len = data->msg.len;
+	MlDsaSigverDataMsg_send.mu.data = data->mu.buf;
+	MlDsaSigverDataMsg_send.mu.len = data->mu.len;
 	MlDsaSigverDataMsg_send.sig.data = data->sig.buf;
 	MlDsaSigverDataMsg_send.sig.len = data->sig.len;
 	MlDsaSigverDataMsg_send.context.data = data->context.buf;

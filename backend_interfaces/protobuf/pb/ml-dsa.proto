@@ -43,13 +43,14 @@ message MlDsaSiggenDataMsg {
 
 message MlDsaSigverDataMsg {
 	bytes msg = 1;
-	bytes sig = 2;
-	bytes pk = 3;
-	bytes context = 4;
-	bytes interface = 5;
-	uint64 cipher = 6;
-	uint64 hashalg = 7;
-	uint32 sigver_success = 8;
+	bytes mu = 2;
+	bytes sig = 3;
+	bytes pk = 4;
+	bytes context = 5;
+	bytes interface = 6;
+	uint64 cipher = 7;
+	uint64 hashalg = 8;
+	uint32 sigver_success = 9;
 }
 
 message MlDsaKeygenEnMsg {
