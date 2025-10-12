@@ -32,41 +32,43 @@
 MODULE_PREFIX="leancrypto__"
 MODULE_POSTFIX="_"
 
-EXEC="Kernel_C"
+EXEC="without_PAA_-_Kernel_C_implementation"
 
 if [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	EXEC="$EXEC
-	      Kernel_ARM_CE Kernel_ARM_ASM Kernel_ARM_2X"
+	      with_PAA_-_Kernel_ARM_CE_implementation without_PAA_-_Kernel_ARM_ASM_implementation without_PAA_-_Kernel_ARM_2X_implementation"
 elif [ $(uname -m) = "riscv64" ]; then
 	EXEC="$EXEC
-	      Kernel_RISCV64"
+	      without_PAA_-_Kernel_RISCV64_implementation without_PAA_-_Kernel_RISCV64_ZBB_implementation without_PAA_-_Kernel_RISCV64_RVV_implementation"
 elif (uname -m | grep -q armv7 ); then
 	EXEC="$EXEC
-	      Kernel_ARM_NEON"
+	      without_PAA_-_Kernel_ARM_NEON_implementation"
 elif [ $(uname -m) = "x86_64" ]; then
 	EXEC="$EXEC
-	      Kernel_AVX2 Kernel_AVX512 Kernel_AVX2_4X Kernel_AESNI"
+	      without_PAA_-_Kernel_AVX2_implementation without_PAA_-_Kernel_AVX512_implementation without_PAA_-_Kernel_AVX2_4X_implementation with_PAA_-_Kernel_AESNI_implementation"
 fi
 
 # The integer values must be consistent
 # with proto_frontend_linux_kernel.c:getenv()
-CIPHER_CALL_Kernel_C="ACVPPARSER_PROTOBUF_IMPL=\"1\""
-CIPHER_CALL_Kernel_AVX2="ACVPPARSER_PROTOBUF_IMPL=\"4\""
-CIPHER_CALL_Kernel_AVX512="ACVPPARSER_PROTOBUF_IMPL=\"5\""
-CIPHER_CALL_Kernel_AESNI="ACVPPARSER_PROTOBUF_IMPL=\"2\""
-CIPHER_CALL_Kernel_ARM_NEON="ACVPPARSER_PROTOBUF_IMPL=\"6\""
-CIPHER_CALL_Kernel_ARM_CE="ACVPPARSER_PROTOBUF_IMPL=\"3\""
-CIPHER_CALL_Kernel_ARM_ASM="ACVPPARSER_PROTOBUF_IMPL=\"7\""
-CIPHER_CALL_Kernel_AVX2_4X="ACVPPARSER_PROTOBUF_IMPL=\"9\""
-CIPHER_CALL_Kernel_ARM_2X="ACVPPARSER_PROTOBUF_IMPL=\"10\""
-CIPHER_CALL_Kernel_RISCV64="ACVPPARSER_PROTOBUF_IMPL=\"11\""
+CIPHER_CALL_without_PAA__Kernel_C_implementation="ACVPPARSER_PROTOBUF_IMPL=\"1\""
+CIPHER_CALL_without_PAA__Kernel_AVX2_implementation="ACVPPARSER_PROTOBUF_IMPL=\"4\""
+CIPHER_CALL_without_PAA__Kernel_AVX512_implementation="ACVPPARSER_PROTOBUF_IMPL=\"5\""
+CIPHER_CALL_with_PAA__Kernel_AESNI_implementation="ACVPPARSER_PROTOBUF_IMPL=\"2\""
+CIPHER_CALL_without_PAA__Kernel_ARM_NEON_implementation="ACVPPARSER_PROTOBUF_IMPL=\"6\""
+CIPHER_CALL_with_PAA__Kernel_ARM_CE_implementation="ACVPPARSER_PROTOBUF_IMPL=\"3\""
+CIPHER_CALL_without_PAA__Kernel_ARM_ASM_implementation="ACVPPARSER_PROTOBUF_IMPL=\"7\""
+CIPHER_CALL_without_PAA__Kernel_AVX2_4X_implementation="ACVPPARSER_PROTOBUF_IMPL=\"9\""
+CIPHER_CALL_without_PAA__Kernel_ARM_2X_implementation="ACVPPARSER_PROTOBUF_IMPL=\"10\""
+CIPHER_CALL_without_PAA__Kernel_RISCV64_implementation="ACVPPARSER_PROTOBUF_IMPL=\"11\""
+CIPHER_CALL_without_PAA__Kernel_RISCV64_ZBB_implementation="ACVPPARSER_PROTOBUF_IMPL=\"12\""
+CIPHER_CALL_without_PAA__Kernel_RISCV64_RVV_implementation="ACVPPARSER_PROTOBUF_IMPL=\"13\""
 
 do_test() {
 	PATH=.:$PATH
 
 	for exec in $EXEC; do
 
-		eval CIPHER_CALL=\$CIPHER_CALL_$exec
+		eval CIPHER_CALL=\$CIPHER_CALL_$(echo $exec | sed 's/-//g')
 
 		local modulename="${MODULE_PREFIX}${exec}${MODULE_POSTFIX}"
 		eval "$CIPHER_CALL exec_module ${modulename}"

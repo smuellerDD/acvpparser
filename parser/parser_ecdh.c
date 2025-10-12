@@ -127,6 +127,45 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	const struct json_array ecdh_su_ver_test =
 			SET_ARRAY(ecdh_su_ver_test_entries, &ecdh_su_ver_testresult);
 
+	/*
+	 * Full Unified VAL
+	 */
+	const struct json_entry ecdh_fu_ver_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &ecdh_ss_ver_vector.validity_success, WRITER_BOOL},		FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_testresult ecdh_fu_ver_testresult =
+		SET_ARRAY(ecdh_fu_ver_testresult_entries, &ecdh_ss_ver_callbacks);
+
+	/* VAL: KDF data */
+	const struct json_entry ecdh_full_unified_kdf_ver_entries[] = {
+		{"label",	{.data.buf = &ecdh_ss_ver_vector.onestep_kdf.label, PARSER_STRING},	FLAG_OP_KAS_SCHEME_TEST |FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_full_unified_kdf_ver = SET_ARRAY(ecdh_full_unified_kdf_ver_entries, NULL);
+
+	const struct json_entry ecdh_fu_ver_test_entries[] = {
+		{"staticPublicServerX",	{.data.buf = &ecdh_ss_ver_vector.Qxrem, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPublicServerY",	{.data.buf = &ecdh_ss_ver_vector.Qyrem, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicServerX",	{.data.buf = &ecdh_ss_ver_vector.Qxrem2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicServerY",	{.data.buf = &ecdh_ss_ver_vector.Qyrem2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPublicIutX",		{.data.buf = &ecdh_ss_ver_vector.Qxloc, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPublicIutY",		{.data.buf = &ecdh_ss_ver_vector.Qyloc, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",		{.data.buf = &ecdh_ss_ver_vector.privloc, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicIutX",		{.data.buf = &ecdh_ss_ver_vector.Qxloc2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicIutY",		{.data.buf = &ecdh_ss_ver_vector.Qyloc2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPrivateIut",		{.data.buf = &ecdh_ss_ver_vector.privloc2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"dkm",			{.data.buf = &ecdh_ss_ver_vector.hashzz, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"kdfParameter",	{.data.array = &ecdh_full_unified_kdf_ver, PARSER_ARRAY_BUFFERARRAY}, FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_fu_ver_test =
+			SET_ARRAY(ecdh_fu_ver_test_entries, &ecdh_fu_ver_testresult);
+
+	/* VAL: KDF configuration */
+	const struct json_entry ecdh_full_unified_kdf_configuration_ver_entries[] = {
+		{"auxFunction",	{.data.largeint = &ecdh_ss_ver_vector.onestep_kdf.aux_function, PARSER_CIPHER},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"fixedInfoPattern",	{.data.buf = &ecdh_ss_ver_vector.onestep_kdf.fixed_info_pattern, PARSER_STRING},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_full_unified_kdf_configuration_ver = SET_ARRAY(ecdh_full_unified_kdf_configuration_ver_entries, NULL);
+
 	/**********************************************************************
 	 * ECDH shared secret generation
 	 **********************************************************************/
@@ -227,6 +266,44 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 			SET_ARRAY(ecdh_su_test_entries, &ecdh_su_testresult);
 
 	/*
+	 * Full Unified
+	 */
+	const struct json_entry ecdh_fu_testresult_entries[] = {
+		{"staticPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicIutX",	{.data.buf = &ecdh_ss_vector.Qxloc2, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicIutY",	{.data.buf = &ecdh_ss_vector.Qyloc2, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPrivateIut",	{.data.buf = &ecdh_ss_vector.privloc2, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"dkm",		{.data.buf = &ecdh_ss_vector.hashzz, WRITER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_testresult ecdh_fu_testresult =
+			SET_ARRAY(ecdh_fu_testresult_entries, &ecdh_ss_callbacks);
+
+	/* AFT: KDF data */
+	const struct json_entry ecdh_full_unified_kdf_entries[] = {
+		{"label",	{.data.buf = &ecdh_ss_vector.onestep_kdf.label, PARSER_STRING},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_full_unified_kdf = SET_ARRAY(ecdh_full_unified_kdf_entries, NULL);
+
+	const struct json_entry ecdh_fu_test_entries[] = {
+		{"staticPublicServerX",	{.data.buf = &ecdh_ss_vector.Qxrem, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"staticPublicServerY",	{.data.buf = &ecdh_ss_vector.Qyrem, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicServerX",	{.data.buf = &ecdh_ss_vector.Qxrem2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"ephemeralPublicServerY",	{.data.buf = &ecdh_ss_vector.Qyrem2, PARSER_BIN},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"kdfParameter",	{.data.array = &ecdh_full_unified_kdf, PARSER_ARRAY_BUFFERARRAY}, FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_fu_test =
+			SET_ARRAY(ecdh_fu_test_entries, &ecdh_fu_testresult);
+
+	/* AFT: KDF configuration */
+	const struct json_entry ecdh_full_unified_kdf_configuration_aft_entries[] = {
+		{"auxFunction",	{.data.largeint = &ecdh_ss_vector.onestep_kdf.aux_function, PARSER_CIPHER},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"fixedInfoPattern",	{.data.buf = &ecdh_ss_vector.onestep_kdf.fixed_info_pattern, PARSER_STRING},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+	};
+	const struct json_array ecdh_full_unified_kdf_configuration = SET_ARRAY(ecdh_full_unified_kdf_configuration_aft_entries, NULL);
+
+	/*
 	 * Define the test group which contains ancillary data and eventually
 	 * the array of individual test ss_vectors.
 	 *
@@ -235,13 +312,26 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry ecdh_testgroup_entries[] = {
 		/* Common entries */
-		{"curve",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"curve",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
+		{"domainParameterGenerationMode",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"hashAlg",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER},	FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"macType",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER},	FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
-		{"curve",	{.data.largeint = &ecdh_ss_ver_vector.cipher, PARSER_CIPHER},	FLAG_OP_MASK_ECDH | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"curve",	{.data.largeint = &ecdh_ss_ver_vector.cipher, PARSER_CIPHER},	FLAG_OP_MASK_ECDH | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER | FLAG_OPTIONAL},
 		{"hashAlg",	{.data.largeint = &ecdh_ss_ver_vector.cipher, PARSER_CIPHER},	FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"macType",	{.data.largeint = &ecdh_ss_ver_vector.cipher, PARSER_CIPHER},	FLAG_OPTIONAL | FLAG_OP_MASK_ECDH | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+
+		/* Full Unified AFT */
+		{"domainParameterGenerationMode",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"iutId",	{.data.buf = &ecdh_ss_vector.iut_id, PARSER_STRING}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER },
+		{"serverId",	{.data.buf = &ecdh_ss_vector.server_id, PARSER_STRING}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER },
+		{"kdfConfiguration",	{.data.array = &ecdh_full_unified_kdf_configuration, PARSER_ARRAY_BUFFERARRAY},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_AFT | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+
+		/* Full Unified VAL */
+		{"domainParameterGenerationMode",	{.data.largeint = &ecdh_ss_ver_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER },
+		{"iutId",	{.data.buf = &ecdh_ss_ver_vector.iut_id, PARSER_STRING}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER },
+		{"serverId",	{.data.buf = &ecdh_ss_ver_vector.server_id, PARSER_STRING}, 	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER },
+		{"kdfConfiguration",	{.data.array = &ecdh_full_unified_kdf_configuration_ver, PARSER_ARRAY_BUFFERARRAY},	FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_VAL | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
 		{"tests",	{.data.array = &ecdh_cdh_test, PARSER_ARRAY},		FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ECCDH_COMPONENT_TEST | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
@@ -256,13 +346,16 @@ static int ecdh_tester(struct json_object *in, struct json_object *out,
 		{"tests",	{.data.array = &ecdh_su_test, PARSER_ARRAY},		FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 		{"tests",	{.data.array = &ecdh_su_ver_test, PARSER_ARRAY},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_STATIC_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
 
+		{"tests",	{.data.array = &ecdh_fu_test, PARSER_ARRAY},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+		{"tests",	{.data.array = &ecdh_fu_ver_test, PARSER_ARRAY},	FLAG_OP_KAS_SCHEME_TEST | FLAG_OP_VAL | FLAG_OP_ECDH_SCHEME_FULL_UNIFIED | FLAG_OP_KAS_ROLE_INITIATOR | FLAG_OP_KAS_ROLE_RESPONDER},
+
 		{"tests",	{.data.array = &ecdh_cdh_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ECCDH_COMPONENT_TEST},
 	};
 	const struct json_array ecdh_testgroup = SET_ARRAY(ecdh_testgroup_entries, NULL);
 
 	const struct json_entry ecdh_component_testgroup_entries[] = {
 		/* Common entries */
-		{"curve",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_MASK_ECDH | FLAG_OP_AFT },
+		{"curve",	{.data.largeint = &ecdh_ss_vector.cipher, PARSER_CIPHER}, 	FLAG_OP_MASK_ECDH | FLAG_OP_AFT | FLAG_OPTIONAL },
 
 		{"tests",	{.data.array = &ecdh_cdh_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ECDH_SCHEME_ECCDH_COMPONENT_TEST},
 	};

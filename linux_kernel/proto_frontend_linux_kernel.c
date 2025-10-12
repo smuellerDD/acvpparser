@@ -118,6 +118,7 @@ static void proto_scrub(void)
 static uint32_t proto_implementation = 0;
 const char *getenv(const char *name)
 {
+	// NOTE: RISCV_RVV is not currently of interest
 	if (!strncmp(name, "LC_AES", 6)) {
 		if (proto_implementation == 1) {
 			static const char out[] = "C";
@@ -163,6 +164,14 @@ const char *getenv(const char *name)
 			static const char out[] = "ARM_CE";
 
 			return out;
+		} else if (proto_implementation == 11) {
+			static const char out[] = "RISCV64";
+
+			return out;
+		} else if (proto_implementation == 12) {
+			static const char out[] = "RISCV64_ZBB";
+
+			return out;
 		} else {
 			return NULL;
 		}
@@ -187,6 +196,14 @@ const char *getenv(const char *name)
 			return NULL;
 		}
 	} else if (!strncmp(name, "LC_KYBER", 8)) {
+		if (proto_implementation == 1) {
+			static const char out[] = "C";
+
+			return out;
+		} else {
+			return NULL;
+		}
+	} else if (!strncmp(name, "LC_AES_GCM", 6)) {
 		if (proto_implementation == 1) {
 			static const char out[] = "C";
 

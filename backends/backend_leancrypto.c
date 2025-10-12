@@ -97,6 +97,9 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 		case ACVP_KW:
 			*impl = lc_aes_kw_c;
 			break;
+		case ACVP_XTS:
+			*impl = lc_aes_xts_c;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -114,6 +117,10 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 		case ACVP_KW:
 			*impl = lc_aes_kw_aesni;
 			lc_cipher_check_c(*impl, lc_aes_kw_c, "AESNI KW");
+			break;
+		case ACVP_XTS:
+			*impl = lc_aes_xts_aesni;
+			lc_cipher_check_c(*impl, lc_aes_xts_c, "AESNI XTS");
 			break;
 		default:
 			return -EINVAL;
@@ -133,6 +140,10 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 			*impl = lc_aes_kw_armce;
 			lc_cipher_check_c(*impl, lc_aes_kw_c, "ARM CE KW");
 			break;
+		case ACVP_XTS:
+			*impl = lc_aes_xts_armce;
+			lc_cipher_check_c(*impl, lc_aes_xts_c, "AESNI XTS");
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -151,6 +162,10 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 			*impl = lc_aes_kw_riscv64;
 			lc_cipher_check_c(*impl, lc_aes_kw_c, "RISC-V 64 KW");
 			break;
+		case ACVP_XTS:
+			*impl = lc_aes_xts_riscv64;
+			lc_cipher_check_c(*impl, lc_aes_xts_c, "AESNI XTS");
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -165,6 +180,9 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 			break;
 		case ACVP_KW:
 			*impl = lc_aes_kw;
+			break;
+		case ACVP_XTS:
+			*impl = lc_aes_xts;
 			break;
 	// 	case ACVP_ECB:
 	// 		*impl = lc_aes_ecb;
@@ -1146,7 +1164,6 @@ out:
 	lc_hash_zero(hash);
 	sha_ldt_clear_buf(data, &msg_p);
 	return ret;
-
 }
 
 static struct sha_backend lc_sha =
@@ -1677,7 +1694,8 @@ static const struct lc_rng lc_static_drng = {
 /************************************************
  * EDDSA interface functions
  ************************************************/
-static int lc_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_flags)
+static int lc_eddsa_25519_keygen(struct eddsa_keygen_data *data,
+				 flags_t parsed_flags)
 {
 	struct lc_ed25519_pk pk;
 	struct lc_ed25519_sk sk;
@@ -1692,7 +1710,8 @@ static int lc_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
-	if (!(data->cipher & ACVP_ED25519)) {
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED25519) {
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
 		return -EINVAL;
 	}
@@ -1709,14 +1728,14 @@ out:
 	return ret;
 }
 
-static int lc_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
-			      void **privkey)
+static int lc_eddsa_25519_keygen_en(struct buffer *qbuf, uint64_t curve,
+				    void **privkey)
 {
 	struct lc_ed25519_pk pk;
 	struct lc_ed25519_sk *sk = NULL;
 	int ret;
 
-	if (!(curve & ACVP_ED25519)) {
+	if (!(curve & ACVP_CIPHERTYPE_ECC) || curve != ACVP_ED25519) {
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
 		return -EINVAL;
 	}
@@ -1737,13 +1756,8 @@ out:
 	return ret;
 }
 
-static void lc_eddsa_free_key(void *privkey)
-{
-	if (privkey)
-		acvp_free(privkey);
-}
-
-static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
+static int lc_eddsa_25519_siggen(struct eddsa_siggen_data *data,
+				 flags_t parsed_flags)
 {
 	struct lc_ed25519_sig sig;
 	struct lc_ed25519_sk *sk = (struct lc_ed25519_sk *)data->privkey;
@@ -1751,7 +1765,8 @@ static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
-	if (!(data->cipher & ACVP_ED25519)) {
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED25519) {
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
 		return -EINVAL;
 	}
@@ -1778,8 +1793,8 @@ out:
 	return ret;
 }
 
-static int lc_eddsa_sigver(struct eddsa_sigver_data *data,
-				  flags_t parsed_flags)
+static int lc_eddsa_25519_sigver(struct eddsa_sigver_data *data,
+				 flags_t parsed_flags)
 {
 	struct lc_ed25519_sig sig;
 	struct lc_ed25519_pk pk;
@@ -1787,7 +1802,8 @@ static int lc_eddsa_sigver(struct eddsa_sigver_data *data,
 
 	(void)parsed_flags;
 
-	if (!(data->cipher & ACVP_ED25519)) {
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED25519) {
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
 		return -EINVAL;
 	}
@@ -1830,6 +1846,203 @@ static int lc_eddsa_sigver(struct eddsa_sigver_data *data,
 	}
 
 	return 0;
+}
+
+static int lc_eddsa_448_keygen(struct eddsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	struct lc_ed448_pk pk;
+	struct lc_ed448_sk sk;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED448) {
+		logger(LOGGER_ERR, "Curve 448 only supported\n");
+		return -EINVAL;
+	}
+
+	CKINT(alloc_buf(LC_ED448_PUBLICKEYBYTES, &data->q));
+	CKINT(alloc_buf(LC_ED448_SECRETKEYBYTES, &data->d));
+
+	CKINT(lc_ed448_keypair(&pk, &sk, lc_seeded_rng));
+
+	memcpy(data->q.buf, pk.pk, LC_ED448_PUBLICKEYBYTES);
+	memcpy(data->d.buf, sk.sk, LC_ED448_SECRETKEYBYTES);
+
+out:
+	return ret;
+}
+
+static int lc_eddsa_448_keygen_en(struct buffer *qbuf, uint64_t curve,
+				  void **privkey)
+{
+	struct lc_ed448_pk pk;
+	struct lc_ed448_sk *sk = NULL;
+	int ret;
+
+	if (!(curve & ACVP_CIPHERTYPE_ECC) ||
+	    curve != ACVP_ED448) {
+		logger(LOGGER_ERR, "Curve 448 only supported\n");
+		return -EINVAL;
+	}
+
+	CKINT(alloc_buf(LC_ED448_PUBLICKEYBYTES, qbuf));
+
+	sk = acvp_calloc(1, sizeof(struct lc_ed448_sk));
+	CKNULL(sk, -ENOMEM);
+
+	CKINT(lc_ed448_keypair(&pk, sk, lc_seeded_rng));
+	memcpy(qbuf->buf, pk.pk, LC_ED448_PUBLICKEYBYTES);
+
+	*privkey = sk;
+
+out:
+	if (ret && sk)
+		acvp_free(sk);
+	return ret;
+}
+
+static int lc_eddsa_448_siggen(struct eddsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	struct lc_ed448_sig sig;
+	struct lc_ed448_sk *sk = (struct lc_ed448_sk *)data->privkey;
+	int ret;
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED448) {
+		logger(LOGGER_ERR, "Curve 448 only supported\n");
+		return -EINVAL;
+	}
+
+	CKNULL(sk, -EINVAL);
+
+	CKINT(alloc_buf(LC_ED448_SIGBYTES, &data->signature));
+	if (data->prehash) {
+		uint8_t digest[LC_SHA512_SIZE_DIGEST];
+
+		lc_xof(lc_shake256, data->msg.buf, data->msg.len, digest,
+		       sizeof(digest));
+		CKINT(lc_ed448ph_sign(&sig, digest, sizeof(digest), sk,
+					lc_seeded_rng));
+	} else {
+		CKINT(lc_ed448_sign(&sig, data->msg.buf, data->msg.len, sk,
+				      lc_seeded_rng));
+	}
+
+	/* extract signature */
+
+	memcpy(data->signature.buf, sig.sig, data->signature.len);
+
+out:
+	return ret;
+}
+
+static int lc_eddsa_448_sigver(struct eddsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	struct lc_ed448_sig sig;
+	struct lc_ed448_pk pk;
+	int ret;
+
+	(void)parsed_flags;
+
+	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
+	    data->cipher != ACVP_ED448) {
+		logger(LOGGER_ERR, "Curve 448 only supported\n");
+		return -EINVAL;
+	}
+
+	if (data->signature.len > LC_ED448_SIGBYTES) {
+		logger(LOGGER_ERR, "Signature unexpected size %zu\n",
+		       data->signature.len);
+		return -EINVAL;
+	}
+
+	if (data->q.len != LC_ED448_PUBLICKEYBYTES) {
+		logger(LOGGER_ERR, "Wrong key size\n");
+		return -EINVAL;
+	}
+
+	memcpy(sig.sig, data->signature.buf, data->signature.len);
+	memcpy(pk.pk, data->q.buf, data->q.len);
+
+	if (data->prehash) {
+		uint8_t digest[LC_SHA512_SIZE_DIGEST];
+
+		lc_xof(lc_shake256, data->msg.buf, data->msg.len, digest,
+		       sizeof(digest));
+		ret = lc_ed448ph_verify(&sig, digest, sizeof(digest), &pk);
+	} else {
+		ret = lc_ed448_verify(&sig, data->msg.buf, data->msg.len,
+					&pk);
+	}
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "EDDSA signature successfully verified\n");
+		data->sigver_success = 1;
+	} else if (ret == -EBADMSG) {
+		logger(LOGGER_DEBUG,
+		       "EDDSA signature verification with bad signature\n");
+		data->sigver_success = 0;
+	} else {
+		logger(LOGGER_DEBUG, "Signature verification failed");
+		data->sigver_success = 0;
+		/* do not fail here, because that is an expected error */
+	}
+
+	return 0;
+}
+
+static int lc_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_flags)
+{
+	if ((data->cipher & ACVP_CIPHERTYPE_ECC) &&
+	    data->cipher == ACVP_ED448) {
+		return lc_eddsa_448_keygen(data, parsed_flags);
+	} else {
+		return lc_eddsa_25519_keygen(data, parsed_flags);
+	}
+}
+
+static int lc_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve,
+			      void **privkey)
+{
+	if ((curve & ACVP_CIPHERTYPE_ECC) && curve == ACVP_ED448) {
+		return lc_eddsa_448_keygen_en(qbuf, curve, privkey);
+	} else {
+		return lc_eddsa_25519_keygen_en(qbuf, curve, privkey);
+	}
+}
+
+
+static void lc_eddsa_free_key(void *privkey)
+{
+	if (privkey)
+		acvp_free(privkey);
+}
+
+static int lc_eddsa_siggen(struct eddsa_siggen_data *data, flags_t parsed_flags)
+{
+	if ((data->cipher & ACVP_CIPHERTYPE_ECC) &&
+	    data->cipher == ACVP_ED448) {
+		return lc_eddsa_448_siggen(data, parsed_flags);
+	} else {
+		return lc_eddsa_25519_siggen(data, parsed_flags);
+	}
+}
+
+static int lc_eddsa_sigver(struct eddsa_sigver_data *data, flags_t parsed_flags)
+{
+	if ((data->cipher & ACVP_CIPHERTYPE_ECC) &&
+	    data->cipher == ACVP_ED448) {
+		return lc_eddsa_448_sigver(data, parsed_flags);
+	} else {
+		return lc_eddsa_25519_sigver(data, parsed_flags);
+	}
 }
 
 static struct eddsa_backend lc_eddsa =
@@ -2326,11 +2539,60 @@ out:
 	return ret;
 }
 
+
+static int lc_ml_kem_enc_check(struct ml_kem_enc_check_data *data,
+			       flags_t parsed_flags)
+{
+	struct lc_kyber_pk pk;
+	struct lc_kyber_ct ct;
+	struct lc_kyber_ss ss;
+	enum lc_kyber_type type;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_kem_type(data->cipher, &type));
+
+	CKINT(lc_kyber_pk_load(&pk, data->ek.buf, data->ek.len));
+	CKINT(lc_kyber_enc(&ct, &ss, &pk));
+
+out:
+	lc_ml_kem_reset_impl();
+	if (ret)
+		data->check_success = 0;
+	else
+		data->check_success = 1;
+	return 0;
+}
+
+static int lc_ml_kem_dec_check(struct ml_kem_dec_check_data *data,
+			       flags_t parsed_flags)
+{
+	struct lc_kyber_sk sk;
+	enum lc_kyber_type type;
+	int ret;
+
+	(void)parsed_flags;
+
+	CKINT(lc_ml_kem_type(data->cipher, &type));
+
+	if (lc_kyber_sk_load(&sk, data->dk.buf, data->dk.len))
+		data->check_success = 0;
+	else
+		data->check_success = 1;
+
+out:
+	lc_ml_kem_reset_impl();
+	return ret;
+}
+
 static struct ml_kem_backend lc_ml_kem =
 {
 	lc_ml_kem_keygen,
 	lc_ml_kem_encapsulation,
 	lc_ml_kem_decapsulation,
+	lc_ml_kem_enc_check,
+	lc_ml_kem_dec_check,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(lc_ml_kem_backend)
@@ -2666,7 +2928,90 @@ static void lc_slh_dsa_backend(void)
 /************************************************
  * AEAD cipher interface functions
  ************************************************/
-static int lc_acvp_aead_encrypt(struct aead_data *data, flags_t parsed_flags)
+
+static void lc_aes_set_impl(void)
+{
+	const char *envstr = getenv("LC_AES_GCM");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_disable();
+}
+
+static void lc_aes_reset_impl(void)
+{
+	const char *envstr = getenv("LC_AES_GCM");
+
+	if (envstr && !strncasecmp(envstr, "C", 1))
+		lc_cpu_feature_enable();
+}
+
+static int lc_aes_gcm_encrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	LC_AES_GCM_CTX_ON_STACK(aes_gcm);
+	int ret;
+
+	(void)parsed_flags;
+
+	lc_aes_set_impl();
+
+	/* Shall we generate a random IV ? */
+	if (!data->iv.len && data->ivlen) {
+		CKINT(lc_aead_setkey(aes_gcm, data->key.buf, data->key.len,
+				     NULL, 0));
+
+		CKINT(alloc_buf(data->ivlen / 8, &data->iv));
+		CKINT(lc_aes_gcm_generate_iv(aes_gcm, data->iv.buf, 0,
+					     data->iv.buf, data->iv.len,
+					     lc_aes_gcm_iv_generate_new));
+	} else {
+		CKINT(lc_aead_setkey(aes_gcm, data->key.buf, data->key.len,
+				     data->iv.buf, data->iv.len));
+	}
+
+	CKINT(alloc_buf(data->taglen / 8, &data->tag));
+
+	CKINT(lc_aead_encrypt(aes_gcm, data->data.buf, data->data.buf,
+			      data->data.len, data->assoc.buf, data->assoc.len,
+			      data->tag.buf, data->tag.len));
+
+out:
+	lc_aead_zero(aes_gcm);
+	lc_aes_reset_impl();
+	return ret;
+}
+
+static int lc_aes_gcm_decrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	LC_AES_GCM_CTX_ON_STACK(aes_gcm);
+	int ret, rc;
+
+	(void)parsed_flags;
+
+	lc_aes_set_impl();
+
+	CKINT(lc_aead_setkey(aes_gcm, data->key.buf, data->key.len,
+			     data->iv.buf, data->iv.len));
+	rc = lc_aead_decrypt(aes_gcm, data->data.buf, data->data.buf,
+			      data->data.len, data->assoc.buf, data->assoc.len,
+			      data->tag.buf, data->tag.len);
+	if (rc == -EBADMSG) {
+		data->integrity_error = 1;
+		logger(LOGGER_DEBUG, "AEAD integrity error identified\n");
+		ret = 0;
+		goto out;
+	}
+	if (rc) {
+		ret = rc;
+		goto out;
+	}
+
+out:
+	lc_aead_zero(aes_gcm);
+	lc_aes_reset_impl();
+	return ret;
+}
+
+static int lc_ascon_encrypt(struct aead_data *data, flags_t parsed_flags)
 {
 	uint32_t taglen = data->taglen / 8;
 	int ret = 0;
@@ -2688,7 +3033,7 @@ out:
 	return ret;
 }
 
-static int lc_acvp_aead_decrypt(struct aead_data *data, flags_t parsed_flags)
+static int lc_ascon_decrypt(struct aead_data *data, flags_t parsed_flags)
 {
 	int ret;
 	LC_AL_CTX_ON_STACK(al);
@@ -2710,6 +3055,20 @@ static int lc_acvp_aead_decrypt(struct aead_data *data, flags_t parsed_flags)
 
 out:
 	return ret;
+}
+
+static int lc_acvp_aead_encrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ASCON_AEAD_128)
+		return lc_ascon_encrypt(data, parsed_flags);
+	return lc_aes_gcm_encrypt(data, parsed_flags);
+}
+
+static int lc_acvp_aead_decrypt(struct aead_data *data, flags_t parsed_flags)
+{
+	if (data->cipher == ACVP_ASCON_AEAD_128)
+		return lc_ascon_decrypt(data, parsed_flags);
+	return lc_aes_gcm_decrypt(data, parsed_flags);
 }
 
 static struct aead_backend lc_aead =

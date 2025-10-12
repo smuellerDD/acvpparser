@@ -185,7 +185,6 @@ static int aead_tester(struct json_object *in, struct json_object *out,
 	return process_json(&aead_testanchor, "1.0", in, out);
 }
 
-
 static int aead_gmac_tester(struct json_object *in, struct json_object *out,
 			    struct aead_data *vector,
 			    const struct json_callbacks *callbacks)
@@ -484,6 +483,97 @@ static int ccm_tester(struct json_object *in, struct json_object *out,
 	return aead_tester(in, out, &vector, &ccm_callbacks);
 }
 
+static int aead_ascon_tester(struct json_object *in, struct json_object *out,
+			     uint64_t cipher)
+{
+	struct aead_data vector;
+
+	if (!aead_backend) {
+		logger(LOGGER_ERR,
+		       "No backend implementation for AEAD ciphers available\n");
+		return EOPNOTSUPP;
+	}
+
+	/* Referencing the GCM backend functions for ASCON */
+	const struct aead_callback ascon_encrypt = { aead_backend->gcm_encrypt, &vector, NULL};
+	const struct aead_callback ascon_decrypt = { aead_backend->gcm_decrypt, &vector, NULL};
+	const struct json_callback ascon_callback[] = {
+		{ .callback.aead = ascon_encrypt, CB_TYPE_aead, FLAG_OP_ENC | FLAG_OP_AFT },
+		{ .callback.aead = ascon_decrypt, CB_TYPE_aead, FLAG_OP_DEC | FLAG_OP_AFT },
+	};
+	const struct json_callbacks ascon_callbacks =
+		SET_CALLBACKS(ascon_callback);
+
+
+	/*
+	 * Define which test result data should be written to the test result
+	 * JSON file.
+	 */
+	const struct json_entry aead_testresult_entries[] = {
+		/* also write empty CT (in case we only perform auth tests) */
+		{"ct",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"tag",		{.data.buf = &vector.tag, WRITER_BIN},	FLAG_OP_ENC | FLAG_OP_AFT},
+
+		/* also write empty PT (in case we only perform auth tests) */
+		{"pt",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"testPassed",	{.data.integer = &vector.integrity_error, WRITER_BOOL_TRUE_TO_FALSE},	FLAG_OP_DEC | FLAG_OP_AFT},
+	};
+	const struct json_testresult aead_testresult = SET_ARRAY(aead_testresult_entries, &ascon_callbacks);
+
+	/*
+	 * Define one particular test vector that is expected in the JSON
+	 * file. For example:
+	 * {
+         *   "tcId": 2171,
+         *   "key": "1529BAC6229586F057FAA59353851686",
+         *   "pt": "",
+         *   "aad": "4B11160620475D8EE440C3795CF62D26"
+         * },
+	 *
+	 * After parsing each individual test vector, the test should be
+	 * executed and the result should be written to a JSON file.
+	 */
+	const struct json_entry aead_test_entries[] = {
+		{"nonce",	{.data.buf = &vector.iv, PARSER_BIN},	 	FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
+		{"key",		{.data.buf = &vector.key, PARSER_BIN}, 		FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
+		{"ad",		{.data.buf = &vector.assoc, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
+		{"payloadLen",	{.data.integer = &vector.ptlen, PARSER_UINT},	FLAG_OP_ENC | FLAG_OP_AFT},
+
+		{"pt",		{.data.buf = &vector.data, PARSER_BIN}, 	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"tagLen",	{.data.integer = &vector.taglen, PARSER_UINT},	FLAG_OP_ENC | FLAG_OP_AFT},
+
+		{"ct",		{.data.buf = &vector.data, PARSER_BIN},		FLAG_OP_DEC | FLAG_OP_AFT},
+		{"tag",		{.data.buf = &vector.tag, PARSER_BIN},		FLAG_OP_DEC | FLAG_OP_AFT},
+	};
+	const struct json_array aead_test = SET_ARRAY(aead_test_entries, &aead_testresult);
+
+	const struct json_entry aead_testgroup_entries[] = {
+		{"tests",	{.data.array = &aead_test, PARSER_ARRAY},	FLAG_OP_ENC | FLAG_OP_DEC | FLAG_OP_AFT},
+	};
+	const struct json_array aead_testgroup = SET_ARRAY(aead_testgroup_entries, NULL);
+
+	/*
+	 * Define the anchor of the tests in the highest level of the JSON
+	 * input data. For example:
+	 * {
+	 *   "acvVersion": "0.2",
+	 *   "vsId": 1564,
+	 *   "algorithm": "AES-GCM",
+	 *   "direction": "encrypt",
+	 *   "testGroups": [
+	 */
+	const struct json_entry aead_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &aead_testgroup, PARSER_ARRAY}, 0 }
+	};
+	const struct json_array aead_testanchor = SET_ARRAY(aead_testanchor_entries, NULL);
+
+	memset(&vector, 0, sizeof(struct aead_data));
+	vector.cipher = cipher;
+
+	/* Process all. */
+	return process_json(&aead_testanchor, "1.0", in, out);
+}
+
 static struct cavs_tester gcm =
 {
 	ACVP_GCM,
@@ -516,6 +606,14 @@ static struct cavs_tester ccm =
 	NULL
 };
 
+static struct cavs_tester ascon_aead =
+{
+	ACVP_ASCON_AEAD_128,
+	0,
+	aead_ascon_tester,	/* process_req */
+	NULL
+};
+
 ACVP_DEFINE_CONSTRUCTOR(register_aead)
 static void register_aead(void)
 {
@@ -523,6 +621,7 @@ static void register_aead(void)
 	register_tester(&gcm_siv, "GCM-SIV");
 	register_tester(&gcm_gmac, "GCM-GMAC");
 	register_tester(&ccm, "CCM");
+	register_tester(&ascon_aead, "Ascon AEAD");
 }
 
 void register_aead_impl(struct aead_backend *implementation)

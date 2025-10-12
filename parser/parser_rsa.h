@@ -68,6 +68,7 @@ struct rsa_keygen_prime_data {
  *		     random e is supported by the module), the module
  *		     generates the random e value, allocates memory for this
  *		     buffer and places it into this buffer.
+ * @var fixed_e [ignore] Internal data
  *
  * The following buffers are for B.3.6 key generation.
  * @var xp [out]
@@ -93,6 +94,7 @@ struct rsa_keygen_data {
 	struct buffer p;
 	struct buffer q;
 	struct buffer e;
+	struct buffer fixed_e;
 
 	struct buffer xp;
 	struct buffer xp1;

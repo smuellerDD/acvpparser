@@ -455,6 +455,12 @@ static int rsa_keygen_helper(const struct json_array *processdata,
 	} else {
 		vector->bitlen_in = 0;
 	}
+
+	if (vector->fixed_e.len) {
+		free_buf(&vector->e);
+		rsa_duplicate_buf(&vector->fixed_e, &vector->e);
+	}
+
 	CKINT(callback(vector, parsed_flags));
 
 	if (parsed_flags & FLAG_OP_RSA_PQ_B36_PRIMES) {
@@ -772,7 +778,7 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_PQ_B34_PRIMES | FLAG_OP_RSA_PQ_B35_PRIMES | FLAG_OP_RSA_PQ_B36_PRIMES | FLAG_OP_RSA_CRT},
 		{"modulo",	{.data.integer = &rsa_keygen_vector.modulus, PARSER_UINT},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},
-		{"fixedPubExp",	{.data.buf = &rsa_keygen_vector.e, PARSER_BIN},
+		{"fixedPubExp",	{.data.buf = &rsa_keygen_vector.fixed_e, PARSER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT | FLAG_OPTIONAL},
 		{"modulo",	{.data.integer = &rsa_keygen_prime_vector.modulus, PARSER_UINT},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_KAT | FLAG_OP_RSA_PQ_B33_PRIMES | FLAG_OP_RSA_CRT},

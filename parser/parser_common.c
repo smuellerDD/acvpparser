@@ -242,7 +242,7 @@ int write_one_entry(const struct json_entry *entry,
 		break;
 	case WRITER_ECC:
 		CKINT(convert_cipher_algo(*data->data.largeint & ACVP_CURVEMASK,
-					  ACVP_CIPHERTYPE_ECC, &algo));
+					  ACVP_CIPHERTYPE_ECC, &algo, NULL));
 		logger(LOGGER_DEBUG, "Add ECC curve %s to test result\n",
 		       algo);
 		json_object_object_add(testresult, entry->name,
@@ -250,7 +250,7 @@ int write_one_entry(const struct json_entry *entry,
 		break;
 	case WRITER_HASH:
 		CKINT(convert_cipher_algo(*data->data.largeint & ACVP_HASHMASK,
-					  ACVP_CIPHERTYPE_HASH, &algo));
+					  ACVP_CIPHERTYPE_HASH, &algo, NULL));
 		logger(LOGGER_DEBUG, "Add hash %s to test result\n",
 		       algo);
 		json_object_object_add(testresult, entry->name,
@@ -275,6 +275,18 @@ int write_one_entry(const struct json_entry *entry,
 		       data->datatype);
 		break;
 	}
+
+	/*
+	 * The following debug code is provided allowing partial results to be
+	 * written to disk. Note that it slows down the processing as for each
+	 * JSON object addition during data processing, the full file is newly
+	 * created. Update the file name as needed.
+	 */
+#if 0
+	CKINT(json_object_to_file_ext("tmpfile.json", testresult,
+				      JSON_C_TO_STRING_PRETTY |
+				      JSON_C_TO_STRING_NOSLASHESCAPE))
+#endif
 
 out:
 	return ret;
@@ -403,6 +415,7 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(ecdsa_keygen_extra)
 			CB_HANDLER(ecdsa_pkvver)
 			CB_HANDLER(ecdsa_siggen)
+			CB_HANDLER(ecdsa_det_siggen)
 			CB_HANDLER(ecdsa_sigver)
 			CB_HANDLER(eddsa_keygen)
 			CB_HANDLER(eddsa_keyver)
@@ -434,6 +447,8 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(ml_kem_keygen)
 			CB_HANDLER(ml_kem_encapsulation)
 			CB_HANDLER(ml_kem_decapsulation)
+			CB_HANDLER(ml_kem_dec_check)
+			CB_HANDLER(ml_kem_enc_check)
 			CB_HANDLER(slh_dsa_keygen)
 			CB_HANDLER(slh_dsa_siggen)
 			CB_HANDLER(slh_dsa_sigver)
@@ -745,6 +760,8 @@ static const struct parser_flagsconv flagsconv_kdf_mode[] = {
 
 /* Flags conversion for ML-KEM function type */
 static const struct parser_flagsconv flagsconv_mlkem_type[] = {
+	{FLAG_OP_ML_KEM_TYPE_ENC_CHECK, {.string = "encapsulationKeyCheck"}, "ML-KEM encapsulation key check function"},
+	{FLAG_OP_ML_KEM_TYPE_DEC_CHECK, {.string = "decapsulationKeyCheck"}, "ML-KEM decapsulation key check function"},
 	{FLAG_OP_ML_KEM_TYPE_ENCAPSULATION, {.string = "encapsulation"}, "ML-KEM encapsulation function"},
 	{FLAG_OP_ML_KEM_TYPE_DECAPSULATION, {.string = "decapsulation"}, "ML-KEM decapsulation function"},
 	{0, {NULL}, NULL}
@@ -1057,7 +1074,7 @@ static int parse_one_entry(const struct json_entry *entry,
 			if (ret)
 				break;
 
-			*data->data.largeint = convert_algo_cipher(cipher,
+			*data->data.largeint = convert_algo_cipher(cipher, NULL,
 							*data->data.largeint);
 			if (*data->data.largeint == ACVP_UNKNOWN) {
 				logger(LOGGER_WARN,
@@ -1089,7 +1106,7 @@ static int parse_one_entry(const struct json_entry *entry,
 				CKINT(json_get_string(readdata, entry->name,
 						      &cipher));
 				carray->cipher[carray->arraysize] =
-					convert_algo_cipher(cipher,
+					convert_algo_cipher(cipher, NULL,
 						carray->cipher[carray->arraysize]);
 				if (carray->cipher[carray->arraysize] ==
 				    ACVP_UNKNOWN) {

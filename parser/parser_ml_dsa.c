@@ -165,7 +165,15 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
 				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
 				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
-				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL |
+				   FLAG_OPTIONAL},
+		{"mu",	{.data.buf = &ml_dsa_sigver_vector.mu, PARSER_BIN},
+			        FLAG_OP_AFT |  FLAG_OP_ASYM_TYPE_SIGVER |
+				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL |
+				   FLAG_OPTIONAL},
 		{"signature",	{.data.buf = &ml_dsa_sigver_vector.sig, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGVER |
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
 				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
@@ -236,7 +244,14 @@ static int ml_dsa_tester(struct json_object *in, struct json_object *out,
 				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
 				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
 				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
-				   FLAG_OP_SLH_DSA_TYPE_INTERNAL},
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL |
+				   FLAG_OPTIONAL},
+		{"mu",	{.data.buf = &ml_dsa_siggen_vector.mu, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
+				   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC |
+				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
+				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |
+				   FLAG_OP_SLH_DSA_TYPE_INTERNAL |
+				   FLAG_OPTIONAL},
 		{"rnd",		{.data.buf = &ml_dsa_siggen_vector.rnd, PARSER_BIN},	FLAG_OP_GDT | FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN |
 				   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC |
 				   FLAG_OP_SLH_DSA_TYPE_EXTERNAL |

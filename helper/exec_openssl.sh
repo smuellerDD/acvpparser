@@ -54,7 +54,7 @@ CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 #	Common implementations
 
 # See lib/module_implementations/definition_impl_openssl.c in acvpproxy
-EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2 KBKDF_3_1"
+EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2 EDDSA_3_4 KBKDF_3_1 PQC"
 
 if [ $(uname -m) = "s390x" ]; then
 	#	Implementations for s390x
@@ -233,9 +233,10 @@ else
 
 	# See https://www.openssl.org/docs/man3.0/man3/OPENSSL_ia32cap.html
 
-	# Used by default.
+	# Note we already remove some bits here to accomodate AES-XTS.
+	# Remove bit 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
 	# This is cipher_hw_aesni_initkey in cipher_aes_hw_aesni.inc.
-	CIPHER_CALL_AESNI=""
+	CIPHER_CALL_AESNI="OPENSSL_ia32cap=~0x1040000000000000:~0x00000600C0230000"
 	# Remove bit 57 (AES-NI).
 	# This is ossl_bsaes_* or vpaes_* in cipher_hw_aes_initkey in cipher_aes_hw.c.
 	CIPHER_CALL_BAES_CTASM="OPENSSL_ia32cap=~0x0200000000000000:~0x0"
@@ -244,7 +245,7 @@ else
 	CIPHER_CALL_AESASM="OPENSSL_ia32cap=~0x0200020000000000:~0x0"
 
 	# Used by default.
-	# This is vaes_gcm in cipher_aes_gcm_hw_vaes_avx512.inc
+	# This is vaes_gcm in cipher_aes_gcm_hw_vaes_avx512.inc and aesni_xts_256_encrypt_avx512 in cipher_aes_xts_hw.c
 	CIPHER_CALL_AESNI_AVX=""
 	# Remove bit 54 (MOVBE), 60 (AVX), 64+16/17/21/30/31 (AVX512), 64+41 (VAES), and 64+42(VPCLMULQDQ).
 	# This is aesni_gcm in cipher_aes_gcm_hw_aesni.inc

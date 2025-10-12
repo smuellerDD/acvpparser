@@ -707,7 +707,7 @@ int64_t json_object_get_int64(const struct json_object *jso)
 	case json_type_int:
 		return jso->o.c_int64;
 	case json_type_double:
-		if (jso->o.c_double >= INT64_MAX)
+		if (jso->o.c_double >= (double)INT64_MAX)
 			return INT64_MAX;
 		if (jso->o.c_double <= INT64_MIN)
 			return INT64_MIN;

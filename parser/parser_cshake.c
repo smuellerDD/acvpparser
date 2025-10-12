@@ -160,7 +160,7 @@ static int cshake_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry cshake_test_mct_entries[] = {
 		{"msg",			{.data.buf = &vector.msg, PARSER_BIN},			FLAG_OP_MCT},
 		{"len",			{.data.integer = &vector.bitlen, PARSER_UINT},		FLAG_OP_MCT},
-		{"functionName",	{.data.buf = &vector.function_name, PARSER_BIN},	FLAG_OP_MCT},
+		{"functionName",	{.data.buf = &vector.function_name, PARSER_STRING},	FLAG_OP_MCT},
 		{"customization",	{.data.buf = &vector.customization, PARSER_STRING},	FLAG_OP_MCT | FLAG_OPTIONAL},
 		{"customizationHex",	{.data.buf = &vector.customization, PARSER_BIN},	FLAG_OP_MCT | FLAG_OPTIONAL},
 	};

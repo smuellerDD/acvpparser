@@ -204,17 +204,17 @@ int openssl_md_convert(uint64_t cipher, const EVP_MD **type);
 int openssl_hash_ss(uint64_t cipher, struct buffer *ss,
 		struct buffer *hashzz);
 
+int openssl_hash(const EVP_MD *md,
+		 uint8_t *in, size_t inlen,
+		 uint8_t *in2, size_t in2len,
+		 uint8_t *in3, size_t in3len,
+		 uint8_t *in4, size_t in4len,
+		 uint8_t *out, unsigned int *outlen);
+
 int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name);
 
 int openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
 			 int *out_nid, char **curve_name, char **instance_name);
-
-int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
-		    uint32_t saltlen, struct buffer *msg, struct buffer *sig);
-
-int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
-		    uint32_t saltlen, struct buffer *msg, struct buffer *sig,
-		    uint32_t *sig_result);
 
 #ifdef OPENSSL_ENABLE_TLS13
 int openssl_hkdf_extract(const EVP_MD *md,

@@ -18,6 +18,9 @@ acvp_proto-y := $(BACKENDDIR)/backend_leancrypto.o
 # provided they are invoked with -DLINUX_KERNEL.
 ccflags-y += -DLINUX_KERNEL -I/usr/local/include
 
+# Leancrypto specific options
+ccflags-y += -Wno-vla-larger-than
+
 # Include the backend special code directory to compile all test code
 ccflags-y += -I$(PWD)/$(ROOTDIR)/backend_interfaces/leancrypto
 

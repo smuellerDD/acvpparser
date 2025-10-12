@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 - 2024, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2023 - 2025, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -21,14 +21,14 @@
 #define AES_AESNI_H
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 extern const struct lc_sym *lc_aes_cbc_aesni;
 extern const struct lc_sym *lc_aes_ctr_aesni;
 extern const struct lc_sym *lc_aes_kw_aesni;
 extern const struct lc_sym *lc_aes_aesni;
+extern const struct lc_sym *lc_aes_xts_aesni;
 
 #ifdef __cplusplus
 }

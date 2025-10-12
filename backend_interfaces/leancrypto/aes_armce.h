@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 - 2024, Stephan Mueller <smueller@chronox.de>
+ * Copyright (C) 2023 - 2025, Stephan Mueller <smueller@chronox.de>
  *
  * License: see LICENSE file in root directory
  *
@@ -21,14 +21,14 @@
 #define AES_ARMCE_V8_H
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 extern const struct lc_sym *lc_aes_cbc_armce;
 extern const struct lc_sym *lc_aes_ctr_armce;
 extern const struct lc_sym *lc_aes_kw_armce;
 extern const struct lc_sym *lc_aes_armce;
+extern const struct lc_sym *lc_aes_xts_armce;
 
 #ifdef __cplusplus
 }

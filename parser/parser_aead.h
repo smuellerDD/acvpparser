@@ -37,6 +37,7 @@ extern "C"
  *		    empty for ciphers that do not support IVs (like AES-ECB or
  *		    AES-KW). For GCM with internal IV generation, the backend
  *		    must allocate the buffer, and fill it appropriately.
+ *		    NOTE: For Ascon AEAD, the iv buffer contains the nonce.
  * @var ivlen [in] If @var iv is NULL, but @var ivlen is set, the
  *		   cipher implementation is requested to invoke GCM with
  *		   internal IV generation. The IV of the given length shall
@@ -93,12 +94,12 @@ struct aead_data {
  * buffer with the return value must be 0 and the @var integrity_error
  * must be set appropriately.
  *
- * @var gcm_encrypt Callback implementing the GCM encrypt operation using the
- *		      @var data buffer. The @var parsed_flags point to
+ * @var gcm_encrypt Callback implementing the GCM and Ascon encrypt operation
+ *		      using the @var data buffer. The @var parsed_flags point to
  *		      flags specified in parser_flags.h.
- * @var gcm_decrypt Callback implementing the GCM decrypt operation using the
- *		      @var data buffer. The @var parsed_flags point to flags
- *		      specified in parser_flags.h.
+ * @var gcm_decrypt Callback implementing the GCM and Ascon decrypt operation
+ *		      using the @var data buffer. The @var parsed_flags point to
+ *		      flags specified in parser_flags.h.
  *
  * @var ccm_encrypt Callback implementing the CCM encrypt operation using the
  *		      @var data buffer. The @var parsed_flags point to

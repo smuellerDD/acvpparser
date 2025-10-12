@@ -424,6 +424,7 @@ static struct ecdsa_backend cryptomb_ecdsa =
 	NULL,
 	NULL,                    /* ecdsa_pkvver */
 	cryptomb_ecdsa_siggen,   /* ecdsa_siggen */
+	NULL,
 	cryptomb_ecdsa_sigver,   /* ecdsa_sigver */
 	cryptomb_ecdsa_keygen_en,
 	cryptomb_ecdsa_free_key,

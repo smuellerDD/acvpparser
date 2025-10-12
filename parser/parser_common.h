@@ -230,6 +230,7 @@ DEF_CALLBACK_TYPE(ecdsa_keygen)
 DEF_CALLBACK_TYPE(ecdsa_keygen_extra)
 DEF_CALLBACK_TYPE(ecdsa_pkvver)
 DEF_CALLBACK_TYPE(ecdsa_siggen)
+DEF_CALLBACK_TYPE(ecdsa_det_siggen)
 DEF_CALLBACK_TYPE(ecdsa_sigver)
 DEF_CALLBACK_TYPE(eddsa_keygen)
 DEF_CALLBACK_TYPE(eddsa_keyver)
@@ -261,6 +262,8 @@ DEF_CALLBACK_TYPE(ml_dsa_sigver)
 DEF_CALLBACK_TYPE(ml_kem_keygen)
 DEF_CALLBACK_TYPE(ml_kem_encapsulation)
 DEF_CALLBACK_TYPE(ml_kem_decapsulation)
+DEF_CALLBACK_TYPE(ml_kem_dec_check)
+DEF_CALLBACK_TYPE(ml_kem_enc_check)
 DEF_CALLBACK_TYPE(slh_dsa_keygen)
 DEF_CALLBACK_TYPE(slh_dsa_siggen)
 DEF_CALLBACK_TYPE(slh_dsa_sigver)
@@ -304,6 +307,7 @@ enum {
 	CB_TYPE_ecdsa_keygen_extra,
 	CB_TYPE_ecdsa_pkvver,
 	CB_TYPE_ecdsa_siggen,
+	CB_TYPE_ecdsa_det_siggen,
 	CB_TYPE_ecdsa_sigver,
 	CB_TYPE_eddsa_keygen,
 	CB_TYPE_eddsa_keyver,
@@ -337,6 +341,8 @@ enum {
 	CB_TYPE_ml_kem_keygen,
 	CB_TYPE_ml_kem_encapsulation,
 	CB_TYPE_ml_kem_decapsulation,
+	CB_TYPE_ml_kem_dec_check,
+	CB_TYPE_ml_kem_enc_check,
 	CB_TYPE_slh_dsa_keygen,
 	CB_TYPE_slh_dsa_siggen,
 	CB_TYPE_slh_dsa_sigver,
@@ -371,6 +377,7 @@ struct json_callback {
 		struct ecdsa_keygen_extra_callback ecdsa_keygen_extra;
 		struct ecdsa_pkvver_callback ecdsa_pkvver;
 		struct ecdsa_siggen_callback ecdsa_siggen;
+		struct ecdsa_det_siggen_callback ecdsa_det_siggen;
 		struct ecdsa_sigver_callback ecdsa_sigver;
 		struct eddsa_keygen_callback eddsa_keygen;
 		struct eddsa_keyver_callback eddsa_keyver;
@@ -402,6 +409,8 @@ struct json_callback {
 		struct ml_kem_keygen_callback ml_kem_keygen;
 		struct ml_kem_encapsulation_callback ml_kem_encapsulation;
 		struct ml_kem_decapsulation_callback ml_kem_decapsulation;
+		struct ml_kem_enc_check_callback ml_kem_enc_check;
+		struct ml_kem_dec_check_callback ml_kem_dec_check;
 		struct slh_dsa_keygen_callback slh_dsa_keygen;
 		struct slh_dsa_siggen_callback slh_dsa_siggen;
 		struct slh_dsa_sigver_callback slh_dsa_sigver;

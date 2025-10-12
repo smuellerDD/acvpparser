@@ -142,6 +142,96 @@ void   ml_kem_decap_data_msg__free_unpacked
   assert(message->base.descriptor == &ml_kem_decap_data_msg__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   ml_kem_enc_check_data_msg__init
+                     (MlKemEncCheckDataMsg         *message)
+{
+  static const MlKemEncCheckDataMsg init_value = ML_KEM_ENC_CHECK_DATA_MSG__INIT;
+  *message = init_value;
+}
+size_t ml_kem_enc_check_data_msg__get_packed_size
+                     (const MlKemEncCheckDataMsg *message)
+{
+  assert(message->base.descriptor == &ml_kem_enc_check_data_msg__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ml_kem_enc_check_data_msg__pack
+                     (const MlKemEncCheckDataMsg *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ml_kem_enc_check_data_msg__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ml_kem_enc_check_data_msg__pack_to_buffer
+                     (const MlKemEncCheckDataMsg *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ml_kem_enc_check_data_msg__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+MlKemEncCheckDataMsg *
+       ml_kem_enc_check_data_msg__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (MlKemEncCheckDataMsg *)
+     protobuf_c_message_unpack (&ml_kem_enc_check_data_msg__descriptor,
+                                allocator, len, data);
+}
+void   ml_kem_enc_check_data_msg__free_unpacked
+                     (MlKemEncCheckDataMsg *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ml_kem_enc_check_data_msg__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   ml_kem_dec_check_data_msg__init
+                     (MlKemDecCheckDataMsg         *message)
+{
+  static const MlKemDecCheckDataMsg init_value = ML_KEM_DEC_CHECK_DATA_MSG__INIT;
+  *message = init_value;
+}
+size_t ml_kem_dec_check_data_msg__get_packed_size
+                     (const MlKemDecCheckDataMsg *message)
+{
+  assert(message->base.descriptor == &ml_kem_dec_check_data_msg__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t ml_kem_dec_check_data_msg__pack
+                     (const MlKemDecCheckDataMsg *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &ml_kem_dec_check_data_msg__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t ml_kem_dec_check_data_msg__pack_to_buffer
+                     (const MlKemDecCheckDataMsg *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &ml_kem_dec_check_data_msg__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+MlKemDecCheckDataMsg *
+       ml_kem_dec_check_data_msg__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (MlKemDecCheckDataMsg *)
+     protobuf_c_message_unpack (&ml_kem_dec_check_data_msg__descriptor,
+                                allocator, len, data);
+}
+void   ml_kem_dec_check_data_msg__free_unpacked
+                     (MlKemDecCheckDataMsg *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &ml_kem_dec_check_data_msg__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 static const ProtobufCFieldDescriptor ml_kem_keygen_data_msg__field_descriptors[5] =
 {
   {
@@ -397,5 +487,133 @@ const ProtobufCMessageDescriptor ml_kem_decap_data_msg__descriptor =
   ml_kem_decap_data_msg__field_indices_by_name,
   1,  ml_kem_decap_data_msg__number_ranges,
   (ProtobufCMessageInit) ml_kem_decap_data_msg__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ml_kem_enc_check_data_msg__field_descriptors[3] =
+{
+  {
+    "ek",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlKemEncCheckDataMsg, ek),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "cipher",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT64,
+    0,   /* quantifier_offset */
+    offsetof(MlKemEncCheckDataMsg, cipher),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "check_success",
+    3,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT32,
+    0,   /* quantifier_offset */
+    offsetof(MlKemEncCheckDataMsg, check_success),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ml_kem_enc_check_data_msg__field_indices_by_name[] = {
+  2,   /* field[2] = check_success */
+  1,   /* field[1] = cipher */
+  0,   /* field[0] = ek */
+};
+static const ProtobufCIntRange ml_kem_enc_check_data_msg__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor ml_kem_enc_check_data_msg__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "MlKemEncCheckDataMsg",
+  "MlKemEncCheckDataMsg",
+  "MlKemEncCheckDataMsg",
+  "",
+  sizeof(MlKemEncCheckDataMsg),
+  3,
+  ml_kem_enc_check_data_msg__field_descriptors,
+  ml_kem_enc_check_data_msg__field_indices_by_name,
+  1,  ml_kem_enc_check_data_msg__number_ranges,
+  (ProtobufCMessageInit) ml_kem_enc_check_data_msg__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor ml_kem_dec_check_data_msg__field_descriptors[3] =
+{
+  {
+    "dk",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(MlKemDecCheckDataMsg, dk),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "cipher",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT64,
+    0,   /* quantifier_offset */
+    offsetof(MlKemDecCheckDataMsg, cipher),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "check_success",
+    3,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT32,
+    0,   /* quantifier_offset */
+    offsetof(MlKemDecCheckDataMsg, check_success),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned ml_kem_dec_check_data_msg__field_indices_by_name[] = {
+  2,   /* field[2] = check_success */
+  1,   /* field[1] = cipher */
+  0,   /* field[0] = dk */
+};
+static const ProtobufCIntRange ml_kem_dec_check_data_msg__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor ml_kem_dec_check_data_msg__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "MlKemDecCheckDataMsg",
+  "MlKemDecCheckDataMsg",
+  "MlKemDecCheckDataMsg",
+  "",
+  sizeof(MlKemDecCheckDataMsg),
+  3,
+  ml_kem_dec_check_data_msg__field_descriptors,
+  ml_kem_dec_check_data_msg__field_indices_by_name,
+  1,  ml_kem_dec_check_data_msg__number_ranges,
+  (ProtobufCMessageInit) ml_kem_dec_check_data_msg__init,
   NULL,NULL,NULL    /* reserved[123] */
 };

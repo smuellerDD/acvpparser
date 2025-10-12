@@ -42,3 +42,15 @@ message MlKemDecapDataMsg {
 	bytes ss = 3;
 	uint64 cipher = 4;
 }
+
+message MlKemEncCheckDataMsg {
+	bytes ek = 1;
+	uint64 cipher = 2;
+	uint32 check_success = 3;
+}
+
+message MlKemDecCheckDataMsg {
+	bytes dk = 1;
+	uint64 cipher = 2;
+	uint32 check_success = 3;
+}

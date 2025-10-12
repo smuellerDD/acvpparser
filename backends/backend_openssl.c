@@ -28,6 +28,124 @@ static void openssl_backend_init(void)
 	FIPS_mode_set(1);
 }
 
+static int openssl_set_rsa_padding(EVP_PKEY_CTX *pkey_ctx, flags_t parsed_flags,
+				   uint32_t saltlen)
+{
+	int ret = 0;
+
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS15) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_PKCS1_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+	}
+	if (parsed_flags & FLAG_OP_RSA_SIG_X931) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_X931_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+	}
+	if (parsed_flags & FLAG_OP_RSA_SIG_PKCS1PSS) {
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_padding(pkey_ctx,
+							 RSA_PKCS1_PSS_PADDING),
+			    "EVP_PKEY_CTX_set_rsa_padding failed\n");
+		CKINT_O_LOG(EVP_PKEY_CTX_set_rsa_pss_saltlen(pkey_ctx, saltlen),
+			    "EVP_PKEY_CTX_set_rsa_pss_saltlen failed\n");
+	}
+
+out:
+	return ret;
+}
+
+int openssl_sig_gen(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig)
+{
+	int ret = 0;
+	EVP_MD_CTX *md_ctx = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+	size_t sz = EVP_PKEY_size(pkey);
+	CKINT(alloc_buf(sz, sig));
+
+	if (md) {
+		md_ctx = EVP_MD_CTX_new();
+		CKNULL(md_ctx, -EFAULT);
+
+		CKINT_O(EVP_DigestSignInit(md_ctx, &pkey_ctx, md, NULL, pkey));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		CKINT_O(EVP_DigestSign(md_ctx, sig->buf, &sig->len, msg->buf,
+				       msg->len));
+	} else {
+		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+		CKNULL(pkey_ctx, -EFAULT);
+
+		CKINT_O(EVP_PKEY_sign_init(pkey_ctx));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		CKINT_O(EVP_PKEY_sign(pkey_ctx, sig->buf, &sig->len, msg->buf,
+				      msg->len));
+	}
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	else if (pkey_ctx)
+		EVP_PKEY_CTX_free(pkey_ctx);
+	return ret;
+}
+
+int openssl_sig_ver(EVP_PKEY *pkey, const EVP_MD *md, flags_t parsed_flags,
+		    uint32_t saltlen, struct buffer *msg, struct buffer *sig,
+		    uint32_t *sig_result)
+{
+	int ret = 0;
+	EVP_MD_CTX *md_ctx = NULL;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
+
+	if (md) {
+		md_ctx = EVP_MD_CTX_new();
+		CKNULL(md_ctx, -EFAULT);
+
+		CKINT_O(EVP_DigestVerifyInit(md_ctx, &pkey_ctx, md, NULL,
+					     pkey));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		ret = EVP_DigestVerify(md_ctx, sig->buf, sig->len, msg->buf,
+				       msg->len);
+	} else {
+		pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+		CKNULL(pkey_ctx, -EFAULT);
+
+		CKINT_O(EVP_PKEY_verify_init(pkey_ctx));
+
+		CKINT(openssl_set_rsa_padding(pkey_ctx, parsed_flags, saltlen));
+
+		ret = EVP_PKEY_verify(pkey_ctx, sig->buf, sig->len, msg->buf,
+				      msg->len);
+	}
+
+	if (!ret) {
+		logger(LOGGER_DEBUG, "Signature verification: signature bad\n");
+		*sig_result = 0;
+	} else if (ret == 1) {
+		logger(LOGGER_DEBUG,
+			"Signature verification: signature good\n");
+		*sig_result = 1;
+		ret = 0;
+	} else {
+		logger(LOGGER_WARN, "Signature verification: general error\n");
+		ret = -EFAULT;
+	}
+
+out:
+	if (md_ctx)
+		EVP_MD_CTX_free(md_ctx);
+	else if (pkey_ctx)
+		EVP_PKEY_CTX_free(pkey_ctx);
+	return ret;
+}
+
 /************************************************
  * OpenSSL version-specific code
  ************************************************/
@@ -4288,3 +4406,310 @@ static void openssl_pbkdf_backend(void)
 {
 	register_pbkdf_impl(&openssl_pbkdf);
 }
+
+#ifdef OPENSSL_ENABLE_TLS13
+#include <openssl/kdf.h>
+/************************************************
+ * RFC8446 TLS v1.3 KDF
+ ************************************************/
+#define TLS13_MAX_DIGEST_SIZE	64
+#define TLS13_MAX_LABEL_LEN     249
+
+static inline void be16_to_ptr(uint8_t *p, const uint16_t value)
+{
+	p[0] = (uint8_t)(value >> 8);
+	p[1] = (uint8_t)(value);
+}
+
+/*
+ * @param secret: secret from the HKDF extract phase
+ * @param label: TLS 1.3 label
+ * @param data: hashed input data
+ * @param out: derived key material
+ */
+static int tls13_hkdf_expand(const EVP_MD *md, const uint8_t *secret,
+			     const uint8_t *label, size_t labellen,
+			     const uint8_t *data, size_t datalen,
+			     uint8_t *out, size_t outlen)
+{
+	static const unsigned char label_prefix[] = "tls13 ";
+	int ret;
+	size_t hkdflabellen;
+	size_t hashlen;
+	/*
+	 * 2 bytes for length of derived secret + 1 byte for length of combined
+	 * prefix and label + bytes for the label itself + 1 byte length of hash
+	 * + bytes for the hash itself
+	 */
+	unsigned char hkdflabel[sizeof(uint16_t) +
+				sizeof(uint8_t) +
+				(sizeof(label_prefix) - 1) +
+				TLS13_MAX_LABEL_LEN + 1 +
+				TLS13_MAX_DIGEST_SIZE];
+
+	if (labellen > TLS13_MAX_LABEL_LEN)
+		return -EINVAL;
+
+	hashlen = (size_t)EVP_MD_size(md);
+
+	be16_to_ptr(hkdflabel, (uint16_t)outlen);
+	hkdflabellen = sizeof(uint16_t);
+
+	hkdflabel[hkdflabellen] = (uint8_t)labellen + 6;
+	hkdflabellen++;
+	memcpy(hkdflabel + hkdflabellen, label_prefix, sizeof(label_prefix) - 1);
+	hkdflabellen += sizeof(label_prefix) - 1;
+	memcpy(hkdflabel + hkdflabellen, label, labellen);
+	hkdflabellen += labellen;
+
+	if (data) {
+		hkdflabel[hkdflabellen] = (uint8_t)datalen;
+		hkdflabellen++;
+		memcpy(hkdflabel + hkdflabellen, data, datalen);
+		hkdflabellen += datalen;
+	}
+
+	CKINT(openssl_hkdf_expand(md, hkdflabel, hkdflabellen,
+				  secret, hashlen, out, &outlen));
+
+out:
+	return ret;
+}
+
+/* Always filled with zeros */
+static const unsigned char default_zeros[TLS13_MAX_DIGEST_SIZE];
+
+/*
+ * @param prevsecret: Result of previous tls13_generate_secret operations
+ * 		      (during first invocation, this is NULL)
+ * @param insecret: Secret (either PSK or DHE shared secret or NULL)
+ * @param outsecret: secret of message digest size
+ */
+/* This function is copied from OpenSSL */
+static int tls13_generate_secret(const EVP_MD *md,
+				 const uint8_t *prevsecret,
+				 const uint8_t *insecret,
+				 size_t insecretlen,
+				 uint8_t *outsecret)
+{
+	size_t mdlen, prevsecretlen;
+	int mdleni;
+	int ret;
+	static const char derived_secret_label[] = "derived";
+	unsigned char preextractsec[TLS13_MAX_DIGEST_SIZE];
+
+	mdleni = EVP_MD_size(md);
+	/* Ensure cast to size_t is safe */
+	if (mdleni < 0)
+		return -EFAULT;
+	mdlen = (size_t)mdleni;
+
+	if (insecret == NULL) {
+		insecret = default_zeros;
+		insecretlen = mdlen;
+	}
+
+	if (prevsecret == NULL) {
+		prevsecret = default_zeros;
+		prevsecretlen = 0;
+	} else {
+		EVP_MD_CTX *mctx = EVP_MD_CTX_new();
+		unsigned char hash[EVP_MAX_MD_SIZE];
+
+		/* The pre-extract derive step uses a hash of no messages */
+		if (mctx == NULL
+		    || EVP_DigestInit_ex(mctx, md, NULL) <= 0
+		    || EVP_DigestFinal_ex(mctx, hash, NULL) <= 0) {
+			logger(LOGGER_ERR, "hash generation failed\n");
+			EVP_MD_CTX_free(mctx);
+			return -EFAULT;
+		}
+		EVP_MD_CTX_free(mctx);
+
+		/* Generate the pre-extract secret */
+		if (!tls13_hkdf_expand(md, prevsecret,
+				       (unsigned char *)derived_secret_label,
+				       sizeof(derived_secret_label) - 1,
+				       hash, mdlen, preextractsec, mdlen))
+			return -EFAULT;
+
+		prevsecret = preextractsec;
+		prevsecretlen = mdlen;
+	}
+
+	CKINT(openssl_hkdf_extract(md, insecret, insecretlen,
+				   prevsecret, prevsecretlen,
+				   outsecret, &mdlen));
+
+out:
+	return ret;
+}
+
+static int openssl_tls13_generate(struct tls13_data *data,
+				  flags_t parsed_flags)
+{
+	static const unsigned char client_early_traffic[] = "c e traffic";
+	static const unsigned char early_exporter_master_secret[] = "e exp master";
+	static const unsigned char client_handshake_traffic[] = "c hs traffic";
+	static const unsigned char client_application_traffic[] = "c ap traffic";
+	static const unsigned char server_handshake_traffic[] = "s hs traffic";
+	static const unsigned char server_application_traffic[] = "s ap traffic";
+	static const unsigned char exporter_master_secret[] = "exp master";
+	static const unsigned char resumption_master_secret[] = "res master";
+
+	const EVP_MD *md = NULL;
+	uint8_t mdbuf[EVP_MAX_MD_SIZE];
+	uint8_t secret[EVP_MAX_MD_SIZE];
+	unsigned int mdbuflen;
+	int mdlen;
+
+	(void)parsed_flags;
+
+	int ret;
+
+	CKINT(openssl_md_convert(data->hash, &md));
+	mdlen = EVP_MD_size(md);
+
+	CKINT(alloc_buf((size_t)mdlen, &data->client_early_traffic_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->early_exporter_master_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->client_application_traffic_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->server_application_traffic_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->client_handshake_traffic_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->server_handshake_traffic_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->exporter_master_secret));
+	CKINT(alloc_buf((size_t)mdlen, &data->resumption_master_secret));
+
+	/* Generate Early Secret without PSK */
+	CKINT_LOG(tls13_generate_secret(md, NULL,
+					data->psk.buf, data->psk.len,
+					secret),
+		  "Generation of Early Secret failed\n");
+
+	/* Generate secrets */
+	CKINT(openssl_hash(md, data->client_hello_random.buf,
+			   data->client_hello_random.len,
+			   NULL, 0,
+			   NULL, 0,
+			   NULL, 0,
+			   mdbuf, &mdbuflen));
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      client_early_traffic,
+				      sizeof(client_early_traffic) - 1,
+				      mdbuf, mdbuflen,
+				      data->client_early_traffic_secret.buf,
+				      data->client_early_traffic_secret.len),
+		    "Generation of client early traffic secret failed\n");
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      early_exporter_master_secret,
+				      sizeof(early_exporter_master_secret) - 1,
+				      mdbuf, mdbuflen,
+				      data->early_exporter_master_secret.buf,
+				      data->early_exporter_master_secret.len),
+		    "Generation of early exporter master secret failed\n");
+
+
+	/* Generate Handshake Secret  */
+	CKINT_LOG(tls13_generate_secret(md, secret,
+					data->dhe.buf, data->dhe.len,
+					secret),
+		  "Generation of Handshake Secret failed\n");
+
+	/* generate the concatenated message as input */
+	CKINT(openssl_hash(md, data->client_hello_random.buf,
+			   data->client_hello_random.len,
+			   data->server_hello_random.buf,
+			   data->server_hello_random.len,
+			   NULL, 0,
+			   NULL, 0,
+			   mdbuf, &mdbuflen));
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      client_handshake_traffic,
+				      sizeof(client_handshake_traffic) - 1,
+				      mdbuf, mdbuflen,
+				      data->client_handshake_traffic_secret.buf,
+				      data->client_handshake_traffic_secret.len),
+		    "Generation of client handshake traffic secret failed\n");
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      server_handshake_traffic,
+				      sizeof(server_handshake_traffic) - 1,
+				      mdbuf, mdbuflen,
+				      data->server_handshake_traffic_secret.buf,
+				      data->server_handshake_traffic_secret.len),
+		    "Generation of server handshake traffic secret failed\n");
+
+	/* Generate Master Secret  */
+	CKINT_LOG(tls13_generate_secret(md, secret, NULL, 0, secret),
+		  "Generation of Master Secret failed\n");
+
+	/* Generate the concatenated message */
+	CKINT(openssl_hash(md, data->client_hello_random.buf,
+			   data->client_hello_random.len,
+			   data->server_hello_random.buf,
+			   data->server_hello_random.len,
+			   data->server_finished_random.buf,
+			   data->server_finished_random.len,
+			   NULL, 0,
+			   mdbuf, &mdbuflen));
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      client_application_traffic,
+				      sizeof(client_application_traffic) - 1,
+				      mdbuf, mdbuflen,
+				      data->client_application_traffic_secret.buf,
+				      data->client_application_traffic_secret.len),
+		    "Generation of client application traffic secret failed\n");
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      server_application_traffic,
+				      sizeof(server_application_traffic) - 1,
+				      mdbuf, mdbuflen,
+				      data->server_application_traffic_secret.buf,
+				      data->server_application_traffic_secret.len),
+		    "Generation of server application traffic secret failed\n");
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      exporter_master_secret,
+				      sizeof(exporter_master_secret) - 1,
+				      mdbuf, mdbuflen,
+				      data->exporter_master_secret.buf,
+				      data->exporter_master_secret.len),
+		    "Generation of exporter master secret failed\n");
+
+	CKINT(openssl_hash(md, data->client_hello_random.buf,
+			   data->client_hello_random.len,
+			   data->server_hello_random.buf,
+			   data->server_hello_random.len,
+			   data->server_finished_random.buf,
+			   data->server_finished_random.len,
+			   data->client_finished_random.buf,
+			   data->client_finished_random.len,
+			   mdbuf, &mdbuflen));
+
+	CKINT_O_LOG(tls13_hkdf_expand(md, secret,
+				      resumption_master_secret,
+				      sizeof(resumption_master_secret) - 1,
+				      mdbuf, mdbuflen,
+				      data->resumption_master_secret.buf,
+				      data->resumption_master_secret.len),
+		    "Generation of resumption master secret failed\n");
+
+out:
+	return ret;
+}
+
+static struct tls13_backend openssl_tls13 =
+{
+	openssl_tls13_generate,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_tls13_backend)
+static void openssl_tls13_backend(void)
+{
+	register_tls13_impl(&openssl_tls13);
+}
+
+#endif /* OPENSSL_ENABLE_TLS13 */

@@ -29,6 +29,24 @@ extern "C"
 #endif
 
 /**
+ * @brief One-Step KDF parameters
+ *
+ * @var aux_functinn [in] auxiliary function (i.e. a hash)'
+ * @var label [in] Label to be used for KDF- note, the buffer
+ *		    contains the ID string (i.e. ASCII-printable characters).
+ *		    The label->len value contains the size of the ID including
+ *		    the terminating zero. If you need the size of the string,
+ *		    use strlen(label->buf) or label->len - 1.
+ * @var label [in] ASCII string describing the fixed info structure (e.g.
+ *		   "label||uPartyInfo||vPartyInfo")
+ */
+struct ecdh_onestep_kdf {
+	uint64_t aux_function;
+	struct buffer label;
+	struct buffer fixed_info_pattern;
+};
+
+/**
  * @brief ECC CDH primitive and hashed Shared Secret generation
  *
  * @var cipher [in] ECC curve containing an OR of: one curve out of
@@ -36,19 +54,47 @@ extern "C"
  * 		      of HMACMASK when using KDF
  * @var Qxrem [in] affine X coordinate of remote pubkey
  * @var Qyrem [in] affine Y coordinate of remote pubkey
+ * @var Qxrem2 [in] optional affine X coordinate of second remote pubkey (e.g.
+ *		    ephemeral for full unitified)
+ * @var Qyrem2 [in] optional affine Y coordinate of second remote pubkey (e.g.
+ *		    ephemeral for full unitified)
  * @var privloc [disregard]
  * @var Qxloc [out] affine X coordinate of local pubkey
  * @var Qyloc [out] affine Y coordinate of local pubkey
+ * @var privloc2 [disregard]
+ * @var Qxloc2 [out] affine X coordinate of second local pubkey (e.g.
+ *		     ephemeral for full unitified)
+ * @var Qyloc2 [out] affine Y coordinate of second local pubkey (e.g.
+ *		     ephemeral for full unitified)
+ * @var iut_id [in] IUT ID to be used for full unified ECDH- note, the buffer
+ *		    contains the ID string (i.e. ASCII-printable characters).
+ *		    The iut_id->len value contains the size of the ID including
+ *		    the terminating zero. If you need the size of the string,
+ *		    use strlen(iut_id->buf) or iut_id->len - 1.
+ * @var server_id [in] Server ID to be used for full unified ECDH- note, the buffer
+ *		    contains the ID string (i.e. ASCII-printable characters).
+ *		    The server_id->len value contains the size of the ID including
+ *		    the terminating zero. If you need the size of the string,
+ *		    use strlen(server_id->buf) or server_id->len - 1.
  * @var hashzz [out] hashed shared secret / raw shared secret for ECC CDH
  */
 struct ecdh_ss_data {
 	uint64_t cipher;
 	struct buffer Qxrem;
 	struct buffer Qyrem;
+	struct buffer Qxrem2;
+	struct buffer Qyrem2;
 	struct buffer privloc;
 	struct buffer Qxloc;
 	struct buffer Qyloc;
+	struct buffer privloc2;
+	struct buffer Qxloc2;
+	struct buffer Qyloc2;
+	struct buffer iut_id;
+	struct buffer server_id;
 	struct buffer hashzz;
+
+	struct ecdh_onestep_kdf onestep_kdf;
 };
 
 /**
@@ -59,10 +105,30 @@ struct ecdh_ss_data {
  * 		      of HMACMASK
  * @var Qxrem [in] affine X coordinate of remote pubkey
  * @var Qyrem [in] affine Y coordinate of remote pubkey
+ * @var Qxrem2 [in] optional affine X coordinate of second remote pubkey (e.g.
+ *		    ephemeral for full unitified)
+ * @var Qyrem2 [in] optional affine Y coordinate of second remote pubkey (e.g.
+ *		    ephemeral for full unitified)
  * @var privloc [in] private local key
  * @var Qxloc [in] affine X coordinate of local pubkey
  * @var Qyloc [in] affine Y coordinate of local pubkey
+ * @var privloc2 [in] optional second private local key (e.g.
+ *		      ephemeral for full unitified)
+ * @var Qxloc2 [in] affine X coordinate of optional second local pubkey (e.g.
+ *		    ephemeral for full unitified)
+ * @var Qyloc2 [in] affine Y coordinate of optional second local pubkey (e.g.
+ *		    ephemeral for full unitified)
  * @var hashzz [in] hashed shared secret / raw shared secret for ECC CDH
+ * @var iut_id [in] IUT ID to be used for full unified ECDH- note, the buffer
+ *		    contains the ID string (i.e. ASCII-printable characters).
+ *		    The iut_id->len value contains the size of the ID including
+ *		    the terminating zero. If you need the size of the string,
+ *		    use strlen(iut_id->buf) or iut_id->len - 1.
+ * @var server_id [in] Server ID to be used for full unified ECDH- note, the buffer
+ *		    contains the ID string (i.e. ASCII-printable characters).
+ *		    The server_id->len value contains the size of the ID including
+ *		    the terminating zero. If you need the size of the string,
+ *		    use strlen(server_id->buf) or server_id->len - 1.
  * @var validity_success [out] Does the generated shared secret match with
  *				 @var hashzz (true - 1) or not (false - 0).
  */
@@ -70,11 +136,22 @@ struct ecdh_ss_ver_data {
 	uint64_t cipher;
 	struct buffer Qxrem;
 	struct buffer Qyrem;
+	struct buffer Qxrem2;
+	struct buffer Qyrem2;
+
 	struct buffer privloc;
 	struct buffer Qxloc;
 	struct buffer Qyloc;
+	struct buffer privloc2;
+	struct buffer Qxloc2;
+	struct buffer Qyloc2;
+
 	struct buffer hashzz;
+	struct buffer iut_id;
+	struct buffer server_id;
 	uint32_t validity_success;
+
+	struct ecdh_onestep_kdf onestep_kdf;
 };
 
 /**

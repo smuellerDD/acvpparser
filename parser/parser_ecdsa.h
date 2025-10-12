@@ -126,6 +126,54 @@ struct ecdsa_siggen_data {
 };
 
 /**
+ * @brief DetECDSA signature generation data structure holding the data for the
+ *	  signature generation operation. This test is specified in the DetECDSA
+ *	  ACVP specification.
+ *
+ * This data structure is also used for the ECDSA signature generation
+ * primitive testing where @var msg is the already hashed message.
+ *
+ * NOTE: You MUST use the very same private key for the same curve. That means
+ *	 you generate a new ECDSA key when a new curve in @var cipher value is
+ *	 provided. If the Qx and Qy values of the data structure below are not
+ *	 filled, you must copy the Qx and Qy from you used key. To simplify the
+ *	 entire key handling, you may implement the helper functions
+ *	 registered with @var ecdsa_keygen_en and @var ecdsa_free_key below.
+ *	 When using these functions, you must ensure that the DetECDSA signature
+ *	 generation is invoked single-threaded because the generated
+ *	 ECDSA key and the Qx and Qy parameter are stored in a global variable.
+ *
+ * @var msg [in] Plaintext message to be signed.
+ * @var random_value [in] The random value to be used as an input into the
+ *			  message randomization function as described in
+ *			  SP 800-106.
+ * @var Qx [in/out] ECDSA affine x coordinate of public point Q that was used
+ *		      to sign the message
+ * @var Qy [in/out] ECDSA affine y coordinate of public point Q that was used
+ *		      to sign the message
+ * @var R [out] R part of the generated ECDSA signature
+ * @var S [out] S part of the generated ECDSA signature
+ * @var component [in] Is vector a DetECDSA component testing (1) or a full
+ *		       DetECDSA signature testing (0)
+ * @var cipher [in] Curve and hash algorithm to be used for DetECDSA signature
+ *		    generation.
+ * @var privkey [in] ECDSA private key to be used for signature generation.
+ *		  This variable is only set if ecdsa_keygen_en callback
+ *		  provided.
+ */
+struct ecdsa_det_siggen_data {
+	struct buffer msg;
+	struct buffer random_value;
+	struct buffer Qx;
+	struct buffer Qy;
+	struct buffer R;
+	struct buffer S;
+	uint32_t component;
+	uint64_t cipher;
+	void *privkey;
+};
+
+/**
  * @brief ECDSA signature verification data structure holding the data for the
  *	  signature verification operation. This test is specified in the ECDSA
  *	  CAVS specification.
@@ -204,6 +252,8 @@ struct ecdsa_backend {
 			    flags_t parsed_flags);
 	int (*ecdsa_siggen)(struct ecdsa_siggen_data *data,
 			    flags_t parsed_flags);
+	int (*ecdsa_det_siggen)(struct ecdsa_det_siggen_data *data,
+				flags_t parsed_flags);
 	int (*ecdsa_sigver)(struct ecdsa_sigver_data *data,
 			    flags_t parsed_flags);
 

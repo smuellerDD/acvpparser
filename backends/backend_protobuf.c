@@ -1825,6 +1825,7 @@ static struct ecdsa_backend pb_ecdsa =
 	pb_ecdsa_keygen_extra,
 	pb_ecdsa_pkvver,   /* ecdsa_pkvver */
 	pb_ecdsa_siggen,   /* ecdsa_siggen */
+	NULL,
 	pb_ecdsa_sigver,   /* ecdsa_sigver */
 	pb_ecdsa_keygen_en,
 	pb_ecdsa_free_key,
@@ -2471,11 +2472,97 @@ out:
 	return ret;
 }
 
+static int pb_ml_kem_enc_check(struct ml_kem_enc_check_data *data,
+			       flags_t parsed_flags)
+{
+	pb_header_t header;
+	MlKemEncCheckDataMsg MlKemEncCheckDataMsg_send = ML_KEM_ENC_CHECK_DATA_MSG__INIT;
+	MlKemEncCheckDataMsg *MlKemEncCheckDataMsg_recv = NULL;
+	BUFFER_INIT(send);
+	BUFFER_INIT(received);
+	int ret;
+
+	MlKemEncCheckDataMsg_send.ek.data = data->ek.buf;
+	MlKemEncCheckDataMsg_send.ek.len = data->ek.len;
+	MlKemEncCheckDataMsg_send.cipher = data->cipher;
+
+	CKINT(pb_alloc_comm_buf(
+		&send, ml_kem_enc_check_data_msg__get_packed_size(&MlKemEncCheckDataMsg_send),
+		PB_ML_KEM_ENC_CHECK, parsed_flags));
+	ml_kem_enc_check_data_msg__pack(&MlKemEncCheckDataMsg_send, send.buf);
+
+	/*************************** SEND / RECEIVE ***************************/
+	CKINT(pb_send_receive_data(&send, &received, &header));
+
+	/*********************** Process received data ************************/
+
+	CKINT(pb_received_data_check(&header, PB_ML_KEM_ENC_CHECK,
+				     parsed_flags));
+	MlKemEncCheckDataMsg_recv =
+		ml_kem_enc_check_data_msg__unpack(NULL, received.len, received.buf);
+	CKNULL(MlKemEncCheckDataMsg_recv, -EBADMSG);
+
+	data->check_success = MlKemEncCheckDataMsg_recv->check_success;
+
+out:
+	free_buf(&send);
+	free_buf(&received);
+
+	if (MlKemEncCheckDataMsg_recv)
+		ml_kem_enc_check_data_msg__free_unpacked(MlKemEncCheckDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static int pb_ml_kem_dec_check(struct ml_kem_dec_check_data *data,
+			       flags_t parsed_flags)
+{
+	pb_header_t header;
+	MlKemDecCheckDataMsg MlKemDecCheckDataMsg_send = ML_KEM_DEC_CHECK_DATA_MSG__INIT;
+	MlKemDecCheckDataMsg *MlKemDecCheckDataMsg_recv = NULL;
+	BUFFER_INIT(send);
+	BUFFER_INIT(received);
+	int ret;
+
+	MlKemDecCheckDataMsg_send.dk.data = data->dk.buf;
+	MlKemDecCheckDataMsg_send.dk.len = data->dk.len;
+	MlKemDecCheckDataMsg_send.cipher = data->cipher;
+
+	CKINT(pb_alloc_comm_buf(
+		&send, ml_kem_dec_check_data_msg__get_packed_size(&MlKemDecCheckDataMsg_send),
+		PB_ML_KEM_DEC_CHECK, parsed_flags));
+	ml_kem_dec_check_data_msg__pack(&MlKemDecCheckDataMsg_send, send.buf);
+
+	/*************************** SEND / RECEIVE ***************************/
+	CKINT(pb_send_receive_data(&send, &received, &header));
+
+	/*********************** Process received data ************************/
+
+	CKINT(pb_received_data_check(&header, PB_ML_KEM_DEC_CHECK,
+				     parsed_flags));
+	MlKemDecCheckDataMsg_recv =
+		ml_kem_dec_check_data_msg__unpack(NULL, received.len, received.buf);
+	CKNULL(MlKemDecCheckDataMsg_recv, -EBADMSG);
+
+	data->check_success = MlKemDecCheckDataMsg_recv->check_success;
+
+out:
+	free_buf(&send);
+	free_buf(&received);
+
+	if (MlKemDecCheckDataMsg_recv)
+		ml_kem_dec_check_data_msg__free_unpacked(MlKemDecCheckDataMsg_recv, NULL);
+
+	return ret;
+}
+
 static struct ml_kem_backend pb_ml_kem =
 {
 	pb_ml_kem_keygen,
 	pb_ml_kem_encapsulation,
 	pb_ml_kem_decapsulation,
+	pb_ml_kem_enc_check,
+	pb_ml_kem_dec_check
 };
 
 ACVP_DEFINE_CONSTRUCTOR(pb_ml_kem_backend)

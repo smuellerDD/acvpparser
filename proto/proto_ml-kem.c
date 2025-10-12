@@ -181,12 +181,106 @@ static struct proto_tester proto_ml_kem_decap =
 	NULL
 };
 
+static int proto_ml_kem_enc_check_tester(struct buffer *in,
+					 struct buffer *out,
+					 flags_t parsed_flags)
+{
+	MlKemEncCheckDataMsg MlKemEncCheckDataMsg_send =
+		ML_KEM_ENC_CHECK_DATA_MSG__INIT;
+	struct ml_kem_enc_check_data data = { 0 };
+	MlKemEncCheckDataMsg *MlKemEncCheckDataMsg_recv = NULL;
+	int ret;
+
+	CKNULL(ml_kem_backend, -EINVAL);
+	CKNULL(ml_kem_backend->ml_kem_enc_check, -EINVAL);
+
+	MlKemEncCheckDataMsg_recv =
+		ml_kem_enc_check_data_msg__unpack(NULL, in->len, in->buf);
+	CKNULL(MlKemEncCheckDataMsg_recv, -EBADMSG);
+
+	data.ek.buf = MlKemEncCheckDataMsg_recv->ek.data;
+	data.ek.len = MlKemEncCheckDataMsg_recv->ek.len;
+	data.cipher = MlKemEncCheckDataMsg_recv->cipher;
+
+	CKINT(ml_kem_backend->ml_kem_enc_check(&data, parsed_flags));
+
+	MlKemEncCheckDataMsg_send.check_success = data.check_success;
+
+	CKINT(proto_alloc_comm_buf(
+		out,
+		ml_kem_enc_check_data_msg__get_packed_size(
+			&MlKemEncCheckDataMsg_send)));
+	ml_kem_enc_check_data_msg__pack(&MlKemEncCheckDataMsg_send, out->buf);
+
+out:
+	if (MlKemEncCheckDataMsg_recv)
+		ml_kem_enc_check_data_msg__free_unpacked(
+			MlKemEncCheckDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static struct proto_tester proto_ml_kem_enc_check =
+{
+	PB_ML_KEM_ENC_CHECK,
+	proto_ml_kem_enc_check_tester,	/* process_req */
+	NULL
+};
+
+static int proto_ml_kem_dec_check_tester(struct buffer *in,
+					 struct buffer *out,
+					 flags_t parsed_flags)
+{
+	MlKemDecCheckDataMsg MlKemDecCheckDataMsg_send =
+		ML_KEM_DEC_CHECK_DATA_MSG__INIT;
+	struct ml_kem_dec_check_data data = { 0 };
+	MlKemDecCheckDataMsg *MlKemDecCheckDataMsg_recv = NULL;
+	int ret;
+
+	CKNULL(ml_kem_backend, -EINVAL);
+	CKNULL(ml_kem_backend->ml_kem_dec_check, -EINVAL);
+
+	MlKemDecCheckDataMsg_recv =
+		ml_kem_dec_check_data_msg__unpack(NULL, in->len, in->buf);
+	CKNULL(MlKemDecCheckDataMsg_recv, -EBADMSG);
+
+	data.dk.buf = MlKemDecCheckDataMsg_recv->dk.data;
+	data.dk.len = MlKemDecCheckDataMsg_recv->dk.len;
+	data.cipher = MlKemDecCheckDataMsg_recv->cipher;
+
+	CKINT(ml_kem_backend->ml_kem_dec_check(&data, parsed_flags));
+
+	MlKemDecCheckDataMsg_send.check_success = data.check_success;
+
+	CKINT(proto_alloc_comm_buf(
+		out,
+		ml_kem_dec_check_data_msg__get_packed_size(
+			&MlKemDecCheckDataMsg_send)));
+	ml_kem_dec_check_data_msg__pack(&MlKemDecCheckDataMsg_send, out->buf);
+
+out:
+	if (MlKemDecCheckDataMsg_recv)
+		ml_kem_dec_check_data_msg__free_unpacked(
+			MlKemDecCheckDataMsg_recv, NULL);
+
+	return ret;
+}
+
+static struct proto_tester proto_ml_kem_dec_check =
+{
+	PB_ML_KEM_DEC_CHECK,
+	proto_ml_kem_dec_check_tester,	/* process_req */
+	NULL
+};
+
 ACVP_DEFINE_CONSTRUCTOR(register_proto_ml_kem)
 static void register_proto_ml_kem(void)
 {
 	proto_register_tester(&proto_ml_kem_keygen, "ML_KEM Keygen");
 	proto_register_tester(&proto_ml_kem_encap, "ML_KEM Encap");
 	proto_register_tester(&proto_ml_kem_decap, "ML_KEM Decap");
+	proto_register_tester(&proto_ml_kem_enc_check, "ML_KEM EncCheck");
+	proto_register_tester(&proto_ml_kem_dec_check, "ML_KEM DecCheck");
 }
 
 void register_ml_kem_impl(struct ml_kem_backend *implementation)

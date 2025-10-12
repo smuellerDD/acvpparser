@@ -359,6 +359,7 @@ static int sha_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry sha_testresult_aft_entries[] = {
 		{"md",		{.data.buf = &vector.mac, WRITER_BIN}, FLAG_OP_MASK_SHA | FLAG_OP_AFT},
+		//{"digest",		{.data.buf = &vector.mac, WRITER_BIN}, FLAG_OP_MASK_SHA | FLAG_OP_AFT},
 	};
 	const struct json_testresult sha_testresult_aft = SET_ARRAY(sha_testresult_aft_entries, &sha_callbacks_aft);
 
@@ -458,6 +459,7 @@ static int shake_tester(struct json_object *in, struct json_object *out,
 	 */
 	const struct json_entry shake_testresult_aft_entries[] = {
 		{"md",		{.data.buf = &vector.mac, WRITER_BIN}, FLAG_OP_MASK_SHA | FLAG_OP_AFT},
+		//{"digest",		{.data.buf = &vector.mac, WRITER_BIN}, FLAG_OP_MASK_SHA | FLAG_OP_AFT},
 		{"outLen",	{.data.integer = &vector.outlen, WRITER_UINT}, FLAG_OP_MASK_SHA | FLAG_OP_AFT},
 	};
 	const struct json_testresult shake_testresult_aft = SET_ARRAY(shake_testresult_aft_entries, &shake_callbacks_aft);
@@ -538,6 +540,14 @@ static struct cavs_tester shake =
 	NULL
 };
 
+static struct cavs_tester ascon_xof =
+{
+	0,
+	ACVP_ASCON_XOF_128,
+	shake_tester,	/* process_req */
+	NULL
+};
+
 static struct cavs_tester sha =
 {
 	0,
@@ -551,6 +561,7 @@ static void register_sha(void)
 {
 	register_tester(&sha, "SHA");
 	register_tester(&shake, "SHAKE");
+	register_tester(&ascon_xof, "Ascon XOF");
 }
 
 void register_sha_impl(struct sha_backend *implementation)

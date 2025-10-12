@@ -66,7 +66,7 @@ void register_tester(struct cavs_tester *curr_tester, const char *log)
 }
 
 static int test_algo(struct json_object *in, struct json_object *out,
-		     const char *algo)
+		     const char *algo, const char *mode)
 {
 	struct cavs_tester *curr_tester;
 	uint64_t cipher;
@@ -74,7 +74,7 @@ static int test_algo(struct json_object *in, struct json_object *out,
 
 	CKNULL_LOG(tester, -EINVAL, "No text executor registered\n");
 
-	cipher = convert_algo_cipher(algo, 0);
+	cipher = convert_algo_cipher(algo, mode, 0);
 	if (cipher == ACVP_UNKNOWN) {
 		logger(LOGGER_ERR, "Unknown cipher %s\n", algo);
 		return -EINVAL;
@@ -100,7 +100,8 @@ out:
 	return ret;
 }
 
-static int get_algorithm(struct json_object *obj, const char **algo)
+static int get_algorithm(struct json_object *obj, const char **algo,
+			 const char **mode)
 {
 	struct json_object *acvpdata, *versiondata;
 	int ret;
@@ -110,6 +111,10 @@ static int get_algorithm(struct json_object *obj, const char **algo)
 	CKINT(json_split_version(obj, &acvpdata, &versiondata));
 
 	CKINT(json_get_string(acvpdata, "algorithm", algo));
+
+	/* It is permissible that this keyword is not present */
+	*mode = NULL;
+	json_get_string(acvpdata, "mode", mode);
 
 out:
 	return ret;
@@ -159,12 +164,12 @@ static int perform_testing(const char *infile, const char *outfile)
 {
 	struct json_object *inobj = NULL, *outobj = NULL;
 	int ret;
-	const char *algo;
+	const char *algo, *mode;
 
 	CKINT(json_read_data(infile, &inobj));
 	logger(LOGGER_DEBUG, "Request file %s read successfully\n", infile);
 
-	CKINT(get_algorithm(inobj, &algo))
+	CKINT(get_algorithm(inobj, &algo, &mode))
 	logger(LOGGER_DEBUG, "Algorithm %s found in request file %s\n",
 	       algo, infile);
 
@@ -172,7 +177,7 @@ static int perform_testing(const char *infile, const char *outfile)
 	CKNULL_LOG(outobj, -ENOMEM,
 		   "Cannot create toplevel output JSON object\n");
 
-	ret = test_algo(inobj, outobj, algo);
+	ret = test_algo(inobj, outobj, algo, mode);
 	if (ret) {
 		char filename[FILENAME_MAX];
 
@@ -215,7 +220,7 @@ static int perform_testing_regression(const char *infile,
 {
 	struct json_object *inobj = NULL, *outobj = NULL, *expected = NULL;
 	int ret;
-	const char *algo;
+	const char *algo, *mode;
 
 	CKINT(json_read_data(infile, &inobj));
 	logger(LOGGER_DEBUG, "Request file %s read successfully\n", infile);
@@ -224,7 +229,7 @@ static int perform_testing_regression(const char *infile,
 	logger(LOGGER_DEBUG, "Expected data file %s read successfully\n",
 	       expectedfile);
 
-	CKINT(get_algorithm(inobj, &algo))
+	CKINT(get_algorithm(inobj, &algo, &mode))
 	logger(LOGGER_DEBUG, "Algorithm %s found in request file %s\n",
 	       algo, infile);
 
@@ -232,7 +237,7 @@ static int perform_testing_regression(const char *infile,
 	CKNULL_LOG(outobj, -ENOMEM,
 		   "Cannot create toplevel output JSON object\n");
 
-	ret = test_algo(inobj, outobj, algo);
+	ret = test_algo(inobj, outobj, algo, mode);
 	if (ret) {
 		if (logger_get_verbosity() >= LOGGER_WARN) {
 			fprintf_red(stdout, "[FAILED] ");
@@ -741,7 +746,7 @@ static int merge_acvp(const char *dstfile, const char *srcfile, char *replace)
 {
 	struct json_object *dst = NULL, *src = NULL, *outobj = NULL;
 	int ret;
-	const char *algo, *str;
+	const char *algo, *mode, *str;
 
 	CKINT(json_read_data(dstfile, &dst));
 	logger(LOGGER_DEBUG, "Source file %s read successfully\n", dstfile);
@@ -759,7 +764,7 @@ static int merge_acvp(const char *dstfile, const char *srcfile, char *replace)
 	printf("%s\n", str);
 #endif
 
-	CKINT(get_algorithm(dst, &algo))
+	CKINT(get_algorithm(dst, &algo, &mode))
 	logger(LOGGER_DEBUG, "Algorithm %s found in request file %s\n",
 	       algo, dstfile);
 
@@ -767,7 +772,7 @@ static int merge_acvp(const char *dstfile, const char *srcfile, char *replace)
 	CKNULL_LOG(outobj, -ENOMEM,
 		   "Cannot create toplevel output JSON object\n");
 
-	ret = test_algo(dst, outobj, algo);
+	ret = test_algo(dst, outobj, algo, mode);
 	if (ret == -EOPNOTSUPP) {
 		logger(LOGGER_ERR,
 		       "Generation of test results failed: validation algorithm not implemented\n");

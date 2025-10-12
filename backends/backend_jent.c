@@ -33,9 +33,52 @@
 /* This is for Jitter RNG < 3.1.0 */
 //#include "jitterentropy-base.c"
 
+#if ((JENT_MAJVERSION >= 3) && (JENT_MINVERSION >= 7))
+#define JENT_SHA512
+#endif
+
 /************************************************
  * SHA cipher interface functions
  ************************************************/
+
+#ifdef JENT_SHA512
+
+static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
+{
+	HASH_CTX_ON_STACK(ctx);
+	int ret;
+
+	(void)parsed_flags;
+
+	if (data->cipher != ACVP_SHA3_512 && data->cipher != ACVP_SHAKE256)
+		return -EOPNOTSUPP;
+
+	if (data->cipher == ACVP_SHAKE256) {
+		size_t outlen = data->outlen / 8;
+
+		if (outlen > JENT_SHA3_256_SIZE_BLOCK ||
+		    outlen % 8) {
+			printf("Wrong SHAKE digest size %zu\n", outlen);
+			return -EOPNOTSUPP;
+		}
+		CKINT_LOG(alloc_buf(outlen, &data->mac),
+			  "SHA buffer cannot be allocated\n");
+		jent_shake256_init(&ctx);
+		jent_shake256_set_digestsize(&ctx, outlen);
+	} else {
+		CKINT(alloc_buf(JENT_SHA3_256_SIZE_DIGEST, &data->mac));
+		jent_sha3_256_init(&ctx);
+	}
+
+	jent_sha3_update(&ctx, data->msg.buf, data->msg.len);
+	jent_sha3_final(&ctx, data->mac.buf);
+
+out:
+	return ret;
+}
+
+#else /* JENT_SHA512 */
+
 static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 {
 	HASH_CTX_ON_STACK(ctx);
@@ -55,6 +98,8 @@ static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 out:
 	return ret;
 }
+
+#endif /* JENT_SHA512 */
 
 static struct sha_backend jent_sha =
 {

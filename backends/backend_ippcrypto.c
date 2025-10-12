@@ -1731,6 +1731,7 @@ static struct ecdsa_backend ippcp_ecdsa =
 	NULL,
 	NULL,                 /* ecdsa_pkvver */
 	ippcp_ecdsa_siggen,   /* ecdsa_siggen */
+	NULL,
 	ippcp_ecdsa_sigver,   /* ecdsa_sigver */
 	ippcp_ecdsa_keygen_en,
 	ippcp_ecdsa_free_key,

@@ -68,35 +68,34 @@ out:
 	return ret;
 }
 
-static int ecdsa_siggen_keygen(struct ecdsa_siggen_data *data,
-			       void **ecdsa_privkey)
+static int ecdsa_siggen_keygen(uint64_t cipher, struct buffer *qx,
+			       struct buffer *qy, void **ecdsa_privkey)
 {
 	int ret = 0;
 
-	if ((ecdsa_key.curve != (data->cipher & ACVP_CURVEMASK)) ||
+	if ((ecdsa_key.curve != (cipher & ACVP_CURVEMASK)) ||
 	    !ecdsa_key.key) {
 		ecdsa_key_free_static();
-		CKINT(ecdsa_backend->ecdsa_keygen_en(data->cipher, &data->Qx,
-						     &data->Qy,
+		CKINT(ecdsa_backend->ecdsa_keygen_en(cipher, qx, qy,
 						     &ecdsa_key.key));
 
-		logger_binary(LOGGER_DEBUG, data->Qx.buf, data->Qx.len,
+		logger_binary(LOGGER_DEBUG, qx->buf, qx->len,
 			      "ECDSA generated Qx");
-		logger_binary(LOGGER_DEBUG, data->Qy.buf, data->Qy.len,
+		logger_binary(LOGGER_DEBUG, qy->buf, qy->len,
 			      "ECDSA generated Qy");
 
 		/* Free the global variable at exit */
 		atexit(ecdsa_key_free_static);
 
-		CKINT(ecdsa_duplicate_buf(&data->Qx, &ecdsa_key.Qx));
-		CKINT(ecdsa_duplicate_buf(&data->Qy, &ecdsa_key.Qy));
-		ecdsa_key.curve = data->cipher & ACVP_CURVEMASK;
+		CKINT(ecdsa_duplicate_buf(qx, &ecdsa_key.Qx));
+		CKINT(ecdsa_duplicate_buf(qy, &ecdsa_key.Qy));
+		ecdsa_key.curve = cipher & ACVP_CURVEMASK;
 	}
 
-	if (!data->Qx.len)
-		CKINT(ecdsa_duplicate_buf(&ecdsa_key.Qx, &data->Qx));
-	if (!data->Qy.len)
-		CKINT(ecdsa_duplicate_buf(&ecdsa_key.Qy, &data->Qy));
+	if (!qx->len)
+		CKINT(ecdsa_duplicate_buf(&ecdsa_key.Qx, qx));
+	if (!qy->len)
+		CKINT(ecdsa_duplicate_buf(&ecdsa_key.Qy, qy));
 
 	*ecdsa_privkey = ecdsa_key.key;
 
@@ -105,9 +104,9 @@ out:
 }
 
 static int ecdsa_siggen_helper(const struct json_array *processdata,
-			     flags_t parsed_flags,
-			     struct json_object *testvector,
-			     struct json_object *testresults,
+			       flags_t parsed_flags,
+			       struct json_object *testvector,
+			       struct json_object *testresults,
 	int (*callback)(struct ecdsa_siggen_data *vector, flags_t parsed_flags),
 			struct ecdsa_siggen_data *vector)
 {
@@ -119,7 +118,35 @@ static int ecdsa_siggen_helper(const struct json_array *processdata,
 	(void)testresults;
 
 	if (ecdsa_backend->ecdsa_keygen_en && ecdsa_backend->ecdsa_free_key) {
-		CKINT(ecdsa_siggen_keygen(vector, &ecdsa_privkey));
+		CKINT(ecdsa_siggen_keygen(vector->cipher, &vector->Qx,
+					  &vector->Qy, &ecdsa_privkey));
+	}
+
+	vector->privkey = ecdsa_privkey;
+
+	CKINT(callback(vector, parsed_flags));
+
+out:
+	return ret;
+}
+
+static int ecdsa_det_siggen_helper(const struct json_array *processdata,
+				   flags_t parsed_flags,
+				   struct json_object *testvector,
+				   struct json_object *testresults,
+	int (*callback)(struct ecdsa_det_siggen_data *vector, flags_t parsed_flags),
+			struct ecdsa_det_siggen_data *vector)
+{
+	int ret;
+	void *ecdsa_privkey = NULL;
+
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	if (ecdsa_backend->ecdsa_keygen_en && ecdsa_backend->ecdsa_free_key) {
+		CKINT(ecdsa_siggen_keygen(vector->cipher, &vector->Qx,
+					  &vector->Qy, &ecdsa_privkey));
 	}
 
 	vector->privkey = ecdsa_privkey;
@@ -310,8 +337,7 @@ static int ecdsa_tester(struct json_object *in, struct json_object *out,
 	const struct json_testresult gen_ecdsa_siggen_testresult = SET_ARRAY(gen_ecdsa_siggen_testresult_entries, &ecdsa_siggen_callbacks);
 
 	const struct json_entry gen_ecdsa_siggen_test_entries[] = {
-		{"message",		{.data.buf = &ecdsa_siggen_vector.msg, PARSER_BIN},
-			         FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"message",	{.data.buf = &ecdsa_siggen_vector.msg, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
 	};
 
 	const struct json_entry gen_ecdsa_siggen_testgroup_result_entries[] = {
@@ -377,10 +403,82 @@ static struct cavs_tester ecdsa =
 	NULL
 };
 
+static int det_ecdsa_tester(struct json_object *in, struct json_object *out,
+			    uint64_t cipher)
+{
+	(void)cipher;
+
+	if (!ecdsa_backend) {
+		logger(LOGGER_WARN, "No ECDSA backend set\n");
+		return -EOPNOTSUPP;
+	}
+
+	/**********************************************************************
+	 * DetECDSA signature generation
+	 **********************************************************************/
+	ECDSA_DEF_CALLBACK_HELPER(ecdsa_det_siggen,
+				  FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN,
+				  ecdsa_det_siggen_helper);
+
+	const struct json_entry det_ecdsa_siggen_testresult_entries[] = {
+		{"r",		{.data.buf = &ecdsa_det_siggen_vector.R, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"s",		{.data.buf = &ecdsa_det_siggen_vector.S, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"randomValue",	{.data.buf = &ecdsa_det_siggen_vector.random_value, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OPTIONAL},
+	};
+	const struct json_testresult det_ecdsa_siggen_testresult = SET_ARRAY(det_ecdsa_siggen_testresult_entries, &ecdsa_det_siggen_callbacks);
+
+	const struct json_entry det_ecdsa_siggen_test_entries[] = {
+		{"message",	{.data.buf = &ecdsa_det_siggen_vector.msg, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN},
+		{"randomValue",	{.data.buf = &ecdsa_det_siggen_vector.random_value, PARSER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OPTIONAL},
+	};
+
+	const struct json_entry det_ecdsa_siggen_testgroup_result_entries[] = {
+		{"qx",		{.data.buf = &ecdsa_det_siggen_vector.Qx, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"qy",		{.data.buf = &ecdsa_det_siggen_vector.Qy, WRITER_BIN},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+	};
+	/*
+	 * The NULL for the function callbacks implies that the qx and qy
+	 * are printed at the same hierarchy level as tgID
+	 */
+	const struct json_testresult det_ecdsa_siggen_testgroup_result = SET_ARRAY(det_ecdsa_siggen_testgroup_result_entries, NULL);
+
+	/* search for empty arrays */
+	const struct json_array det_ecdsa_siggen_test = SET_ARRAY(det_ecdsa_siggen_test_entries, &det_ecdsa_siggen_testresult);
+
+	const struct json_entry det_ecdsa_siggen_testgroup_entries[] = {
+		{"curve",	{.data.largeint = &ecdsa_det_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"hashAlg",	{.data.largeint = &ecdsa_det_siggen_vector.cipher, PARSER_CIPHER},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+		{"componentTest",	{.data.integer = &ecdsa_det_siggen_vector.component, PARSER_BOOL},	FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN | FLAG_OPTIONAL},
+		{"tests",	{.data.array = &det_ecdsa_siggen_test, PARSER_ARRAY},		FLAG_OP_AFT | FLAG_OP_ASYM_TYPE_SIGGEN },
+	};
+	const struct json_array det_ecdsa_siggen_testgroup = SET_ARRAY(det_ecdsa_siggen_testgroup_entries,
+		  &det_ecdsa_siggen_testgroup_result);
+
+	/**********************************************************************
+	 * DetECDSA common test group
+	 **********************************************************************/
+	const struct json_entry det_ecdsa_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &det_ecdsa_siggen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_SIGGEN},
+	};
+	const struct json_array det_ecdsa_testanchor = SET_ARRAY(det_ecdsa_testanchor_entries, NULL);
+
+	/* Process all. */
+	return process_json(&det_ecdsa_testanchor, "1.0", in, out);
+}
+
+static struct cavs_tester det_ecdsa =
+{
+	ACVP_DET_ECDSA,
+	0,
+	det_ecdsa_tester,	/* process_req */
+	NULL
+};
+
 ACVP_DEFINE_CONSTRUCTOR(register_ecdsa)
 static void register_ecdsa(void)
 {
 	register_tester(&ecdsa, "ECDSA");
+	register_tester(&det_ecdsa, "DetECDSA");
 }
 
 void register_ecdsa_impl(struct ecdsa_backend *implementation)

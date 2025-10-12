@@ -35,6 +35,43 @@
 
 static struct ml_kem_backend *ml_kem_backend = NULL;
 
+static int ml_kem_decap_helper(const struct json_array *processdata,
+			       flags_t parsed_flags,
+			       struct json_object *testvector,
+			       struct json_object *testresults,
+			       int (*callback)(struct ml_kem_decapsulation_data *vector,
+					       flags_t parsed_flags),
+				struct ml_kem_decapsulation_data *vector)
+{
+	int ret;
+
+	(void)callback;
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	/*
+	 * Transparently handle the transition from per-test set to per-vector
+	 * DK
+	 */
+	if (vector->per_test_dk.len) {
+		free_buf(&vector->dk);
+		vector->dk.buf = vector->per_test_dk.buf;
+		vector->dk.len = vector->per_test_dk.len;
+	}
+
+	CKINT(callback(vector, parsed_flags));
+
+	if (vector->per_test_dk.len) {
+		vector->dk.buf = NULL;
+		vector->dk.len = 0;
+	}
+
+out:
+	return ret;
+}
+
+
 static int ml_kem_tester(struct json_object *in, struct json_object *out,
 			 uint64_t cipher)
 {
@@ -44,10 +81,55 @@ static int ml_kem_tester(struct json_object *in, struct json_object *out,
 	}
 
 	/**********************************************************************
+	 * ML-KEM key encapsulation check
+	 **********************************************************************/
+	ML_KEM_DEF_CALLBACK(ml_kem_enc_check,
+			    FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_ENC_CHECK );
+
+	const struct json_entry ml_kem_enc_check_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &ml_kem_enc_check_vector.check_success, WRITER_BOOL},	FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_ENC_CHECK},
+	};
+	const struct json_testresult ml_kem_enc_check_testresult = SET_ARRAY(ml_kem_enc_check_testresult_entries,
+		  &ml_kem_enc_check_callbacks);
+
+	const struct json_entry ml_kem_enc_check_test_entries[] = {
+		{"ek",	{.data.buf = &ml_kem_enc_check_vector.ek, PARSER_BIN},
+			        FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_ENC_CHECK},
+	};
+
+	/* search for empty arrays */
+	const struct json_array ml_kem_enc_check_test =
+		SET_ARRAY(ml_kem_enc_check_test_entries,
+			  &ml_kem_enc_check_testresult);
+
+	/**********************************************************************
+	 * ML-KEM key decapsulation check
+	 **********************************************************************/
+	ML_KEM_DEF_CALLBACK(ml_kem_dec_check,
+			    FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_DEC_CHECK );
+
+	const struct json_entry ml_kem_dec_check_testresult_entries[] = {
+		{"testPassed",	{.data.integer = &ml_kem_dec_check_vector.check_success, WRITER_BOOL},	FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_DEC_CHECK},
+	};
+	const struct json_testresult ml_kem_dec_check_testresult = SET_ARRAY(ml_kem_dec_check_testresult_entries,
+		  &ml_kem_dec_check_callbacks);
+
+	const struct json_entry ml_kem_dec_check_test_entries[] = {
+		{"dk",	{.data.buf = &ml_kem_dec_check_vector.dk, PARSER_BIN},
+			        FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_DEC_CHECK},
+	};
+
+	/* search for empty arrays */
+	const struct json_array ml_kem_dec_check_test =
+		SET_ARRAY(ml_kem_dec_check_test_entries,
+			  &ml_kem_dec_check_testresult);
+
+	/**********************************************************************
 	 * ML-KEM decapsulation
 	 **********************************************************************/
-	ML_KEM_DEF_CALLBACK(ml_kem_decapsulation,
-			    FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP);
+	ML_KEM_DEF_CALLBACK_HELPER(ml_kem_decapsulation,
+		FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP,
+		ml_kem_decap_helper);
 
 	const struct json_entry ml_kem_decapsulation_testresult_entries[] = {
 		{"k",	{.data.buf = &ml_kem_decapsulation_vector.ss, WRITER_BIN},
@@ -59,6 +141,8 @@ static int ml_kem_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry ml_kem_decapsulation_test_entries[] = {
 		{"c",	{.data.buf = &ml_kem_decapsulation_vector.c, PARSER_BIN},
 			        FLAG_OP_VAL |  FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP},
+		{"dk",	{.data.buf = &ml_kem_decapsulation_vector.per_test_dk, PARSER_BIN},
+			        FLAG_OP_VAL |  FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OPTIONAL},
 	};
 
 	/* search for empty arrays */
@@ -96,8 +180,16 @@ static int ml_kem_tester(struct json_object *in, struct json_object *out,
 
 		/* Decapsulation */
 		{"parameterSet",	{.data.largeint = &ml_kem_decapsulation_vector.cipher, PARSER_CIPHER},	FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP},
-		{"dk",		{.data.buf = &ml_kem_decapsulation_vector.dk, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP},
+		{"dk",		{.data.buf = &ml_kem_decapsulation_vector.dk, PARSER_BIN},	FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OPTIONAL},
 		{"tests",	{.data.array = &ml_kem_decapsulation_test, PARSER_ARRAY},		FLAG_OP_VAL | FLAG_OP_ML_KEM_TYPE_DECAPSULATION | FLAG_OP_ASYM_TYPE_ENCAPDECAP },
+
+		/* Encapsulation key check */
+		{"parameterSet",	{.data.largeint = &ml_kem_enc_check_vector.cipher, PARSER_CIPHER},	FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_ENC_CHECK},
+		{"tests",	{.data.array = &ml_kem_enc_check_test, PARSER_ARRAY},		FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_ENC_CHECK},
+
+		/* Decapsulation key check */
+		{"parameterSet",	{.data.largeint = &ml_kem_dec_check_vector.cipher, PARSER_CIPHER},	FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_DEC_CHECK},
+		{"tests",	{.data.array = &ml_kem_dec_check_test, PARSER_ARRAY},		FLAG_OP_VAL | FLAG_OP_ASYM_TYPE_ENCAPDECAP | FLAG_OP_ML_KEM_TYPE_DEC_CHECK},
 	};
 
 	const struct json_array ml_kem_encapsulation_testgroup =

@@ -2125,6 +2125,7 @@ static struct ecdsa_backend kcapi_ecdsa =
 	ecdsa_keygen,
 	ecdsa_keyver,
 	NULL,
+	NULL,
 	ecdsa_sigver,
 	NULL,
 	NULL
