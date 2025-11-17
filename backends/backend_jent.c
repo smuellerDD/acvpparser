@@ -34,14 +34,14 @@
 //#include "jitterentropy-base.c"
 
 #if ((JENT_MAJVERSION >= 3) && (JENT_MINVERSION >= 7))
-#define JENT_SHA512
+#define JENT_370
 #endif
 
 /************************************************
  * SHA cipher interface functions
  ************************************************/
 
-#ifdef JENT_SHA512
+#ifdef JENT_370
 
 static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 {
@@ -50,7 +50,7 @@ static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
-	if (data->cipher != ACVP_SHA3_512 && data->cipher != ACVP_SHAKE256)
+	if (data->cipher != ACVP_SHA3_256 && data->cipher != ACVP_SHAKE256)
 		return -EOPNOTSUPP;
 
 	if (data->cipher == ACVP_SHAKE256) {
@@ -77,7 +77,7 @@ out:
 	return ret;
 }
 
-#else /* JENT_SHA512 */
+#else /* JENT_370 */
 
 static int jent_sha_generate(struct sha_data *data, flags_t parsed_flags)
 {
@@ -99,7 +99,7 @@ out:
 	return ret;
 }
 
-#endif /* JENT_SHA512 */
+#endif /* JENT_370 */
 
 static struct sha_backend jent_sha =
 {
