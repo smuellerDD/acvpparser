@@ -1855,7 +1855,7 @@ static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
     IppsLMSAlgo lmsType = getIppsLMSAlgo(data->lmsMode, &hashByteSize);
     IppsLMOTSAlgo lmotsType = getIppsLMOTSAlgo(data->lmOtsMode, &pCount);
     const IppsLMSAlgoType lmsAlgType = { lmotsType, lmsType };
-    
+
     /* Allocate memory for the scratch buffer */
     int buffSize;
     status = ippsLMSBufferGetSize(&buffSize, msgLen, lmsAlgType);
@@ -1865,14 +1865,14 @@ static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
     /* Parse public key vector */
     IppsLMSAlgo lmsTypePk;
     dataReverse((Ipp8u*)&lmsTypePk, (const char *)data->pub.buf, sizeof(Ipp32u));
-    
+
     IppsLMOTSAlgo lmotsTypePk;
     dataReverse((Ipp8u*)&lmotsTypePk, (const char *)data->pub.buf+sizeof(Ipp32u), sizeof(Ipp32u));
     const IppsLMSAlgoType lmsAlgTypePk = { lmotsTypePk, lmsTypePk };
-    
+
     const Ipp8u* pI = (const Ipp8u*)data->pub.buf + 2*sizeof(Ipp32u);
     const Ipp8u* pK = pI + IPPCP_LMS_PK_I_BYTESIZE;
-    
+
     /* Allocate memory for the LMS public key state */
     int ippcpPubKeySize;
     status = ippsLMSPublicKeyStateGetSize(&ippcpPubKeySize, lmsAlgType);
@@ -1886,17 +1886,17 @@ static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
     /* Parse signature vector */
     Ipp32u q = 0;
     dataReverse((Ipp8u*)&q, (const char *)data->sig.buf, sizeof(Ipp32u));
-    
+
     IppsLMOTSAlgo lmotsTypeSig;
     dataReverse((Ipp8u*)&lmotsTypeSig, (const char *)data->sig.buf+sizeof(Ipp32u), sizeof(Ipp32u));
-    
+
     const Ipp8u* pC = (const Ipp8u*)data->sig.buf + 2*sizeof(Ipp32u);
     const Ipp8u* pY = pC + hashByteSize;
 
     IppsLMSAlgo lmsTypeSig;
     dataReverse((Ipp8u*)&lmsTypeSig, (const char *)pY+hashByteSize*pCount, sizeof(Ipp32u));
-    
-    const IppsLMSAlgoType lmsAlgTypeSig = { lmotsTypeSig, lmsTypeSig };   
+
+    const IppsLMSAlgoType lmsAlgTypeSig = { lmotsTypeSig, lmsTypeSig };
     const Ipp8u* pAuthPath = pY + sizeof(Ipp32u) + hashByteSize*pCount;
 
     /* Allocate memory for the LMS signature state */
@@ -1940,6 +1940,31 @@ static void ippcp_lms_backend(void)
 }
 
 /************************************************
+ * Hash DRBG callback function
+ ************************************************/
+#define UNUSED_PARAM(x) (void)(x)
+
+static Ipp8u* pEntropyInput  = NULL;
+static int entrInputBytesLen = 0;
+
+static IppStatus IPP_CALL getEntropyInputCallback(Ipp8u* entropyInput,
+                                                  int* entropyBitsLen,
+                                                  const int minEntropyInBits,
+                                                  const int maxEntropyInBits,
+                                                  const int predResistanceRequest)
+{
+    UNUSED_PARAM(predResistanceRequest);
+    if (((entrInputBytesLen * 8) < minEntropyInBits) ||
+        ((entrInputBytesLen * 8) > maxEntropyInBits)) {
+        return ippStsLengthErr;
+    }
+    memcpy(entropyInput, pEntropyInput, entrInputBytesLen);
+    *entropyBitsLen = entrInputBytesLen * 8;
+
+    return ippStsNoErr;
+}
+
+/************************************************
  * Hash DRBG interface functions
  ************************************************/
 static int ippcp_hash_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
@@ -1948,69 +1973,121 @@ static int ippcp_hash_drbg_generate(struct drbg_data *data, flags_t parsed_flags
 
     IppStatus sts = ippStsNoErr;
     int ret = 0;
-    
+
     // set the necessary hash method
-    IppsHashMethod* hashMethod = NULL;
+    IppsHashMethod* pHashMethod = NULL;
     switch (data->cipher) {
         case ACVP_SHA256:
-            hashMethod = (IppsHashMethod*)ippsHashMethod_SHA256();
+            pHashMethod = (IppsHashMethod*)ippsHashMethod_SHA256();
             break;
         case ACVP_SHA384:
-            hashMethod = (IppsHashMethod*)ippsHashMethod_SHA384();
+            pHashMethod = (IppsHashMethod*)ippsHashMethod_SHA384();
             break;
         case ACVP_SHA512:
-            hashMethod = (IppsHashMethod*)ippsHashMethod_SHA512();
+            pHashMethod = (IppsHashMethod*)ippsHashMethod_SHA512();
             break;
         case ACVP_SHA512256:
-            hashMethod = (IppsHashMethod*)ippsHashMethod_SHA512_256();
+            pHashMethod = (IppsHashMethod*)ippsHashMethod_SHA512_256();
             break;
         default:
-            logger(LOGGER_ERR, "Not supported for the DRBG hash algorithm\n");
+            logger(LOGGER_ERR, "Not supported hash algorithm for the Hash DRBG\n");
     }
 
+    BUFFER_INIT(entrInputAndNonce)
+    alloc_buf(data->entropy.len + data->nonce.len, &entrInputAndNonce);
+
+    memcpy(entrInputAndNonce.buf, data->entropy.buf, data->entropy.len);
+    memcpy(entrInputAndNonce.buf + data->entropy.len, data->nonce.buf, data->nonce.len);
+
+    pEntropyInput     = entrInputAndNonce.buf;
+    entrInputBytesLen = (int)(data->entropy.len + data->nonce.len);
+
+    int entrInputCtxSize;
+    sts = ippsHashDRBG_EntropyInputCtxGetSize(&entrInputCtxSize, entrInputBytesLen * 8, pHashMethod);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_EntropyInputCtxGetSize\n")
+
+    BUFFER_INIT(entrInputCtxBuff)
+    alloc_buf(entrInputCtxSize + IPPCP_DATA_ALIGNMENT, &entrInputCtxBuff);
+
+    IppsHashDRBG_EntropyInputCtx* pEntrInputCtx =
+        (IppsHashDRBG_EntropyInputCtx*)(IPP_ALIGNED_PTR(entrInputCtxBuff.buf, IPPCP_DATA_ALIGNMENT));
+
+    sts = ippsHashDRBG_EntropyInputCtxInit(pEntrInputCtx,
+                                           entrInputBytesLen * 8,
+                                           getEntropyInputCallback);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_EntropyInputCtxInit\n")
+
     int size;
-    sts = ippsDRBGGetSize(&size, hashMethod);
-    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsDRBGGetSize\n")
-    
+    sts = ippsHashDRBG_GetSize(&size, pHashMethod);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_GetSize\n")
+
     BUFFER_INIT(drbgBuf)
     alloc_buf(size + IPPCP_DATA_ALIGNMENT, &drbgBuf);
 
-    IppsDRBGState* pDrbgCtx = (IppsDRBGState*)(IPP_ALIGNED_PTR(drbgBuf.buf, IPPCP_DATA_ALIGNMENT));
+    IppsHashDRBGState* pDrbgCtx =
+        (IppsHashDRBGState*)(IPP_ALIGNED_PTR(drbgBuf.buf, IPPCP_DATA_ALIGNMENT));
 
-    // data->pr indicates whether or not prediction resistance is requested.
-    // If it's requested V and C arrays will be reseeded in ippsDRBGGen()
-    sts = ippsDRBGInstantiate(data->entropy.buf, data->entropy.len,
-                              data->nonce.buf, data->nonce.len,
-                              data->pers.buf, data->pers.len,
-                              data->pr, hashMethod, pDrbgCtx);
-    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsDRBGInstantiate\n")
+    sts = ippsHashDRBG_Init(pHashMethod, pDrbgCtx);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Init\n")
+
+    int requestedSecurityStrength = 128;
+    int predictionResistanceFlag  = 1;
+
+    sts = ippsHashDRBG_Instantiate(requestedSecurityStrength,
+                                   predictionResistanceFlag,
+                                   data->pers.buf,
+                                   (int)(data->pers.len * 8),
+                                   pEntrInputCtx,
+                                   pDrbgCtx);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Instantiate\n")
 
     if (data->entropy_reseed.buffers[0].len) {
-        sts = ippsDRBGReseed(data->entropy_reseed.buffers[0].buf, data->entropy_reseed.buffers[0].len,
-                             data->addtl_reseed.buffers[0].buf, data->addtl_reseed.buffers[0].len, 
-                             hashMethod, pDrbgCtx);
-        CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsDRBGReseed\n")
+        pEntropyInput     = data->entropy_reseed.buffers[0].buf;
+        entrInputBytesLen = (int)data->entropy_reseed.buffers[0].len;
+
+        sts = ippsHashDRBG_Reseed(data->pr,
+                                  data->addtl_reseed.buffers[0].buf,
+                                  (int)(data->addtl_reseed.buffers[0].len * 8),
+                                  pEntrInputCtx,
+                                  pDrbgCtx);
+        CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Reseed\n")
     }
 
     CKINT(alloc_buf(data->rnd_data_bits_len / 8, &data->random));
 
-    sts = ippsDRBGGen((Ipp32u*)data->random.buf, (int)data->rnd_data_bits_len,
-                      data->entropy_generate.buffers[0].buf, (int)data->entropy_generate.buffers[0].len,
-                      data->addtl_generate.buffers[0].buf, (int)data->addtl_generate.buffers[0].len,
-                      hashMethod, pDrbgCtx);
-    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsDRBGGen (1st call)\n")
+    pEntropyInput     = data->entropy_generate.buffers[0].buf;
+    entrInputBytesLen = (int)data->entropy_generate.buffers[0].len;
 
-    sts = ippsDRBGGen((Ipp32u*)data->random.buf, (int)data->rnd_data_bits_len,
-                      data->entropy_generate.buffers[1].buf, (int)data->entropy_generate.buffers[1].len,
-                      data->addtl_generate.buffers[1].buf, (int)data->addtl_generate.buffers[1].len,
-                      hashMethod, pDrbgCtx);
-    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsDRBGGen (2nd call)\n")
+    sts = ippsHashDRBG_Gen((Ipp32u*)data->random.buf,
+                           (int)data->rnd_data_bits_len,
+                           requestedSecurityStrength,
+                           data->pr,
+                           data->addtl_generate.buffers[0].buf,
+                           (int)(data->addtl_generate.buffers[0].len * 8),
+                           pEntrInputCtx,
+                           pDrbgCtx);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Gen (1st call)\n")
+
+    pEntropyInput     = data->entropy_generate.buffers[1].buf;
+    entrInputBytesLen = (int)data->entropy_generate.buffers[1].len;
+
+    sts = ippsHashDRBG_Gen((Ipp32u*)data->random.buf,
+                           (int)data->rnd_data_bits_len,
+                           requestedSecurityStrength,
+                           data->pr,
+                           data->addtl_generate.buffers[1].buf,
+                           (int)(data->addtl_generate.buffers[1].len * 8),
+                           pEntrInputCtx,
+                           pDrbgCtx);
+    CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Gen (2nd call)\n")
 
     ret = 0;
 
 out:
     if (pDrbgCtx)
-        ippsDRBGUninstantiate(hashMethod, pDrbgCtx);
+        ippsHashDRBG_Uninstantiate(pDrbgCtx);
+    free_buf(&entrInputAndNonce);
+    free_buf(&entrInputCtxBuff);
     free_buf(&drbgBuf);
     return ret;
 }
