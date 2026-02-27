@@ -1969,7 +1969,7 @@ static IppStatus IPP_CALL getEntropyInputCallback(Ipp8u* entropyInput,
  ************************************************/
 static int ippcp_hash_drbg_generate(struct drbg_data *data, flags_t parsed_flags)
 {
-    (void)parsed_flags;
+    UNUSED_PARAM(parsed_flags);
 
     IppStatus sts = ippStsNoErr;
     int ret = 0;
@@ -2030,8 +2030,8 @@ static int ippcp_hash_drbg_generate(struct drbg_data *data, flags_t parsed_flags
     sts = ippsHashDRBG_Init(pHashMethod, pDrbgCtx);
     CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsHashDRBG_Init\n")
 
-    int requestedSecurityStrength = 128;
-    int predictionResistanceFlag  = 1;
+    const int requestedSecurityStrength = 128;
+    const int predictionResistanceFlag  = 1;
 
     sts = ippsHashDRBG_Instantiate(requestedSecurityStrength,
                                    predictionResistanceFlag,
