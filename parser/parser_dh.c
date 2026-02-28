@@ -291,9 +291,9 @@ out:
 	return ret;
 }
 
-static int kas_ffc_r3_ssc_tester(struct json_object *in,
-				 struct json_object *out,
-				 uint64_t cipher)
+static int kas_ffc_r3_ssc_keygen_tester(struct json_object *in,
+					struct json_object *out,
+					uint64_t cipher)
 {
 	(void)cipher;
 
@@ -354,6 +354,31 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 
 	const struct json_array dh_keyver_testgroup = SET_ARRAY(dh_keyver_testgroup_entries, NULL);
 
+	/*
+	 * Define the anchor of the tests in the highest level of the JSON
+	 * input data.
+	 */
+	const struct json_entry dh_testanchor_entries[] = {
+		{"testGroups",	{.data.array = &dh_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN},
+		{"testGroups",	{.data.array = &dh_keyver_testgroup, PARSER_ARRAY}, FLAG_OP_ASYM_TYPE_KEYVER}
+	};
+	const struct json_array dh_testanchor = SET_ARRAY(dh_testanchor_entries, NULL);
+
+	/* Process all. */
+
+	return process_json(&dh_testanchor, "1.0", in, out);
+}
+
+static int kas_ffc_r3_ssc_tester(struct json_object *in,
+				 struct json_object *out,
+				 uint64_t cipher)
+{
+	(void)cipher;
+
+	if (!dh_backend) {
+		logger(LOGGER_WARN, "No DH backend set\n");
+		return -EOPNOTSUPP;
+	}
 
 	/**********************************************************************
 	 * DH shared secret verification
@@ -545,8 +570,6 @@ static int kas_ffc_r3_ssc_tester(struct json_object *in,
 	 */
 	const struct json_entry dh_testanchor_entries[] = {
 		{"testGroups",	{.data.array = &dh_testgroup, PARSER_ARRAY},	0},
-		{"testGroups",	{.data.array = &dh_keygen_testgroup, PARSER_ARRAY},	FLAG_OP_ASYM_TYPE_KEYGEN},
-		{"testGroups",	{.data.array = &dh_keyver_testgroup, PARSER_ARRAY}, FLAG_OP_ASYM_TYPE_KEYVER}
 	};
 	const struct json_array dh_testanchor = SET_ARRAY(dh_testanchor_entries, NULL);
 
@@ -567,7 +590,7 @@ static struct cavs_tester safeprimes =
 {
 	ACVP_SAFEPRIMES,
 	0,
-	kas_ffc_r3_ssc_tester,	/* process_req */
+	kas_ffc_r3_ssc_keygen_tester,	/* process_req */
 	NULL
 };
 

@@ -141,6 +141,10 @@ endif
 
 ifeq (openssh,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_openssh.c
+	CFLAGS += -std=gnu11
+	INCLUDE_DIRS += /home/joachim/Downloads/openssh-9.6p1
+	INCLUDE_DIRS += backend_interfaces/openssh
+	LIBRARIES += crypto
 endif
 
 ######################################################
@@ -285,7 +289,8 @@ endif
 
 ifeq (leancrypto,$(firstword $(MAKECMDGOALS)))
 	C_SRCS += backends/backend_leancrypto.c
-	INCLUDE_DIRS += backend_interfaces/leancrypto/
+	INCLUDE_DIRS += backend_interfaces/leancrypto/ /opt/homebrew/include
+	LIBRARY_DIRS += /opt/homebrew/lib
 	ifeq ($(uname -m),x86_64)
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt
 	endif

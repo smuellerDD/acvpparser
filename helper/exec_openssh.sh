@@ -29,41 +29,28 @@
 
 . $(dirname $0)/exec_lib.sh
 
-TARGET_openssl="openssl"
 TARGET_openssh="openssh"
 
-MODULE_PREFIX="OpenSSH"
+MODULE_PREFIX="OpenSSH__"
 MODULE_POSTFIX="_"
 
-EXEC_TYPES="_Client__ _Server__"
 EXEC="Generic_C"
-
-# No special options for OpenSSL
-CIPHER_CALL_COMMON=""
 
 ################### Heavy Lifting #######################
 
 do_test() {
 	PATH=.:$PATH
 
-	for ssh_type in $EXEC_TYPES; do
-		for exec in $EXEC; do
-			eval CIPHER_CALL=\$CIPHER_CALL_$exec
+	for exec in $EXEC; do
+		eval CIPHER_CALL=\$CIPHER_CALL_$exec
 
-			local modulename="${MODULE_PREFIX}${ssh_type}${exec}${MODULE_POSTFIX}"
+		local modulename="${MODULE_PREFIX}${exec}${MODULE_POSTFIX}"
 
-			eval "$CIPHER_CALL exec_module ${modulename}"
-		done
+		eval "$CIPHER_CALL exec_module ${modulename}"
 	done
 }
 
-echo "##############################################################################"
-echo "# OpenSSH testing commences"
-build_tool ${TARGET_openssh}
+build_tool "openssh"
 do_test
 
-echo "##############################################################################"
-echo "# OpenSSL testing commences"
-build_tool ${TARGET_openssl}
-do_test
 exit $failures

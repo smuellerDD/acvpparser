@@ -3303,6 +3303,7 @@ static struct ecdsa_backend openssl_ecdsa =
 	NULL,
 	openssl_ecdsa_pkvver,   /* ecdsa_pkvver */
 	openssl_ecdsa_siggen,   /* ecdsa_siggen */
+	NULL,
 	openssl_ecdsa_sigver,   /* ecdsa_sigver */
 	openssl_ecdsa_keygen_en,
 	openssl_ecdsa_free_key,

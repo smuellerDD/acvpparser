@@ -1074,6 +1074,12 @@ openssl_ecdh_ss_common(uint64_t cipher,
 					curve_name, 0);
 	OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 1);
 	if (Qxloc->len && Qyloc->len) {
+		size_t dlen, xlen, ylen;
+
+		ecdsa_get_bufferlen(cipher, &dlen, &xlen, &ylen);
+		CKINT(left_pad_buf(Qxloc, xlen));
+		CKINT(left_pad_buf(Qyloc, ylen));
+
 		CKINT(alloc_buf(Qxloc->len + Qyloc->len + 1, &publoc));
 		publoc.buf[0]= POINT_CONVERSION_UNCOMPRESSED;
 		memcpy(publoc.buf + 1, Qxloc->buf, Qxloc->len);
@@ -2707,12 +2713,16 @@ static int openssl_ecdsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
 	EVP_PKEY_CTX *ctx = NULL;
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
+	size_t dlen, xlen, ylen;
 	int ret = 0;
 
 	CKINT(openssl_ecdsa_curves(cipher, &nid, &curve_name));
+	ecdsa_get_bufferlen(cipher, &dlen, &xlen, &ylen);
+
+	CKINT(left_pad_buf(Qx, xlen));
+	CKINT(left_pad_buf(Qy, ylen));
 
 	CKINT(alloc_buf(Qx->len + Qy->len + 1, &pub));
-
 	pub.buf[0] = POINT_CONVERSION_UNCOMPRESSED;
 	memcpy(pub.buf + 1, Qx->buf, Qx->len);
 	memcpy(pub.buf + 1 + Qx->len, Qy->buf, Qy->len);
@@ -5210,13 +5220,103 @@ out:
 	return ret;
 }
 
+static int openssl_mlkem_encap_check(struct ml_kem_enc_check_data *data,
+				     flags_t parsed_flags)
+{
+	const char *instance;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pkey = NULL;
+	EVP_PKEY_CTX *enc_ctx = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_get_ml_kem_instance(data->cipher, &instance));
+
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+						 OSSL_PKEY_PARAM_PUB_KEY,
+						 data->ek.buf, data->ek.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, instance, NULL);
+	CKNULL(ctx, -EFAULT);
+
+	CKINT_O(EVP_PKEY_fromdata_init(ctx));
+
+	if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_PUBLIC_KEY, params) != 1)
+		data->check_success = 0;
+	else
+		data->check_success = 1;
+
+out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	if (pkey)
+		EVP_PKEY_free(pkey);
+	if (enc_ctx)
+		EVP_PKEY_CTX_free(enc_ctx);
+	return ret;
+}
+
+static int openssl_mlkem_decap_check(struct ml_kem_dec_check_data *data,
+				     flags_t parsed_flags)
+{
+	const char *instance;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	EVP_PKEY_CTX *ctx = NULL;
+	EVP_PKEY *pkey = NULL;
+	EVP_PKEY_CTX *dec_ctx = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(openssl_get_ml_kem_instance(data->cipher, &instance));
+
+	bld = OSSL_PARAM_BLD_new();
+	CKINT_O(OSSL_PARAM_BLD_push_octet_string(bld,
+						 OSSL_PKEY_PARAM_PRIV_KEY,
+						 data->dk.buf, data->dk.len));
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, instance, NULL);
+	CKNULL(ctx, -EFAULT);
+
+	CKINT_O(EVP_PKEY_fromdata_init(ctx));
+
+	if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEYPAIR, params) != 1)
+		data->check_success = 0;
+	else
+		data->check_success = 1;
+
+out:
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (params)
+		OSSL_PARAM_free(params);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	if (pkey)
+		EVP_PKEY_free(pkey);
+	if (dec_ctx)
+		EVP_PKEY_CTX_free(dec_ctx);
+	return ret;
+}
+
 static struct ml_kem_backend openssl_ml_kem =
 {
 	openssl_ml_kem_keygen,
 	openssl_ml_kem_encapsulation,
 	openssl_ml_kem_decapsulation,
-	NULL,
-	NULL,
+	openssl_mlkem_encap_check,
+	openssl_mlkem_decap_check,
 };
 
 ACVP_DEFINE_CONSTRUCTOR(openssl_ml_kem_backend)

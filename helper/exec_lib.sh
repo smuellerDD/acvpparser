@@ -145,8 +145,14 @@ get_proc_family() {
 
 # List of JSON keyword:value pairs to search for JSON test vectors known
 # to be no known answer test and thus are unfit for regression testing
+#
+# NOTE: mode:keyGen for DH should be skipped (as we do not have a verifier), but
+# for ECDH it should remain - thus, we leave it enabled and need to manually
+# sort out the DH failure
+#
 REGRESSION_VECTOR_SKIP="
 	algorithm:KTS-IFC
+	algorithm:KAS-FFC-SSC
 "
 
 # List of JSON search_keyword:search_value:replace_keyword:replace_value set to

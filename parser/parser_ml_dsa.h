@@ -65,12 +65,12 @@ struct ml_dsa_keygen_data {
  *		  size before storing data in it. The parser frees the memory.
  * @var pk [ignore] Variable managed by parser via ml_dsa_keygen_en
  * @var rnd [in] Random number for signature generation
- *		     When (parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+ *		     When (parsed_flags & FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) ==
  *			   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC
  *			   then: When rnd->len == 0 then generate the rnd buffer
  *				 filled with the used random value, else use
  *				 the value in rnd as the random value
- *		     When (parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+ *		     When (parsed_flags & FLAG_OP_ML_DSA_TYPE_DETERMINISTIC) ==
  *			   FLAG_OP_ML_DSA_TYPE_DETERMINISTIC
  *			   then: perform deterministic signature generation
  * @var privkey [in] ML-DSA secret key to be used for signature generation as

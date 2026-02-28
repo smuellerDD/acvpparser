@@ -11,7 +11,7 @@ LIBDIR := lib
 PARSERDIR := parser
 
 CC ?= cc
-CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11 -Wno-variadic-macros
+CFLAGS +=-Wextra -Wall -pedantic -fPIE -O2 -Wno-long-long -Werror -DACVP_PARSER_IUT=\"$(firstword $(MAKECMDGOALS))\" -g -std=c11 -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments
 
 ifeq (/etc/lsb-release,$(wildcard /etc/lsb-release))
 OS := $(shell cat /etc/lsb-release | grep DISTRIB_ID | grep -o Ubuntu)

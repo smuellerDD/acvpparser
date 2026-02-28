@@ -1397,12 +1397,22 @@ static int lc_drbg_test(struct drbg_data *data, flags_t parsed_flags)
 
 	(void)parsed_flags;
 
- 	if ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) {
- 		LC_DRBG_HMAC_CTX_ON_STACK(drbg);
- 		ret = lc_drbg_do_test(data, drbg);
- 	} else {
+	if ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHMAC) {
+		LC_DRBG_HMAC_CTX_ON_STACK(drbg);
+		ret = lc_drbg_do_test(data, drbg);
+	} else if ((data->type & ACVP_DRBGMASK) == ACVP_DRBGHASH) {
 		LC_DRBG_HASH_CTX_ON_STACK(drbg);
 		ret = lc_drbg_do_test(data, drbg);
+	} else if ((data->type & ACVP_DRBGMASK) == ACVP_DRBGCTR) {
+		if (data->df) {
+			LC_DRBG_CTR_USE_DF_CTX_ON_STACK(drbg);
+			ret = lc_drbg_do_test(data, drbg);
+		} else {
+			LC_DRBG_CTR_NO_DF_CTX_ON_STACK(drbg);
+			ret = lc_drbg_do_test(data, drbg);
+		}
+	} else {
+		ret = -EINVAL;
 	}
 
 	return ret;
@@ -2217,7 +2227,7 @@ static int lc_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 
 		CKINT(lc_dilithium_sign_ctx(sig, ctx, msg_ptr->buf,
 					    msg_ptr->len, &sk, &s_drng));
-	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_MASK) ==
+	} else if ((parsed_flags & FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) ==
 		   FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
 		/* Module is required to generate random data */
 
