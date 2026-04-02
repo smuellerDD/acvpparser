@@ -957,11 +957,23 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 
     int rsaBitsize = modulus;
 
-    ret = openssl_generate_rsa_key(rsa, bn_e, rsaBitsize);
+    ret = openssl_generate_rsa_key(&rsa, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
 
+#if OPENSSL_VERSION_MAJOR >= 3
     EVP_PKEY_get_bn_param(rsa, "n", &n);
     EVP_PKEY_get_bn_param(rsa, "e", &egen);
+#else
+    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa);
+
+    const BIGNUM *rsa_n, *rsa_e, *rsa_d;
+    RSA_get0_key(rsa_key, &rsa_n, &rsa_e, &rsa_d);
+
+    if (rsa_n != NULL && rsa_e != NULL) {
+        BN_copy(n, rsa_n);
+        BN_copy(egen, rsa_e);
+    }
+#endif
 
     /* Store n and e in output buffers */
     alloc_buf(BN_num_bytes(egen), ebuf);
@@ -1082,6 +1094,8 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
     BIGNUM *bn_dp = BN_new();
     BIGNUM *bn_dq = BN_new();
     BIGNUM *bn_qinvp = BN_new();
+
+#if OPENSSL_VERSION_MAJOR >= 3
     EVP_PKEY_get_bn_param(rsa, "n", &bn_n);
     EVP_PKEY_get_bn_param(rsa, "e", &bn_e);
     EVP_PKEY_get_bn_param(rsa, "d", &bn_d);
@@ -1090,6 +1104,33 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
     EVP_PKEY_get_bn_param(rsa, "rsa-exponent1", &bn_dp);
     EVP_PKEY_get_bn_param(rsa, "rsa-exponent2", &bn_dq);
     EVP_PKEY_get_bn_param(rsa, "rsa-coefficient1", &bn_qinvp);
+#else
+    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa);
+    if (rsa_key) {
+        // Get public key components (n, e)
+        const BIGNUM *rsa_n, *rsa_e, *rsa_d;
+        RSA_get0_key(rsa_key, &rsa_n, &rsa_e, &rsa_d);
+
+        if (rsa_n) BN_copy(bn_n, rsa_n);
+        if (rsa_e) BN_copy(bn_e, rsa_e);
+        if (rsa_d) BN_copy(bn_d, rsa_d);
+
+        // Get private key factors (p, q)
+        const BIGNUM *rsa_p, *rsa_q;
+        RSA_get0_factors(rsa_key, &rsa_p, &rsa_q);
+
+        if (rsa_p) BN_copy(bn_p, rsa_p);
+        if (rsa_q) BN_copy(bn_q, rsa_q);
+
+        // Get CRT parameters (dp, dq, qinv)
+        const BIGNUM *rsa_dp, *rsa_dq, *rsa_qinv;
+        RSA_get0_crt_params(rsa_key, &rsa_dp, &rsa_dq, &rsa_qinv);
+
+        if (rsa_dp) BN_copy(bn_dp, rsa_dp);
+        if (rsa_dq) BN_copy(bn_dq, rsa_dq);
+        if (rsa_qinv) BN_copy(bn_qinvp, rsa_qinv);
+    }
+#endif
 
     /* Convert bignumms to strings */
     for(int i = 0; i < MBX_NUM_BUFFERS; i++) {
