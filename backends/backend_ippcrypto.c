@@ -2102,3 +2102,332 @@ static void ippcp_hash_drbg_backend(void)
 {
     register_drbg_impl(&ippcp_hash_drbg);
 }
+
+/************************************************
+ * ML-DSA interface functions
+ ************************************************/
+#ifdef IPPCP_PREVIEW_ML_DSA
+
+#define IPPCP_MLDSA_ALIGNMENT 64
+
+static IppStatus IPP_CALL mldsa_kat_seed_supplier(Ipp32u* pData, int nBits, void* pParams)
+{
+	const Ipp8u* seed = (const Ipp8u*)pParams;
+	Ipp8u* pData_8    = (Ipp8u*)pData;
+	int i;
+
+	/* Expect exactly 256 bits (32 bytes) */
+	if (nBits == 256) {
+		for (i = 0; i < 32; i++) {
+			pData_8[i] = seed[i];
+		}
+		return ippStsNoErr;
+	}
+
+	return ippStsErr;
+}
+
+static IppStatus IPP_CALL mldsa_live_rnd_supplier(Ipp32u* pBits, int nBits, void* pParam)
+{
+	UNUSED_PARAM(pParam);
+	IppsPRNGState* pRand = newPRNG();
+	if (!pRand)
+		return ippStsMemAllocErr;
+
+	IppStatus sts = ippsPRNGenRDRAND(pBits, nBits, pRand);
+	free(pRand);
+	return sts;
+}
+
+static IppStatus ippcp_ml_dsa_type(uint64_t cipher, IppsMLDSAParamSet *type)
+{
+	switch (cipher & (ACVP_ML_DSA_44 | ACVP_ML_DSA_65 | ACVP_ML_DSA_87)) {
+	case ACVP_ML_DSA_44:
+		*type = ML_DSA_44;
+		break;
+	case ACVP_ML_DSA_65:
+		*type = ML_DSA_65;
+		break;
+	case ACVP_ML_DSA_87:
+		*type = ML_DSA_87;
+		break;
+	default:
+		return ippStsNotSupportedModeErr;
+	}
+	return ippStsNoErr;
+}
+
+static int ippcp_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
+			       flags_t parsed_flags)
+{
+	(void)parsed_flags;
+	IppStatus sts = ippStsNoErr;
+	int ret = 0;
+	IppsMLDSAParamSet type;
+	IppsMLDSAInfo info;
+	int stateSize = 0, scratchSize = 0;
+	BUFFER_INIT(stateBuf)
+	BUFFER_INIT(scratchBuf)
+
+	CKNULL_LOG((ippcp_ml_dsa_type(data->cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
+
+	sts = ippsMLDSA_GetInfo(&info, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetInfo")
+
+	sts = ippsMLDSA_GetSize(&stateSize);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetSize")
+
+	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
+	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	sts = ippsMLDSA_Init(pState, 1, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
+
+	sts = ippsMLDSA_KeyGenBufferGetSize(&scratchSize, pState);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGenBufferGetSize")
+
+	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
+	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	BUFFER_INIT(pk_aligned)
+	BUFFER_INIT(sk_aligned)
+	CKINT(alloc_buf(info.publicKeySize + IPPCP_MLDSA_ALIGNMENT, &pk_aligned));
+	CKINT(alloc_buf(info.privateKeySize + IPPCP_MLDSA_ALIGNMENT, &sk_aligned));
+	Ipp8u* pPk = (Ipp8u*)(IPP_ALIGNED_PTR(pk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+	Ipp8u* pSk = (Ipp8u*)(IPP_ALIGNED_PTR(sk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	sts = ippsMLDSA_KeyGen(pPk, pSk, pState, pScratch, mldsa_kat_seed_supplier, data->seed.buf);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGen")
+
+	CKINT(alloc_buf(info.publicKeySize, &data->pk));
+	CKINT(alloc_buf(info.privateKeySize, &data->sk));
+	memcpy(data->pk.buf, pPk, info.publicKeySize);
+	memcpy(data->sk.buf, pSk, info.privateKeySize);
+	free_buf(&pk_aligned);
+	free_buf(&sk_aligned);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGen")
+
+out:
+	free_buf(&stateBuf);
+	free_buf(&scratchBuf);
+	return ret;
+}
+
+static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
+			       flags_t parsed_flags)
+{
+	IppStatus sts = ippStsNoErr;
+	int ret = 0;
+	IppsMLDSAParamSet type;
+	IppsMLDSAInfo info;
+	int stateSize = 0, scratchSize = 0;
+	BUFFER_INIT(stateBuf)
+	BUFFER_INIT(scratchBuf)
+
+	if (data->hashalg) {
+		logger(LOGGER_ERR, "Hash-ML-DSA not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	CKNULL_LOG((ippcp_ml_dsa_type(data->cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
+
+	sts = ippsMLDSA_GetInfo(&info, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetInfo")
+
+	sts = ippsMLDSA_GetSize(&stateSize);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetSize")
+
+	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
+	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	sts = ippsMLDSA_Init(pState, data->msg.len, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
+
+	sts = ippsMLDSA_SignBufferGetSize(&scratchSize, pState);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_SignBufferGetSize")
+
+	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
+	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	BUFFER_INIT(sig_aligned)
+	CKINT(alloc_buf(info.signatureSize + IPPCP_MLDSA_ALIGNMENT, &sig_aligned));
+	Ipp8u* pSig = (Ipp8u*)(IPP_ALIGNED_PTR(sig_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	IppBitSupplier rndFunc = mldsa_kat_seed_supplier;
+	static Ipp8u mldsa_zero_seed[32] = { 0 };
+	void *pRndParam = mldsa_zero_seed;
+
+	if (parsed_flags & FLAG_OP_ML_DSA_TYPE_NONDETERMINISTIC) {
+		if (data->rnd.len) {
+			pRndParam = data->rnd.buf;
+		} else {
+			rndFunc = mldsa_live_rnd_supplier;
+			pRndParam = NULL;
+		}
+	}
+
+	BUFFER_INIT(sk_aligned)
+	CKINT(alloc_buf(info.privateKeySize + IPPCP_MLDSA_ALIGNMENT, &sk_aligned));
+	Ipp8u* pSk = (Ipp8u*)(IPP_ALIGNED_PTR(sk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+	memcpy(pSk, data->sk.len ? data->sk.buf : (Ipp8u*)data->privkey, info.privateKeySize);
+
+	sts = ippsMLDSA_Sign(data->msg.buf, data->msg.len,
+			     data->context.len ? data->context.buf : NULL,
+			     data->context.len,
+			     pSk, pSig, pState, pScratch, rndFunc, pRndParam);
+	free_buf(&sk_aligned);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Sign")
+
+	CKINT(alloc_buf(info.signatureSize, &data->sig));
+	memcpy(data->sig.buf, pSig, info.signatureSize);
+	free_buf(&sig_aligned);
+
+out:
+	free_buf(&stateBuf);
+	free_buf(&scratchBuf);
+	return ret;
+}
+
+static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
+			       flags_t parsed_flags)
+{
+	(void)parsed_flags;
+	IppStatus sts = ippStsNoErr;
+	int ret = 0;
+	IppsMLDSAParamSet type;
+	int stateSize = 0, scratchSize = 0;
+	BUFFER_INIT(stateBuf)
+	BUFFER_INIT(scratchBuf)
+	int isValid = 0;
+
+	if (data->hashalg) {
+		logger(LOGGER_ERR, "Hash-ML-DSA not supported\n");
+		return -EOPNOTSUPP;
+	}
+
+	CKNULL_LOG((ippcp_ml_dsa_type(data->cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
+
+	sts = ippsMLDSA_GetSize(&stateSize);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetSize")
+
+	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
+	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	sts = ippsMLDSA_Init(pState, data->msg.len, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
+
+	sts = ippsMLDSA_VerifyBufferGetSize(&scratchSize, pState);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_VerifyBufferGetSize")
+
+	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
+	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	IppsMLDSAInfo info;
+	sts = ippsMLDSA_GetInfo(&info, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetInfo")
+
+	BUFFER_INIT(pk_aligned)
+	BUFFER_INIT(sig_aligned)
+	CKINT(alloc_buf(info.publicKeySize + IPPCP_MLDSA_ALIGNMENT, &pk_aligned));
+	CKINT(alloc_buf(info.signatureSize + IPPCP_MLDSA_ALIGNMENT, &sig_aligned));
+	Ipp8u* pPk = (Ipp8u*)(IPP_ALIGNED_PTR(pk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+	Ipp8u* pSig = (Ipp8u*)(IPP_ALIGNED_PTR(sig_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	memcpy(pPk, data->pk.buf, info.publicKeySize);
+	memcpy(pSig, data->sig.buf, info.signatureSize);
+
+	sts = ippsMLDSA_Verify(data->msg.buf, data->msg.len,
+			       data->context.len ? data->context.buf : NULL,
+			       data->context.len,
+			       pPk, pSig, &isValid, pState, pScratch);
+
+	free_buf(&pk_aligned);
+	free_buf(&sig_aligned);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Verify")
+
+	data->sigver_success = isValid;
+
+out:
+	free_buf(&stateBuf);
+	free_buf(&scratchBuf);
+	return ret;
+}
+
+static int ippcp_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk, void **sk)
+{
+	IppStatus sts = ippStsNoErr;
+	int ret = 0;
+	IppsMLDSAParamSet type;
+	IppsMLDSAInfo info;
+	int stateSize = 0, scratchSize = 0;
+	BUFFER_INIT(stateBuf)
+	BUFFER_INIT(scratchBuf)
+	Ipp8u *privKeyBuf = NULL;
+	BUFFER_INIT(seed)
+
+	CKNULL_LOG((ippcp_ml_dsa_type(cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
+
+	sts = ippsMLDSA_GetInfo(&info, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetInfo")
+
+	sts = ippsMLDSA_GetSize(&stateSize);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetSize")
+
+	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
+	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	sts = ippsMLDSA_Init(pState, 1, type);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
+
+	sts = ippsMLDSA_KeyGenBufferGetSize(&scratchSize, pState);
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGenBufferGetSize")
+
+	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
+	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
+
+	CKINT(alloc_buf(info.publicKeySize, pk));
+	privKeyBuf = malloc(info.privateKeySize);
+	CKNULL(privKeyBuf, -ENOMEM);
+
+	/* Generate a random seed for internal key generation if none is provided */
+	CKINT(alloc_buf(32, &seed));
+	RAND_bytes(seed.buf, 32);
+
+	sts = ippsMLDSA_KeyGen(pk->buf, privKeyBuf, pState, pScratch, mldsa_kat_seed_supplier, seed.buf);
+	if (sts != ippStsNoErr) {
+		free(privKeyBuf);
+		free_buf(&seed);
+		CKNULL_LOG(0, sts, "Error in ippsMLDSA_KeyGen")
+	}
+
+	*sk = privKeyBuf;
+
+out:
+	free_buf(&stateBuf);
+	free_buf(&scratchBuf);
+	free_buf(&seed);
+	return ret;
+}
+
+static void ippcp_ml_dsa_free_key(void *sk)
+{
+	if (sk)
+		free(sk);
+}
+
+static struct ml_dsa_backend ippcp_ml_dsa =
+{
+	ippcp_ml_dsa_keygen,
+	ippcp_ml_dsa_siggen,
+	ippcp_ml_dsa_sigver,
+	ippcp_ml_dsa_keygen_en,
+	ippcp_ml_dsa_free_key
+};
+
+ACVP_DEFINE_CONSTRUCTOR(ippcp_ml_dsa_backend)
+static void ippcp_ml_dsa_backend(void)
+{
+	register_ml_dsa_impl(&ippcp_ml_dsa);
+}
+
+#endif // IPPCP_PREVIEW_ML_DSA
