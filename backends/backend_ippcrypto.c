@@ -2203,11 +2203,10 @@ static int ippcp_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
 	CKINT(alloc_buf(info.privateKeySize, &data->sk));
 	memcpy(data->pk.buf, pPk, info.publicKeySize);
 	memcpy(data->sk.buf, pSk, info.privateKeySize);
-	free_buf(&pk_aligned);
-	free_buf(&sk_aligned);
-	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGen")
 
 out:
+	free_buf(&pk_aligned);
+	free_buf(&sk_aligned);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
 	return ret;
@@ -2275,14 +2274,14 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 			     data->context.len ? data->context.buf : NULL,
 			     data->context.len,
 			     pSk, pSig, pState, pScratch, rndFunc, pRndParam);
-	free_buf(&sk_aligned);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Sign")
 
 	CKINT(alloc_buf(info.signatureSize, &data->sig));
 	memcpy(data->sig.buf, pSig, info.signatureSize);
-	free_buf(&sig_aligned);
 
 out:
+	free_buf(&sk_aligned);
+	free_buf(&sig_aligned);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
 	return ret;
@@ -2341,13 +2340,13 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 			       data->context.len,
 			       pPk, pSig, &isValid, pState, pScratch);
 
-	free_buf(&pk_aligned);
-	free_buf(&sig_aligned);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Verify")
 
 	data->sigver_success = isValid;
 
 out:
+	free_buf(&pk_aligned);
+	free_buf(&sig_aligned);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
 	return ret;
@@ -2394,15 +2393,13 @@ static int ippcp_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk, void **sk)
 	RAND_bytes(seed.buf, 32);
 
 	sts = ippsMLDSA_KeyGen(pk->buf, privKeyBuf, pState, pScratch, mldsa_kat_seed_supplier, seed.buf);
-	if (sts != ippStsNoErr) {
-		free(privKeyBuf);
-		free_buf(&seed);
-		CKNULL_LOG(0, sts, "Error in ippsMLDSA_KeyGen")
-	}
+	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGen")
 
 	*sk = privKeyBuf;
+	privKeyBuf = NULL;
 
 out:
+	free(privKeyBuf);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
 	free_buf(&seed);

@@ -299,7 +299,7 @@ endif
 
 ################## CONFIGURE BACKEND ippcrypto ################
 
-ifeq (ippcrypto,$(firstword $(MAKECMDGOALS)))
+ifneq (,$(filter ippcrypto,$(MAKECMDGOALS)))
 	C_SRCS += backends/backend_ippcrypto.c
 	INCLUDE_DIRS += $(IPPCRYPTOROOT)/include
 	INCLUDE_DIRS += $(OPENSSL_ROOT_DIR)/include/

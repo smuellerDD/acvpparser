@@ -49,7 +49,7 @@ static void ml_dsa_key_free(struct ml_dsa_static_key *key)
 
 	free_buf(&key->pk);
 	if (ml_dsa_backend->ml_dsa_free_key)
-		ml_dsa_backend->ml_dsa_free_key(&key->sk);
+		ml_dsa_backend->ml_dsa_free_key(key->sk);
 	key->sk = NULL;
 	key->cipher  = 0;
 }
