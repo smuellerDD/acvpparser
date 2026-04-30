@@ -2362,7 +2362,6 @@ static int ippcp_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk, void **sk)
 	BUFFER_INIT(stateBuf)
 	BUFFER_INIT(scratchBuf)
 	Ipp8u *privKeyBuf = NULL;
-	BUFFER_INIT(seed)
 
 	CKNULL_LOG((ippcp_ml_dsa_type(cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
 
@@ -2388,11 +2387,7 @@ static int ippcp_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk, void **sk)
 	privKeyBuf = malloc(info.privateKeySize);
 	CKNULL(privKeyBuf, -ENOMEM);
 
-	/* Generate a random seed for internal key generation if none is provided */
-	CKINT(alloc_buf(32, &seed));
-	RAND_bytes(seed.buf, 32);
-
-	sts = ippsMLDSA_KeyGen(pk->buf, privKeyBuf, pState, pScratch, mldsa_kat_seed_supplier, seed.buf);
+	sts = ippsMLDSA_KeyGen(pk->buf, privKeyBuf, pState, pScratch, NULL, NULL);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_KeyGen")
 
 	*sk = privKeyBuf;
@@ -2402,7 +2397,6 @@ out:
 	free(privKeyBuf);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
-	free_buf(&seed);
 	return ret;
 }
 
