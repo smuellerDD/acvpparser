@@ -363,6 +363,9 @@ ifeq (cryptombssl,$(firstword $(MAKECMDGOALS)))
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
 	CFLAGS += -Wno-unused-function -Wno-incompatible-pointer-types
+	ifeq ($(REGULAR_TESTING),1)
+		CFLAGS += -DDETERMINISTIC_KEY_GEN -D_NO_IPP_DEPRECATED
+	endif
 
 	ifeq ($(UNAME_S),Linux)
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a

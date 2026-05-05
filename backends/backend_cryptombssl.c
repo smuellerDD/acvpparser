@@ -552,6 +552,9 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     left_pad_buf(&init->n, data->modulus >> 3);
     if (!init->dkm.len) {
         alloc_buf(keyBitlen >> 3, &init->dkm);
+#ifdef DETERMINISTIC_KEY_GEN
+        set_drng_to_gen_rep_seq(777);
+#endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
 
         /*
@@ -559,6 +562,9 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
         * not too large.
         */
         init->dkm.buf[0] &= ~0x80;
+#ifdef DETERMINISTIC_KEY_GEN
+        restore_original_rng();
+#endif
     }
     dkm_p = &init->dkm;
     c_p = &init->iut_c;
@@ -662,6 +668,7 @@ static void cryptomb_kts_ifc_backend(void)
  ****************************************************/
 static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **privkey, struct buffer *nbuf)
 {
+    static int key_counter = 0;
     int ret = 0;
 
 	BIGNUM *egen = BN_new();
@@ -674,8 +681,17 @@ static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void
 
     int rsaBitsize = modulus;
 
+#ifdef DETERMINISTIC_KEY_GEN
+    // Generate different key for each call
+    set_drng_to_gen_rep_seq(1000 + key_counter++);
+#endif
+
     ret = openssl_generate_rsa_key(rsa, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
+
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
+#endif
 
     EVP_PKEY_get_bn_param(rsa, "n", &n);
     EVP_PKEY_get_bn_param(rsa, "e", &egen);
