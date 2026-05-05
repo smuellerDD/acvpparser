@@ -37,6 +37,7 @@
 #include <ippcp.h>
 
 #include "backend_common.h"
+#include "backend_crypto_common.h"
 
 #define NUM_OF_DIGS(bitsize, digsize)   (((bitsize) + (digsize)-1)/(digsize))
 
@@ -136,48 +137,16 @@ typedef enum {
     projective_coords
 } coords_type;
 
-#ifdef DETERMINISTIC_KEY_GEN
-#if OPENSSL_VERSION_MAJOR >= 3
-#else
-#ifndef OPENSSL_IS_BORINGSSL
-static int stdlib_rand_seed(const void* buf, int num)
-{
-    (void)num;
-    srand(*((unsigned int*)buf));
-    return 1;
-}
-
-static int stdlib_rand_bytes(unsigned char* buf, int num)
-{
-    for (int index = 0; index < num; ++index) {
-        buf[index] = rand() % 256;
-    }
-    return 1;
-}
-#else
-static void stdlib_rand_seed(const void* buf, int num) { (void)num; srand(*((unsigned int*)buf)); }
-
-static int stdlib_rand_bytes(uint8_t* buf, size_t num)
-{
-    for (int index = 0; index < num; ++index) {
-        buf[index] = rand() % 256;
-    }
-    return 1;
-}
-#endif
-
-RAND_METHOD stdlib_rand_meth = {
-    stdlib_rand_seed, stdlib_rand_bytes, NULL, NULL, stdlib_rand_bytes, NULL
-};
-#endif
-#endif
-
 /* Produce OpenSSL public and private keys and return BIGNUMs */
 static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BIGNUM* puby_key, BIGNUM* pubz_key, EC_GROUP* EC, const char *curvename, int len8, coords_type coords)
 {
     (void)pubz_key; (void)coords;
     EVP_PKEY* keyA = NULL;
     BN_CTX* ctx = BN_CTX_new();
+
+#ifdef DETERMINISTIC_KEY_GEN
+    set_drng_to_gen_rep_seq(777);
+#endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
     EVP_PKEY_CTX *evp_ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
@@ -219,15 +188,6 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
 #else
     (void)curvename; (void)len8;
 
-#ifdef DETERMINISTIC_KEY_GEN
-    // Store original RNG method for restoration
-    const RAND_METHOD* current_ossl_rnd = RAND_get_rand_method();
-    RAND_set_rand_method(&stdlib_rand_meth);
-
-    Ipp32u ossl_seed = 777;
-    RAND_seed(&ossl_seed, sizeof(Ipp32u));
-#endif
-
     // Create EC_KEY first
     EC_KEY* ec_key = EC_KEY_new();
     EC_KEY_set_group(ec_key, EC);
@@ -251,16 +211,15 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
         if (coords == projective_coords) {
 #if !defined(OPENSSL_IS_BORINGSSL)
             EC_POINT_get_Jprojective_coordinates_GFp(EC, EC_KEY_get0_public_key(ec_key), pubx_key, puby_key, pubz_key, ctx);
-
 #endif
         }
         else
             EC_POINT_get_affine_coordinates_GFp(EC, EC_KEY_get0_public_key(ec_key), pubx_key, puby_key, ctx);
     }
-#ifdef DETERMINISTIC_KEY_GEN
-    // Restore original RNG method
-    RAND_set_rand_method(current_ossl_rnd);
 #endif
+
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
 #endif
 
     // release resources
@@ -334,34 +293,12 @@ static ECDSA_SIG* openssl_generate_signature(int8u* msg_buffer, int msg_byte_siz
     EVP_PKEY_CTX *sign_ctx = NULL;
 
 #ifdef DETERMINISTIC_KEY_GEN
-    // Store original RNG method for restoration
-    const RAND_METHOD* original_method = RAND_get_rand_method();
-
-    // Set deterministic RNG for signature generation
-    RAND_set_rand_method(&stdlib_rand_meth);
-
-    // Use a fixed seed for deterministic nonce generation
-    Ipp32u sig_seed = 888; // Different from key generation seed (777)
-    RAND_seed(&sig_seed, sizeof(Ipp32u));
+    set_drng_to_gen_rep_seq(888);
 #endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
-    // OpenSSL 3.x path
     sign_ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
-
-#ifdef DETERMINISTIC_KEY_GEN
-    // Enable deterministic signatures (RFC 6979)
-    OSSL_PARAM params[2];
-    params[0] = OSSL_PARAM_construct_utf8_string("ecdsa-sig", "rfc6979", 0);
-    params[1] = OSSL_PARAM_construct_end();
-
-    // Note: This might not be supported in all OpenSSL 3.x versions
-    // If it fails, we'll rely on the deterministic RNG we set above
-    EVP_PKEY_CTX_set_params(sign_ctx, params);
-#endif
-
 #else
-    // OpenSSL 1.1.x path
     sign_ctx = EVP_PKEY_CTX_new(key, NULL);
 #endif
 
@@ -380,9 +317,8 @@ static ECDSA_SIG* openssl_generate_signature(int8u* msg_buffer, int msg_byte_siz
     EVP_PKEY_CTX_free(sign_ctx);
     free(sig);
 
-#if defined(DETERMINISTIC_KEY_GEN) && (OPENSSL_VERSION_MAJOR < 3)
-    // Restore original RNG method
-    RAND_set_rand_method(original_method);
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
 #endif
 
     return sign;
@@ -478,6 +414,8 @@ static int openssl_generate_rsa_key(EVP_PKEY* rsa, BIGNUM* bn_e, unsigned int rs
 #endif
 
     ret = EVP_PKEY_keygen(pctx, &rsa) & ret;
+
+    EVP_PKEY_CTX_free(pctx);
 
     return ret;
 }

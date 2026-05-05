@@ -17,6 +17,7 @@
 #include "ippcp.h"
 #include "backend_common.h"
 #include "backend_ippcrypto_common.h"
+#include "backend_crypto_common.h"
 
 /************************************************************************************************
  * Symmetric cipher interface functions - AES-CBC, AES-CBC_CS1/2/3, AES-CTR, AES-OFB, AES_OFB128
@@ -688,9 +689,15 @@ static int ippcp_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **pri
             sts = ippcp_init_set_bn(E0, pubExpWordSize,  ippBigNumPOS, &e0_data,  pubExpWordSize);
             CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippcp_init_set_bn")
 
+#ifdef DETERMINISTIC_KEY_GEN
+            sts = ippsRSA_GenerateKeys(E0, N, E, D, pPrvKey, buffScratch.buf,
+                                       0, pPrimeG, ippsPRNGen, pPRNG);
+#else
             sts = ippsRSA_GenerateKeys(E0, N, E, D, pPrvKey, buffScratch.buf,
                                        0, pPrimeG, ippsPRNGenRDRAND, pPRNG);
-            if(ippStsInsufficientEntropy == sts) {
+#endif
+
+            if (ippStsInsufficientEntropy == sts) {
 			    logger(LOGGER_WARN, "ippStsInsufficientEntropy\n");
                 continue;
             }
@@ -795,8 +802,13 @@ static int ippcp_rsa_siggen(struct rsa_siggen_data *data, flags_t parsed_flags)
     }
 
     // RSA sign
-    if(parsed_flags &FLAG_OP_RSA_SIG_PKCS1PSS) {
-        sts = ippsRSASign_PSS_rmf(data->msg.buf,data->msg.len, salt, data->saltlen, data->sig.buf, pPrvKey,
+    if (parsed_flags &FLAG_OP_RSA_SIG_PKCS1PSS) {
+#ifdef DETERMINISTIC_KEY_GEN
+        // deterministic salt derived from message
+        for (size_t i = 0; i < data->saltlen; i++)
+            salt[i] = data->msg.buf[i % data->saltlen] ^ (Ipp8u)i;
+#endif
+        sts = ippsRSASign_PSS_rmf(data->msg.buf, data->msg.len, salt, data->saltlen, data->sig.buf, pPrvKey,
                                     pPubKey, method, pLocSignBuffer.buf);
         CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsRSASign_PSS_rmf")
     }
@@ -1015,6 +1027,9 @@ static int ippcp_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32_t 
     left_pad_buf(&init->n, data->modulus >> 3);
     if (!init->dkm.len) {
         alloc_buf(IPPCP_BITS2BYTES(keyBitlen), &init->dkm);
+#ifdef DETERMINISTIC_KEY_GEN
+        set_drng_to_gen_rep_seq(777);
+#endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
 
         /*
@@ -1022,6 +1037,9 @@ static int ippcp_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32_t 
         * not too large.
         */
         init->dkm.buf[0] &= ~0x80;
+#ifdef DETERMINISTIC_KEY_GEN
+        restore_original_rng();
+#endif
     }
     dkm_p = &init->dkm; (void)dkm_p;
     c_p = &init->iut_c; (void)c_p;
@@ -1292,8 +1310,12 @@ static int ippcp_ecdsa_keygen_en(uint64_t curve, struct buffer *Qx_buf, struct b
     IppsPRNGState* pRand = newPRNG();
     Ipp32u isZeroRes;
     do {
+#ifdef DETERMINISTIC_KEY_GEN
         // get regular private key
+        sts = ippsGFpECPrivateKey(bnPrivate, pEC, ippsPRNGen, pRand);
+#else
         sts = ippsGFpECPrivateKey(bnPrivate, pEC, ippsPRNGenRDRAND, pRand);
+#endif
         CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsGFpECPrivateKey")
 
         ippsCmpZero_BN(bnPrivate, &isZeroRes);
@@ -1479,8 +1501,14 @@ static int ippcp_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_fla
     IppsPRNGState* pRand = newPRNG();
 
     Ipp32u isZeroRes, isEquRes;
-    do { // get new ephemeral private key
+    do {
+#ifdef DETERMINISTIC_KEY_GEN
+        // get regular ephemeral private key
+        sts = ippsGFpECPrivateKey(bnEphPrivate, pEC, ippsPRNGen, pRand);
+#else
+        // get new ephemeral private key
         sts = ippsGFpECPrivateKey(bnEphPrivate, pEC, ippsPRNGenRDRAND, pRand);
+#endif
         CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsGFpECPrivateKey")
         ippsCmpZero_BN(bnEphPrivate, &isZeroRes);
         ippsCmp_BN(bnEphPrivate, bnRegPrivate, &isEquRes);
