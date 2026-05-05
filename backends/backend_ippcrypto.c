@@ -2168,6 +2168,13 @@ static int ippcp_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
 	int stateSize = 0, scratchSize = 0;
 	BUFFER_INIT(stateBuf)
 	BUFFER_INIT(scratchBuf)
+	BUFFER_INIT(pk_aligned)
+	BUFFER_INIT(sk_aligned)
+
+	data->pk.buf = NULL;
+	data->pk.len = 0;
+	data->sk.buf = NULL;
+	data->sk.len = 0;
 
 	CKNULL_LOG((ippcp_ml_dsa_type(data->cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
 
@@ -2189,8 +2196,6 @@ static int ippcp_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
 	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
 	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
 
-	BUFFER_INIT(pk_aligned)
-	BUFFER_INIT(sk_aligned)
 	CKINT(alloc_buf(info.publicKeySize + IPPCP_MLDSA_ALIGNMENT, &pk_aligned));
 	CKINT(alloc_buf(info.privateKeySize + IPPCP_MLDSA_ALIGNMENT, &sk_aligned));
 	Ipp8u* pPk = (Ipp8u*)(IPP_ALIGNED_PTR(pk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
@@ -2205,6 +2210,10 @@ static int ippcp_ml_dsa_keygen(struct ml_dsa_keygen_data *data,
 	memcpy(data->sk.buf, pSk, info.privateKeySize);
 
 out:
+	if (ret < 0) {
+		free_buf(&data->pk);
+		free_buf(&data->sk);
+	}
 	free_buf(&pk_aligned);
 	free_buf(&sk_aligned);
 	free_buf(&stateBuf);
@@ -2222,6 +2231,11 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	int stateSize = 0, scratchSize = 0;
 	BUFFER_INIT(stateBuf)
 	BUFFER_INIT(scratchBuf)
+	BUFFER_INIT(sig_aligned)
+	BUFFER_INIT(sk_aligned)
+
+	data->sig.buf = NULL;
+	data->sig.len = 0;
 
 	if (data->hashalg) {
 		logger(LOGGER_ERR, "Hash-ML-DSA not supported\n");
@@ -2248,7 +2262,6 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
 	Ipp8u* pScratch = (Ipp8u*)(IPP_ALIGNED_PTR(scratchBuf.buf, IPPCP_MLDSA_ALIGNMENT));
 
-	BUFFER_INIT(sig_aligned)
 	CKINT(alloc_buf(info.signatureSize + IPPCP_MLDSA_ALIGNMENT, &sig_aligned));
 	Ipp8u* pSig = (Ipp8u*)(IPP_ALIGNED_PTR(sig_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
 
@@ -2265,7 +2278,6 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 		}
 	}
 
-	BUFFER_INIT(sk_aligned)
 	CKINT(alloc_buf(info.privateKeySize + IPPCP_MLDSA_ALIGNMENT, &sk_aligned));
 	Ipp8u* pSk = (Ipp8u*)(IPP_ALIGNED_PTR(sk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
 	memcpy(pSk, data->sk.len ? data->sk.buf : (Ipp8u*)data->privkey, info.privateKeySize);
@@ -2280,6 +2292,8 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	memcpy(data->sig.buf, pSig, info.signatureSize);
 
 out:
+	if (ret < 0)
+		free_buf(&data->sig);
 	free_buf(&sk_aligned);
 	free_buf(&sig_aligned);
 	free_buf(&stateBuf);
@@ -2297,6 +2311,8 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	int stateSize = 0, scratchSize = 0;
 	BUFFER_INIT(stateBuf)
 	BUFFER_INIT(scratchBuf)
+	BUFFER_INIT(pk_aligned)
+	BUFFER_INIT(sig_aligned)
 	int isValid = 0;
 
 	if (data->hashalg) {
@@ -2325,8 +2341,6 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	sts = ippsMLDSA_GetInfo(&info, type);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_GetInfo")
 
-	BUFFER_INIT(pk_aligned)
-	BUFFER_INIT(sig_aligned)
 	CKINT(alloc_buf(info.publicKeySize + IPPCP_MLDSA_ALIGNMENT, &pk_aligned));
 	CKINT(alloc_buf(info.signatureSize + IPPCP_MLDSA_ALIGNMENT, &sig_aligned));
 	Ipp8u* pPk = (Ipp8u*)(IPP_ALIGNED_PTR(pk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
@@ -2394,6 +2408,8 @@ static int ippcp_ml_dsa_keygen_en(uint64_t cipher, struct buffer *pk, void **sk)
 	privKeyBuf = NULL;
 
 out:
+	if (ret < 0)
+		free_buf(pk);
 	free(privKeyBuf);
 	free_buf(&stateBuf);
 	free_buf(&scratchBuf);
