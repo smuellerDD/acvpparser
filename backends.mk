@@ -308,6 +308,9 @@ ifneq (,$(filter ippcrypto,$(MAKECMDGOALS)))
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
 	CFLAGS += -Wno-uninitialized -Wno-error=deprecated-declarations -DIPPCP_PREVIEW_LMS -DIPPCP_PREVIEW_ML_DSA
+	ifeq ($(REGULAR_TESTING),1)
+		CFLAGS += -DDETERMINISTIC_KEY_GEN -D_NO_IPP_DEPRECATED
+	endif
 
 	# Static link for lnx
 	ifeq ($(UNAME_S),Linux)
@@ -333,6 +336,9 @@ ifeq (cryptomb,$(firstword $(MAKECMDGOALS)))
 		CFLAGS += -mavx2 -mbmi2 -mpopcnt -g
 	endif
 	CFLAGS += -Wno-incompatible-pointer-types
+	ifeq ($(REGULAR_TESTING),1)
+		CFLAGS += -DDETERMINISTIC_KEY_GEN -D_NO_IPP_DEPRECATED
+	endif
 
 	ifeq ($(UNAME_S),Linux)
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libcrypto_mb.a $(IPPCRYPTOROOT)/lib/libippcp.a
