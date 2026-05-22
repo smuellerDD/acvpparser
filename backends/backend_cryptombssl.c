@@ -668,7 +668,6 @@ static void cryptomb_kts_ifc_backend(void)
  ****************************************************/
 static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **privkey, struct buffer *nbuf)
 {
-    static int key_counter = 0;
     int ret = 0;
 
 	BIGNUM *egen = BN_new();
@@ -682,6 +681,8 @@ static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void
     int rsaBitsize = modulus;
 
 #ifdef DETERMINISTIC_KEY_GEN
+    // A counter to generate different key for each call
+    static int key_counter = 0;
     // Generate different key for each call
     set_drng_to_gen_rep_seq(1000 + key_counter++);
 #endif

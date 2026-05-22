@@ -17,7 +17,6 @@
 #include "ippcp.h"
 #include "backend_common.h"
 #include "backend_ippcrypto_common.h"
-#include "backend_crypto_common.h"
 
 /************************************************************************************************
  * Symmetric cipher interface functions - AES-CBC, AES-CBC_CS1/2/3, AES-CTR, AES-OFB, AES_OFB128
@@ -1886,8 +1885,8 @@ static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
 
     /* Allocate memory for the scratch buffer */
     int buffSize;
-    status = ippsLMSBufferGetSize(&buffSize, msgLen, lmsAlgType);
-    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSBufferGetSize")
+    status = ippsLMSVerifyBufferGetSize(&buffSize, msgLen, lmsAlgType);
+    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSVerifyBufferGetSize")
     pScratchBuffer = malloc(buffSize);
 
     /* Parse public key vector */
