@@ -1886,8 +1886,8 @@ static int ippcp_lms_sigver(struct lms_sigver_data *data, flags_t parsed_flags)
 
     /* Allocate memory for the scratch buffer */
     int buffSize;
-    status = ippsLMSBufferGetSize(&buffSize, msgLen, lmsAlgType);
-    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSBufferGetSize")
+    status = ippsLMSVerifyBufferGetSize(&buffSize, msgLen, lmsAlgType);
+    CKNULL_LOG((status == ippStsNoErr), status, "Error in ippsLMSVerifyBufferGetSize")
     pScratchBuffer = malloc(buffSize);
 
     /* Parse public key vector */
