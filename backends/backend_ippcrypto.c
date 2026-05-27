@@ -17,6 +17,7 @@
 #include "ippcp.h"
 #include "backend_common.h"
 #include "backend_ippcrypto_common.h"
+#include "backend_crypto_common.h"
 
 /************************************************************************************************
  * Symmetric cipher interface functions - AES-CBC, AES-CBC_CS1/2/3, AES-CTR, AES-OFB, AES_OFB128
