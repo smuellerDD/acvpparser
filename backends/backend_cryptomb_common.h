@@ -37,6 +37,7 @@
 #include <ippcp.h>
 
 #include "backend_common.h"
+#include "backend_crypto_common.h"
 
 #define NUM_OF_DIGS(bitsize, digsize)   (((bitsize) + (digsize)-1)/(digsize))
 
