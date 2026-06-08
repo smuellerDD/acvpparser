@@ -897,7 +897,6 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     if (!init->dkm.len) {
         alloc_buf(keyBitlen >> 3, &init->dkm);
 #ifdef DETERMINISTIC_KEY_GEN
-        printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
         set_drng_to_gen_rep_seq(777);
 #endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
@@ -1004,8 +1003,6 @@ static void cryptomb_kts_ifc_backend(void)
 static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **privkey, struct buffer *nbuf) {
     int ret = 0;
 
-    printf("=== RSA Key Generation Debug ===\n");
-
 	BIGNUM *egen = BN_new();
     BIGNUM *n = BN_new();
 	EVP_PKEY *rsa_pkey = NULL;
@@ -1019,7 +1016,6 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
     int rsaBitsize = modulus;
 
 #ifdef DETERMINISTIC_KEY_GEN
-    printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
     // A counter to generate different key for each call
     static int key_counter = 0;
     // Generate different key for each call
