@@ -260,6 +260,13 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
 
     pKeys* sslPrivKey = (pKeys*)data->privkey;
 
+    // Print the private key being used
+    printf("USING_PRIVATE_KEY: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", ((unsigned char*)sslPrivKey->pRegKey)[i]);
+    }
+    printf("\n");
+
     memcpy(reg_skey[0], sslPrivKey->pRegKey, len8);
 
     ECDSA_SIG* sign = openssl_generate_signature(data_msg_digest[0], BN_num_bytes(bn_msg), sslPrivKey->pEcKeyPair);
@@ -312,6 +319,19 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
         }
     }
 
+    // Print MBX signature results
+    printf("MBX_SIGNATURE r: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", pa_sign_r[0][i]);
+    }
+    printf("\n");
+
+    printf("MBX_SIGNATURE s: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", pa_sign_s[0][i]);
+    }
+    printf("\n");
+
     if(sts == MBX_STATUS_OK) {
         /* Get S component */
         alloc_buf(len8, &data->S);
@@ -322,6 +342,19 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
         alloc_buf(len8, &data->R);
         memset(data->R.buf, 0, len8);
         memcpy(data->R.buf, pa_sign_r[0], len8);
+
+        // Print final output
+        printf("FINAL_OUTPUT r: ");
+        for(size_t i = 0; i < data->R.len; i++) {
+            printf("%02x", data->R.buf[i]);
+        }
+        printf("\n");
+
+        printf("FINAL_OUTPUT s: ");
+        for(size_t i = 0; i < data->S.len; i++) {
+            printf("%02x", data->S.buf[i]);
+        }
+        printf("\n");
     }
 
 out:
@@ -851,6 +884,7 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
 
     int ret = 0;
     mbx_status sts = MBX_STATUS_OK;
+    printf("cryptomb_rsa_kas_ifc_encrypt_common\n");
 
     struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
 
@@ -863,6 +897,7 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     if (!init->dkm.len) {
         alloc_buf(keyBitlen >> 3, &init->dkm);
 #ifdef DETERMINISTIC_KEY_GEN
+        printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
         set_drng_to_gen_rep_seq(777);
 #endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
@@ -969,24 +1004,29 @@ static void cryptomb_kts_ifc_backend(void)
 static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **privkey, struct buffer *nbuf) {
     int ret = 0;
 
+    printf("=== RSA Key Generation Debug ===\n");
+
 	BIGNUM *egen = BN_new();
     BIGNUM *n = BN_new();
-	EVP_PKEY *rsa = EVP_PKEY_new();
+	EVP_PKEY *rsa_pkey = NULL;
 
     int64u e = 65537;
     BIGNUM* bn_e = BN_new();
     BN_set_word(bn_e, e);
 
+    printf("Public exponent e: %llu\n", e);
+
     int rsaBitsize = modulus;
 
 #ifdef DETERMINISTIC_KEY_GEN
+    printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
     // A counter to generate different key for each call
     static int key_counter = 0;
     // Generate different key for each call
     set_drng_to_gen_rep_seq(1000 + key_counter++);
 #endif
 
-    ret = openssl_generate_rsa_key(rsa, bn_e, rsaBitsize);
+    ret = openssl_generate_rsa_key(&rsa_pkey, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
 
 #ifdef DETERMINISTIC_KEY_GEN
@@ -994,10 +1034,10 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 #endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
-    EVP_PKEY_get_bn_param(rsa, "n", &n);
-    EVP_PKEY_get_bn_param(rsa, "e", &egen);
+    EVP_PKEY_get_bn_param(rsa_pkey, "n", &n);
+    EVP_PKEY_get_bn_param(rsa_pkey, "e", &egen);
 #else
-    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa);
+    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa_pkey);
 
     const BIGNUM *rsa_n, *rsa_e, *rsa_d;
     RSA_get0_key(rsa_key, &rsa_n, &rsa_e, &rsa_d);
@@ -1014,7 +1054,7 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
     alloc_buf(BN_num_bytes(n), nbuf);
     BN_bn2binpad(n, nbuf->buf, BN_num_bytes(n));
 
-    *privkey = rsa;
+    *privkey = rsa_pkey;
 
 out:
     BN_free(bn_e);
@@ -1026,10 +1066,10 @@ out:
 
 static void cryptomb_rsa_free_key(void *privkey)
 {
-	EVP_PKEY *rsa = (EVP_PKEY *)privkey;
+	EVP_PKEY *rsa_pkey = (EVP_PKEY *)privkey;
 
-	if (rsa)
-		EVP_PKEY_free(rsa);
+	if (rsa_pkey)
+		EVP_PKEY_free(rsa_pkey);
 }
 
 static int
@@ -1234,6 +1274,15 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
         alloc_buf(rsaByteLen, &data->s);
         memcpy(data->s.buf, pa_plaintext_basic[0], rsaByteLen);
     }
+
+    // Print modulus n
+    unsigned char n_bytes[512];
+    int n_len = BN_bn2bin(bn_n, n_bytes);
+    printf("n: ");
+    for(int i = 0; i < n_len; i++) {
+        printf("%02x", n_bytes[i]);
+    }
+    printf("\n");
 
 out:
     BN_free(bn_n);

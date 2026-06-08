@@ -672,7 +672,7 @@ static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void
 
 	BIGNUM *egen = BN_new();
     BIGNUM *n = BN_new();
-	EVP_PKEY *rsa = EVP_PKEY_new();
+	EVP_PKEY *rsa_pkey = NULL();
 
     int64u e = 65537;
     BIGNUM* bn_e = BN_new();
@@ -687,15 +687,15 @@ static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void
     set_drng_to_gen_rep_seq(1000 + key_counter++);
 #endif
 
-    ret = openssl_generate_rsa_key(rsa, bn_e, rsaBitsize);
+    ret = openssl_generate_rsa_key(&rsa_pkey, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
 
 #ifdef DETERMINISTIC_KEY_GEN
     restore_original_rng();
 #endif
 
-    EVP_PKEY_get_bn_param(rsa, "n", &n);
-    EVP_PKEY_get_bn_param(rsa, "e", &egen);
+    EVP_PKEY_get_bn_param(rsa_pkey, "n", &n);
+    EVP_PKEY_get_bn_param(rsa_pkey, "e", &egen);
 
     /* Store n and e in output buffers */
     alloc_buf(BN_num_bytes(egen), ebuf);
@@ -703,7 +703,7 @@ static int cryptombssl_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void
     alloc_buf(BN_num_bytes(n), nbuf);
     BN_bn2binpad(n, nbuf->buf, BN_num_bytes(n));
 
-    *privkey = rsa;
+    *privkey = rsa_pkey;
 
 out:
     BN_free(bn_e);
@@ -715,10 +715,10 @@ out:
 
 static void cryptombssl_rsa_free_key(void *privkey)
 {
-	EVP_PKEY *rsa = (EVP_PKEY *)privkey;
+	EVP_PKEY *rsa_pkey = (EVP_PKEY *)privkey;
 
-	if (rsa)
-		EVP_PKEY_free(rsa);
+	if (rsa_pkey)
+		EVP_PKEY_free(rsa_pkey);
 }
 
 static int
