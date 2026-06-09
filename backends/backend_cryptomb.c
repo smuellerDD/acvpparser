@@ -979,9 +979,11 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 
     int rsaBitsize = modulus;
 
+    printf("cryptomb_rsa_keygen_en\n");
+
 #ifdef DETERMINISTIC_KEY_GEN
     // A counter to generate different key for each call
-    static int key_counter = 0;
+    static __thread int key_counter = 0;
     // Generate different key for each call
     set_drng_to_gen_rep_seq(1000 + key_counter++);
 #endif
