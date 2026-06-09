@@ -145,7 +145,7 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
     BN_CTX* ctx = BN_CTX_new();
 
 #ifdef DETERMINISTIC_KEY_GEN
-    set_drng_to_gen_rep_seq(777);
+    set_drng_to_gen_rep_seq_protected(777, 0);
 #endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
@@ -219,7 +219,7 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
 #endif
 
 #ifdef DETERMINISTIC_KEY_GEN
-    restore_original_rng();
+    restore_original_rng_protected();
 #endif
 
     // release resources
@@ -293,7 +293,7 @@ static ECDSA_SIG* openssl_generate_signature(int8u* msg_buffer, int msg_byte_siz
     EVP_PKEY_CTX *sign_ctx = NULL;
 
 #ifdef DETERMINISTIC_KEY_GEN
-    set_drng_to_gen_rep_seq(777);
+    set_drng_to_gen_rep_seq_protected(777, 0);
 #endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
@@ -318,7 +318,7 @@ static ECDSA_SIG* openssl_generate_signature(int8u* msg_buffer, int msg_byte_siz
     free(sig);
 
 #ifdef DETERMINISTIC_KEY_GEN
-    restore_original_rng();
+    restore_original_rng_protected();
 #endif
 
     return sign;

@@ -611,7 +611,7 @@ static int cryptomb_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve, void **
     EVP_PKEY_keygen_init(key_ctx); // init EVP_PKEY context
 
 #ifdef DETERMINISTIC_KEY_GEN
-    set_drng_to_gen_rep_seq(777);
+    set_drng_to_gen_rep_seq_protected(777, 0);
 #endif
 
     // generate key pair using OpenSSL
@@ -619,7 +619,7 @@ static int cryptomb_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve, void **
     CKNULL_LOG((evpres == 1), evpres, "Error in EVP_PKEY_keygen")
 
 #ifdef DETERMINISTIC_KEY_GEN
-    restore_original_rng();
+    restore_original_rng_protected();
 #endif
 
     EVP_PKEY_CTX_free(key_ctx);
@@ -679,7 +679,7 @@ static int cryptomb_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_
    };
 
 #ifdef DETERMINISTIC_KEY_GEN
-    set_drng_to_gen_rep_seq(888);
+    set_drng_to_gen_rep_seq_protected(888, 0);
 #endif
 
     // generate key pair using OpenSSL
@@ -689,7 +689,7 @@ static int cryptomb_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_
     }
 
 #ifdef DETERMINISTIC_KEY_GEN
-    restore_original_rng();
+    restore_original_rng_protected();
 #endif
 
     // extract private and public kyes considered as "known"
@@ -863,7 +863,7 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     if (!init->dkm.len) {
         alloc_buf(keyBitlen >> 3, &init->dkm);
 #ifdef DETERMINISTIC_KEY_GEN
-        set_drng_to_gen_rep_seq(777);
+        set_drng_to_gen_rep_seq_protected(777, 0);
 #endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
 
@@ -873,7 +873,7 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
         */
         init->dkm.buf[0] &= ~0x80;
 #ifdef DETERMINISTIC_KEY_GEN
-        restore_original_rng();
+        restore_original_rng_protected();
 #endif
     }
     dkm_p = &init->dkm;
@@ -971,7 +971,7 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 
 	BIGNUM *egen = BN_new();
     BIGNUM *n = BN_new();
-	EVP_PKEY *rsa_pkey = NULL;
+	EVP_PKEY *rsa_pkey = EVP_PKEY_new();
 
     int64u e = 65537;
     BIGNUM* bn_e = BN_new();
@@ -979,20 +979,16 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 
     int rsaBitsize = modulus;
 
-    printf("cryptomb_rsa_keygen_en\n");
-
 #ifdef DETERMINISTIC_KEY_GEN
-    // A counter to generate different key for each call
-    static __thread int key_counter = 0;
-    // Generate different key for each call
-    set_drng_to_gen_rep_seq(1000 + key_counter++);
+    // Use thread-safe protected function and increment counter inside
+    set_drng_to_gen_rep_seq_protected(1000, 1);
 #endif
 
     ret = openssl_generate_rsa_key(&rsa_pkey, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
 
 #ifdef DETERMINISTIC_KEY_GEN
-    restore_original_rng();
+    restore_original_rng_protected();
 #endif
 
 #if OPENSSL_VERSION_MAJOR >= 3
