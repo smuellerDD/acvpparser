@@ -61,12 +61,17 @@ RAND_METHOD stdlib_rand_meth = {
 #endif
 
 // Thread-safe global state
-static int global_key_counter = 0;
+static __thread int global_key_counter = 0;
 static pthread_mutex_t rng_mutex = PTHREAD_MUTEX_INITIALIZER;
 static const RAND_METHOD* original_rng_method = NULL;
 
 static void set_drng_to_gen_rep_seq_protected(Ipp32u base_seed, int inc_seed)
 {
+    // Add thread ID and timing info
+    pthread_t thread_id = pthread_self();
+    printf("[DEBUG] Thread %lu: Acquiring RNG mutex, base_seed=%u, inc_seed=%d\n",
+           (unsigned long)thread_id, base_seed, inc_seed);
+
     // Lock mutex to protect both counter and RNG state
     pthread_mutex_lock(&rng_mutex);
 
@@ -74,6 +79,11 @@ static void set_drng_to_gen_rep_seq_protected(Ipp32u base_seed, int inc_seed)
     if (inc_seed) {
         // Get unique seed for this thread/call
         seed = base_seed + global_key_counter++;
+        printf("[DEBUG] Thread %lu: Using incremented seed=%d (counter was %d)\n",
+               (unsigned long)thread_id, seed, global_key_counter-1);
+    } else {
+        printf("[DEBUG] Thread %lu: Using fixed seed=%d\n",
+               (unsigned long)thread_id, seed);
     }
 
     // Suppress deprecation warnings for OpenSSL 3.x
@@ -102,6 +112,8 @@ static void restore_original_rng_protected()
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
+
+    pthread_t thread_id = pthread_self();
     // Restore original RNG method
     if (original_rng_method) {
         RAND_set_rand_method(original_rng_method);
@@ -110,6 +122,7 @@ static void restore_original_rng_protected()
 #if OPENSSL_VERSION_MAJOR >= 3
 #pragma GCC diagnostic pop
 #endif
+    printf("[DEBUG] Thread %lu: Restoring RNG and releasing mutex\n", (unsigned long)thread_id);
     // Unlock mutex after key generation is complete
     pthread_mutex_unlock(&rng_mutex);
 }

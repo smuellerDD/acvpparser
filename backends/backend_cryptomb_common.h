@@ -144,7 +144,10 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
     EVP_PKEY* keyA = NULL;
     BN_CTX* ctx = BN_CTX_new();
 
+    pthread_t thread_id = pthread_self();
+
 #ifdef DETERMINISTIC_KEY_GEN
+    printf("[DEBUG] Thread %lu: Starting key generation with deterministic RNG\n", (unsigned long)thread_id);
     set_drng_to_gen_rep_seq_protected(777, 0);
 #endif
 
@@ -218,7 +221,15 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
     }
 #endif
 
+    // Log the generated key
+    if (pubx_key != NULL) {
+        char *hex_key = BN_bn2hex(pubx_key);
+        printf("[DEBUG] Thread %lu: Generated pubx_key: %.32s...\n", (unsigned long)thread_id, hex_key);
+        OPENSSL_free(hex_key);
+    }
+
 #ifdef DETERMINISTIC_KEY_GEN
+    printf("[DEBUG] Thread %lu: Finishing key generation\n", (unsigned long)thread_id);
     restore_original_rng_protected();
 #endif
 
