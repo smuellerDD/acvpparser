@@ -260,6 +260,13 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
 
     pKeys* sslPrivKey = (pKeys*)data->privkey;
 
+    // Print the private key being used
+    printf("USING_PRIVATE_KEY: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", ((unsigned char*)sslPrivKey->pRegKey)[i]);
+    }
+    printf("\n");
+
     memcpy(reg_skey[0], sslPrivKey->pRegKey, len8);
 
     ECDSA_SIG* sign = openssl_generate_signature(data_msg_digest[0], BN_num_bytes(bn_msg), sslPrivKey->pEcKeyPair);
@@ -312,6 +319,19 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
         }
     }
 
+    // Print MBX signature results
+    printf("MBX_SIGNATURE r: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", pa_sign_r[0][i]);
+    }
+    printf("\n");
+
+    printf("MBX_SIGNATURE s: ");
+    for(int i = 0; i < len8; i++) {
+        printf("%02x", pa_sign_s[0][i]);
+    }
+    printf("\n");
+
     if(sts == MBX_STATUS_OK) {
         /* Get S component */
         alloc_buf(len8, &data->S);
@@ -322,6 +342,19 @@ static int cryptomb_ecdsa_siggen(struct ecdsa_siggen_data *data, flags_t parsed_
         alloc_buf(len8, &data->R);
         memset(data->R.buf, 0, len8);
         memcpy(data->R.buf, pa_sign_r[0], len8);
+
+        // Print final output
+        printf("FINAL_OUTPUT r: ");
+        for(size_t i = 0; i < data->R.len; i++) {
+            printf("%02x", data->R.buf[i]);
+        }
+        printf("\n");
+
+        printf("FINAL_OUTPUT s: ");
+        for(size_t i = 0; i < data->S.len; i++) {
+            printf("%02x", data->S.buf[i]);
+        }
+        printf("\n");
     }
 
 out:
@@ -851,6 +884,7 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
 
     int ret = 0;
     mbx_status sts = MBX_STATUS_OK;
+    printf("cryptomb_rsa_kas_ifc_encrypt_common\n");
 
     struct kts_ifc_init_data *init = &data->u.kts_ifc_init;
 
@@ -976,6 +1010,8 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
     int64u e = 65537;
     BIGNUM* bn_e = BN_new();
     BN_set_word(bn_e, e);
+
+    printf("Public exponent e: %llu\n", e);
 
     int rsaBitsize = modulus;
 
@@ -1234,6 +1270,15 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
         alloc_buf(rsaByteLen, &data->s);
         memcpy(data->s.buf, pa_plaintext_basic[0], rsaByteLen);
     }
+
+    // Print modulus n
+    unsigned char n_bytes[512];
+    int n_len = BN_bn2bin(bn_n, n_bytes);
+    printf("n: ");
+    for(int i = 0; i < n_len; i++) {
+        printf("%02x", n_bytes[i]);
+    }
+    printf("\n");
 
 out:
     BN_free(bn_n);
