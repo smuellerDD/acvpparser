@@ -18,8 +18,6 @@
 #define _BACKEND_CRYPTO_COMMON_H
 
 #ifdef DETERMINISTIC_KEY_GEN
-#include <pthread.h>
-
 #ifndef OPENSSL_IS_BORINGSSL
 static int stdlib_rand_seed(const void* buf, int num)
 {
@@ -60,58 +58,41 @@ RAND_METHOD stdlib_rand_meth = {
 #pragma GCC diagnostic pop
 #endif
 
-// Thread-safe global state
-static int global_key_counter = 0;
-static pthread_mutex_t rng_mutex = PTHREAD_MUTEX_INITIALIZER;
-static const RAND_METHOD* original_rng_method = NULL;
+// Global variable to store the original RAND method
+static const RAND_METHOD* current_ossl_rnd = NULL;
 
-static void set_drng_to_gen_rep_seq_protected(Ipp32u base_seed, int inc_seed)
+static void set_drng_to_gen_rep_seq(Ipp32u seed)
 {
-    // Lock mutex to protect both counter and RNG state
-    pthread_mutex_lock(&rng_mutex);
-
-    int seed = base_seed;
-    if (inc_seed) {
-        // Get unique seed for this thread/call
-        seed = base_seed + global_key_counter++;
-    }
-
     // Suppress deprecation warnings for OpenSSL 3.x
 #if OPENSSL_VERSION_MAJOR >= 3
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-    // Store original RNG method for restoration (only once)
-    if (!original_rng_method) {
-        original_rng_method = RAND_get_rand_method();
-    }
-
+    // Store original RNG method for restoration
+    current_ossl_rnd = RAND_get_rand_method();
     // Set deterministic RNG for generation
     RAND_set_rand_method(&stdlib_rand_meth);
-    RAND_seed(&seed, sizeof(Ipp32u));
 
+    RAND_seed(&seed, sizeof(Ipp32u));
 #if OPENSSL_VERSION_MAJOR >= 3
 #pragma GCC diagnostic pop
 #endif
-    // DON'T unlock here - keep RNG locked during key generation
 }
 
-static void restore_original_rng_protected()
+static void restore_original_rng()
 {
 #if OPENSSL_VERSION_MAJOR >= 3
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-    // Restore original RNG method
-    if (original_rng_method) {
-        RAND_set_rand_method(original_rng_method);
-        // Don't reset original_rng_method to NULL - we might need it again
+    if (current_ossl_rnd) {
+        // Restore original RNG method
+        RAND_set_rand_method(current_ossl_rnd);
+        current_ossl_rnd = NULL;
     }
 #if OPENSSL_VERSION_MAJOR >= 3
 #pragma GCC diagnostic pop
 #endif
-    // Unlock mutex after key generation is complete
-    pthread_mutex_unlock(&rng_mutex);
 }
 #endif
 
