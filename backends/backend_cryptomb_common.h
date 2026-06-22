@@ -144,10 +144,7 @@ static EVP_PKEY* openssl_generate_keys_bn(BIGNUM* priv_key, BIGNUM* pubx_key, BI
     EVP_PKEY* keyA = NULL;
     BN_CTX* ctx = BN_CTX_new();
 
-    printf("openssl_generate_keys_bn\n");
-
 #ifdef DETERMINISTIC_KEY_GEN
-    printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
     set_drng_to_gen_rep_seq(777);
 #endif
 
@@ -293,12 +290,9 @@ static ECDSA_SIG* openssl_generate_signature(int8u* msg_buffer, int msg_byte_siz
     ECDSA_SIG* sign = 0;
     (void)key;
 
-    printf("openssl_generate_signature\n");
-
     EVP_PKEY_CTX *sign_ctx = NULL;
 
 #ifdef DETERMINISTIC_KEY_GEN
-    printf("***** DETERMINISTIC_KEY_GEN is enabled *****\n");
     set_drng_to_gen_rep_seq(888);
 #endif
 
@@ -399,7 +393,7 @@ static int8u* wsp_str(int8u* tofrom, int len)
 }
 
 /* Generate OpenSSL RSA key */
-static int openssl_generate_rsa_key(EVP_PKEY** rsa_pkey, BIGNUM* bn_e, unsigned int rsaBitsize) {
+static int openssl_generate_rsa_key(EVP_PKEY* rsa, BIGNUM* bn_e, unsigned int rsaBitsize) {
     int ret = 1;
 
     EVP_PKEY_CTX *pctx = NULL;
@@ -419,7 +413,7 @@ static int openssl_generate_rsa_key(EVP_PKEY** rsa_pkey, BIGNUM* bn_e, unsigned 
     ret = EVP_PKEY_CTX_set_rsa_keygen_pubexp(pctx, bn_e) & ret;
 #endif
 
-    ret = EVP_PKEY_keygen(pctx, rsa_pkey) & ret;
+    ret = EVP_PKEY_keygen(pctx, &rsa) & ret;
 
     EVP_PKEY_CTX_free(pctx);
 
