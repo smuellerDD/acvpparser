@@ -1028,7 +1028,7 @@ static int ippcp_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32_t 
     if (!init->dkm.len) {
         alloc_buf(IPPCP_BITS2BYTES(keyBitlen), &init->dkm);
 #ifdef DETERMINISTIC_KEY_GEN
-        set_drng_to_gen_rep_seq_protected(777, 0);
+        set_drng_to_gen_rep_seq(777);
 #endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
 
@@ -1038,7 +1038,7 @@ static int ippcp_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32_t 
         */
         init->dkm.buf[0] &= ~0x80;
 #ifdef DETERMINISTIC_KEY_GEN
-        restore_original_rng_protected();
+        restore_original_rng();
 #endif
     }
     dkm_p = &init->dkm; (void)dkm_p;
