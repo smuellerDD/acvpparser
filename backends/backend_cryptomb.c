@@ -593,7 +593,7 @@ typedef struct {
     ed25519_private_key* priv_key_;
 } eddsaKeyPair;
 
-static int  cryptomb_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve, void **privkey)
+static int cryptomb_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve, void **privkey)
 {
     (void)qbuf; (void)curve; (void)privkey;
     int ret = 0;
@@ -610,9 +610,17 @@ static int  cryptomb_eddsa_keygen_en(struct buffer *qbuf, uint64_t curve, void *
     EVP_PKEY_CTX* key_ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_ED25519, NULL); //get EVP_PKEY context
     EVP_PKEY_keygen_init(key_ctx); // init EVP_PKEY context
 
+#ifdef DETERMINISTIC_KEY_GEN
+    set_drng_to_gen_rep_seq(777);
+#endif
+
     // generate key pair using OpenSSL
     int evpres = EVP_PKEY_keygen(key_ctx, &key);
     CKNULL_LOG((evpres == 1), evpres, "Error in EVP_PKEY_keygen")
+
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
+#endif
 
     EVP_PKEY_CTX_free(key_ctx);
     key_ctx = NULL;
@@ -670,11 +678,19 @@ static int cryptomb_eddsa_keygen(struct eddsa_keygen_data *data, flags_t parsed_
       priv_key, priv_key, priv_key, priv_key
    };
 
+#ifdef DETERMINISTIC_KEY_GEN
+    set_drng_to_gen_rep_seq(888);
+#endif
+
     // generate key pair using OpenSSL
     int evpres = EVP_PKEY_keygen(key_ctx, &key);
-    if(1!=evpres) {
+    if (1 != evpres) {
         logger(LOGGER_ERR, "Error in EVP_PKEY_keygen\n");
     }
+
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
+#endif
 
     // extract private and public kyes considered as "known"
     size_t privale_len = 32;
@@ -846,6 +862,9 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
     left_pad_buf(&init->n, modBytelen);
     if (!init->dkm.len) {
         alloc_buf(keyBitlen >> 3, &init->dkm);
+#ifdef DETERMINISTIC_KEY_GEN
+        set_drng_to_gen_rep_seq(777);
+#endif
         RAND_bytes(init->dkm.buf, (int)init->dkm.len);
 
         /*
@@ -853,6 +872,9 @@ static int cryptomb_rsa_kas_ifc_encrypt_common(struct kts_ifc_data *data, uint32
         * not too large.
         */
         init->dkm.buf[0] &= ~0x80;
+#ifdef DETERMINISTIC_KEY_GEN
+        restore_original_rng();
+#endif
     }
     dkm_p = &init->dkm;
     c_p = &init->iut_c;
@@ -942,7 +964,7 @@ static void cryptomb_kts_ifc_backend(void)
 }
 
 /****************************************************
- * RSA priv exponent testing - rsa decrypt privitive
+ * RSA priv exponent testing - rsa decrypt primitive
  ****************************************************/
 static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **privkey, struct buffer *nbuf) {
     int ret = 0;
@@ -957,11 +979,34 @@ static int cryptomb_rsa_keygen_en(struct buffer *ebuf, uint32_t modulus, void **
 
     int rsaBitsize = modulus;
 
+#ifdef DETERMINISTIC_KEY_GEN
+    // A counter to generate different key for each call
+    static int key_counter = 0;
+    // Generate different key for each call
+    set_drng_to_gen_rep_seq(1000 + key_counter++);
+#endif
+
     ret = openssl_generate_rsa_key(rsa, bn_e, rsaBitsize);
     CKNULL_LOG((ret == 1), ret, "Error in openssl_generate_rsa_key")
 
+#ifdef DETERMINISTIC_KEY_GEN
+    restore_original_rng();
+#endif
+
+#if OPENSSL_VERSION_MAJOR >= 3
     EVP_PKEY_get_bn_param(rsa, "n", &n);
     EVP_PKEY_get_bn_param(rsa, "e", &egen);
+#else
+    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa);
+
+    const BIGNUM *rsa_n, *rsa_e, *rsa_d;
+    RSA_get0_key(rsa_key, &rsa_n, &rsa_e, &rsa_d);
+
+    if (rsa_n != NULL && rsa_e != NULL) {
+        BN_copy(n, rsa_n);
+        BN_copy(egen, rsa_e);
+    }
+#endif
 
     /* Store n and e in output buffers */
     alloc_buf(BN_num_bytes(egen), ebuf);
@@ -1082,6 +1127,8 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
     BIGNUM *bn_dp = BN_new();
     BIGNUM *bn_dq = BN_new();
     BIGNUM *bn_qinvp = BN_new();
+
+#if OPENSSL_VERSION_MAJOR >= 3
     EVP_PKEY_get_bn_param(rsa, "n", &bn_n);
     EVP_PKEY_get_bn_param(rsa, "e", &bn_e);
     EVP_PKEY_get_bn_param(rsa, "d", &bn_d);
@@ -1090,6 +1137,33 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
     EVP_PKEY_get_bn_param(rsa, "rsa-exponent1", &bn_dp);
     EVP_PKEY_get_bn_param(rsa, "rsa-exponent2", &bn_dq);
     EVP_PKEY_get_bn_param(rsa, "rsa-coefficient1", &bn_qinvp);
+#else
+    RSA *rsa_key = EVP_PKEY_get0_RSA(rsa);
+    if (rsa_key) {
+        // Get public key components (n, e)
+        const BIGNUM *rsa_n, *rsa_e, *rsa_d;
+        RSA_get0_key(rsa_key, &rsa_n, &rsa_e, &rsa_d);
+
+        if (rsa_n) BN_copy(bn_n, rsa_n);
+        if (rsa_e) BN_copy(bn_e, rsa_e);
+        if (rsa_d) BN_copy(bn_d, rsa_d);
+
+        // Get private key factors (p, q)
+        const BIGNUM *rsa_p, *rsa_q;
+        RSA_get0_factors(rsa_key, &rsa_p, &rsa_q);
+
+        if (rsa_p) BN_copy(bn_p, rsa_p);
+        if (rsa_q) BN_copy(bn_q, rsa_q);
+
+        // Get CRT parameters (dp, dq, qinv)
+        const BIGNUM *rsa_dp, *rsa_dq, *rsa_qinv;
+        RSA_get0_crt_params(rsa_key, &rsa_dp, &rsa_dq, &rsa_qinv);
+
+        if (rsa_dp) BN_copy(bn_dp, rsa_dp);
+        if (rsa_dq) BN_copy(bn_dq, rsa_dq);
+        if (rsa_qinv) BN_copy(bn_qinvp, rsa_qinv);
+    }
+#endif
 
     /* Convert bignumms to strings */
     for(int i = 0; i < MBX_NUM_BUFFERS; i++) {
@@ -1119,7 +1193,7 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
     BIGNUM *bn_msg = BN_new();
     BN_bin2bn(data->msg.buf, data->msg.len, bn_msg);
     int cmp_bn_res = BN_cmp(bn_msg, bn_n);
-    if(cmp_bn_res == 1){
+    if (cmp_bn_res == 1) {
         logger(LOGGER_WARN, "Error, message is bigger than modulus\n");
         data->dec_result = 0;
         goto out;
@@ -1153,7 +1227,7 @@ cryptomb_rsa_decryption_primitive(struct rsa_decryption_primitive_data *data, fl
         }
     }
 
-    if(!ret) {
+    if (!ret) {
         data->dec_result = 0;
     }
     else{

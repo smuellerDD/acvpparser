@@ -336,7 +336,7 @@ out:
 	case CB_TYPE_##name :						       \
 	{								       \
 		const struct name ## _callback *cb = &callback->callback.name ;\
-		if (cb && cb->helper) {					       \
+		if (cb && cb->helper && cb->fn) {					       \
 			CKINT(cb->helper(processdata, parsed_flags, testvector,\
 					 testresults, cb->fn, cb->vector));    \
 		} else if (cb && cb->fn) {				       \

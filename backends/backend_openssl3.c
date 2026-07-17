@@ -511,15 +511,19 @@ out:
 static int openssl_hmac_generate(struct hmac_data *data)
 {
 	const EVP_MD *md = NULL;
+	const char *mdname;
 	int ret = 0;
 
 	logger_binary(LOGGER_DEBUG, data->msg.buf, data->msg.len, "msg");
 	logger_binary(LOGGER_DEBUG, data->key.buf, data->key.len, "key");
 
 	CKINT(openssl_md_convert(data->cipher, &md));
+	mdname = OBJ_nid2sn(EVP_MD_get_type(md));
+	if (!mdname)
+		mdname = EVP_MD_name(md);
 
 	if (openssl_mac_generate_helper(data, "HMAC", OSSL_MAC_PARAM_DIGEST,
-		(char *)EVP_MD_name(md)))
+		(char *)mdname))
 	{
 		ret = -EFAULT;
 		goto out;
