@@ -2348,6 +2348,8 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 		return -EOPNOTSUPP;
 	}
 
+	int externalMu = (data->mu.len > 0);
+
 	CKNULL_LOG((ippcp_ml_dsa_type(data->cipher, &type) == ippStsNoErr), -EINVAL, "Unknown ML-DSA parameter set")
 
 	sts = ippsMLDSA_GetSize(&stateSize);
@@ -2356,10 +2358,15 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
 	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
 
-	sts = ippsMLDSA_Init(pState, data->msg.len, type);
+	sts = ippsMLDSA_Init(pState,
+			     externalMu ? IPPCP_MLDSA_NO_MESSAGE : data->msg.len,
+			     type);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
 
-	sts = ippsMLDSA_VerifyBufferGetSize(&scratchSize, pState);
+	if (externalMu)
+		sts = ippsMLDSA_Verify_Mu_BufferGetSize(&scratchSize, pState);
+	else
+		sts = ippsMLDSA_VerifyBufferGetSize(&scratchSize, pState);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_VerifyBufferGetSize")
 
 	CKINT(alloc_buf(scratchSize + IPPCP_MLDSA_ALIGNMENT, &scratchBuf));
@@ -2377,10 +2384,14 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	memcpy(pPk, data->pk.buf, info.publicKeySize);
 	memcpy(pSig, data->sig.buf, info.signatureSize);
 
-	sts = ippsMLDSA_Verify(data->msg.buf, data->msg.len,
-			       data->context.len ? data->context.buf : NULL,
-			       data->context.len,
-			       pPk, pSig, &isValid, pState, pScratch);
+	if (externalMu)
+		sts = ippsMLDSA_Verify_Mu(data->mu.buf, pPk, pSig, &isValid,
+					  pState, pScratch);
+	else
+		sts = ippsMLDSA_Verify(data->msg.buf, data->msg.len,
+				       data->context.len ? data->context.buf : NULL,
+				       data->context.len,
+				       pPk, pSig, &isValid, pState, pScratch);
 
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Verify")
 
