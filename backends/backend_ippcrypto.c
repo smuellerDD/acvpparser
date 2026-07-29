@@ -2281,7 +2281,7 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	CKINT(alloc_buf(stateSize + IPPCP_MLDSA_ALIGNMENT, &stateBuf));
 	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
 
-	sts = ippsMLDSA_Init(pState, data->msg.len, type);
+	sts = ippsMLDSA_Init(pState, (Ipp32s)data->msg.len, type);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
 
 	sts = ippsMLDSA_SignBufferGetSize(&scratchSize, pState);
@@ -2310,7 +2310,7 @@ static int ippcp_ml_dsa_siggen(struct ml_dsa_siggen_data *data,
 	Ipp8u* pSk = (Ipp8u*)(IPP_ALIGNED_PTR(sk_aligned.buf, IPPCP_MLDSA_ALIGNMENT));
 	memcpy(pSk, data->sk.len ? data->sk.buf : (Ipp8u*)data->privkey, info.privateKeySize);
 
-	sts = ippsMLDSA_Sign(data->msg.buf, data->msg.len,
+	sts = ippsMLDSA_Sign(data->msg.buf, (Ipp32s)data->msg.len,
 			     data->context.len ? data->context.buf : NULL,
 			     data->context.len,
 			     pSk, pSig, pState, pScratch, rndFunc, pRndParam);
@@ -2359,7 +2359,7 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 	IppsMLDSAState* pState = (IppsMLDSAState*)(IPP_ALIGNED_PTR(stateBuf.buf, IPPCP_MLDSA_ALIGNMENT));
 
 	sts = ippsMLDSA_Init(pState,
-			     externalMu ? IPPCP_MLDSA_NO_MESSAGE : data->msg.len,
+			     externalMu ? IPPCP_MLDSA_NO_MESSAGE : (Ipp32s)data->msg.len,
 			     type);
 	CKNULL_LOG((sts == ippStsNoErr), sts, "Error in ippsMLDSA_Init")
 
@@ -2388,7 +2388,7 @@ static int ippcp_ml_dsa_sigver(struct ml_dsa_sigver_data *data,
 		sts = ippsMLDSA_Verify_Mu(data->mu.buf, pPk, pSig, &isValid,
 					  pState, pScratch);
 	else
-		sts = ippsMLDSA_Verify(data->msg.buf, data->msg.len,
+		sts = ippsMLDSA_Verify(data->msg.buf, (Ipp32s)data->msg.len,
 				       data->context.len ? data->context.buf : NULL,
 				       data->context.len,
 				       pPk, pSig, &isValid, pState, pScratch);
