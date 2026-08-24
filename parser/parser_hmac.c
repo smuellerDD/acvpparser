@@ -125,6 +125,38 @@ out:
 }
 #endif
 
+/*
+ * The macLen field location depends on the ACVP revision of the request:
+ *   - Revision 1.0: macLen is a test-group-wide value.
+ *   - Revision 2.0: the group carries only tgId/testType/tests, macLen is
+ *     specified per test case.
+ * Both locations are parsed as optional (FLAG_OPTIONAL). This helper
+ * runs once per test case, after both the group and test-case entries have been
+ * parsed, and enforces that a macLen value was supplied by one of the two
+ * locations before the backend is invoked. 
+ * keyLen and msgLen is not parsed here.
+ */
+static int hmac_maclen_helper(const struct json_array *processdata,
+			      flags_t parsed_flags,
+			      struct json_object *testvector,
+			      struct json_object *testresults,
+			      int (*callback)(struct hmac_data *vector,
+					      flags_t parsed_flags),
+			      struct hmac_data *vector)
+{
+	(void)processdata;
+	(void)testvector;
+	(void)testresults;
+
+	if (!vector->maclen) {
+		logger(LOGGER_ERR,
+		       "HMAC: macLen not found in test group or test case\n");
+		return -EINVAL;
+	}
+
+	return callback(vector, parsed_flags);
+}
+
 static int hmac_tester(struct json_object *in, struct json_object *out,
 		      uint64_t cipher)
 {
@@ -136,7 +168,7 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	}
 
 	/* Referencing the backend functions */
-	const struct hmac_callback hmac = { hmac_backend->hmac_generate, &vector, NULL};
+	const struct hmac_callback hmac = { hmac_backend->hmac_generate, &vector, hmac_maclen_helper};
 	const struct json_callback hmac_callback[] = {
 		{ .callback.hmac = hmac, CB_TYPE_hmac, FLAG_OP_AFT},
 	};
@@ -158,6 +190,8 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	const struct json_entry hmac_test_entries[] = {
 		{"msg",		{.data.buf = &vector.msg, PARSER_BIN},	FLAG_OP_AFT},
 		{"key",		{.data.buf = &vector.key, PARSER_BIN},	FLAG_OP_AFT},
+		/* Revision 2.0: macLen is specified per test case. */
+		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT | FLAG_OPTIONAL},
 	};
 	const struct json_array hmac_test = SET_ARRAY(hmac_test_entries, &hmac_testresult);
 
@@ -169,7 +203,8 @@ static int hmac_tester(struct json_object *in, struct json_object *out,
 	 * the testresult entry is set to NULL.
 	 */
 	const struct json_entry mac_testgroup_entries[] = {
-		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT},
+		/* Revision 1.0: macLen is a test-group-wide value. */
+		{"macLen",	{.data.integer = &vector.maclen, PARSER_UINT},	FLAG_OP_AFT | FLAG_OPTIONAL},
 		{"tests",	{.data.array = &hmac_test, PARSER_ARRAY},	FLAG_OP_AFT},
 	};
 	const struct json_array mac_testgroup = SET_ARRAY(mac_testgroup_entries, NULL);
