@@ -34,7 +34,6 @@
 #include "parser_drbg.h"
 #include "parser_dsa.h"
 #include "parser_ecdh.h"
-#include "parser_ecdh_ed.h"
 #include "parser_ecdsa.h"
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
@@ -59,6 +58,7 @@
 #include "parser_ml_dsa.h"
 #include "parser_ml_kem.h"
 #include "parser_slh_dsa.h"
+#include "parser_xecdh.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -224,8 +224,6 @@ DEF_CALLBACK_TYPE(dsa_siggen)
 DEF_CALLBACK_TYPE(dsa_sigver)
 DEF_CALLBACK_TYPE(ecdh_ss)
 DEF_CALLBACK_TYPE(ecdh_ss_ver)
-DEF_CALLBACK_TYPE(ecdh_ed_ss)
-DEF_CALLBACK_TYPE(ecdh_ed_ss_ver)
 DEF_CALLBACK_TYPE(ecdsa_keygen)
 DEF_CALLBACK_TYPE(ecdsa_keygen_extra)
 DEF_CALLBACK_TYPE(ecdsa_pkvver)
@@ -267,6 +265,9 @@ DEF_CALLBACK_TYPE(ml_kem_enc_check)
 DEF_CALLBACK_TYPE(slh_dsa_keygen)
 DEF_CALLBACK_TYPE(slh_dsa_siggen)
 DEF_CALLBACK_TYPE(slh_dsa_sigver)
+DEF_CALLBACK_TYPE(xecdh_keygen)
+DEF_CALLBACK_TYPE(xecdh_keyver)
+DEF_CALLBACK_TYPE(xecdh_ssc)
 
 /**
  * @brief json_callback specifies one generic callback. It therefore wraps the
@@ -301,8 +302,6 @@ enum {
 	CB_TYPE_dsa_sigver,
 	CB_TYPE_ecdh_ss,
 	CB_TYPE_ecdh_ss_ver,
-	CB_TYPE_ecdh_ed_ss,
-	CB_TYPE_ecdh_ed_ss_ver,
 	CB_TYPE_ecdsa_keygen,
 	CB_TYPE_ecdsa_keygen_extra,
 	CB_TYPE_ecdsa_pkvver,
@@ -346,6 +345,9 @@ enum {
 	CB_TYPE_slh_dsa_keygen,
 	CB_TYPE_slh_dsa_siggen,
 	CB_TYPE_slh_dsa_sigver,
+	CB_TYPE_xecdh_keygen,
+	CB_TYPE_xecdh_keyver,
+	CB_TYPE_xecdh_ssc,
 };
 struct json_callback {
 	union {
@@ -371,8 +373,6 @@ struct json_callback {
 		struct dsa_sigver_callback dsa_sigver;
 		struct ecdh_ss_callback ecdh_ss;
 		struct ecdh_ss_ver_callback ecdh_ss_ver;
-		struct ecdh_ed_ss_callback ecdh_ed_ss;
-		struct ecdh_ed_ss_ver_callback ecdh_ed_ss_ver;
 		struct ecdsa_keygen_callback ecdsa_keygen;
 		struct ecdsa_keygen_extra_callback ecdsa_keygen_extra;
 		struct ecdsa_pkvver_callback ecdsa_pkvver;
@@ -414,6 +414,9 @@ struct json_callback {
 		struct slh_dsa_keygen_callback slh_dsa_keygen;
 		struct slh_dsa_siggen_callback slh_dsa_siggen;
 		struct slh_dsa_sigver_callback slh_dsa_sigver;
+		struct xecdh_keygen_callback xecdh_keygen;
+		struct xecdh_keyver_callback xecdh_keyver;
+		struct xecdh_ssc_callback xecdh_ssc;
 	} callback;
 	uint32_t cb_type;
 	flags_t flags;

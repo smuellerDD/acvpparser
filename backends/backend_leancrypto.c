@@ -169,8 +169,13 @@ static int lc_cipher_convert(struct sym_data *data, const struct lc_sym **impl)
 		default:
 			return -EINVAL;
 		}
+	} else if (envstr && !strncasecmp(envstr, "AESSBOX", 7)) {
+		logger(LOGGER_VERBOSE, "AES implementation: S-Box\n");
+		lc_init(LC_INIT_AES_SBOX);
+		goto default_impl;
 	} else {
 		logger(LOGGER_ERR, "AES implementation: default\n");
+default_impl:
 		switch(data->cipher) {
 		case ACVP_CBC:
 			*impl = lc_aes_cbc;
@@ -1720,6 +1725,8 @@ static int lc_eddsa_25519_keygen(struct eddsa_keygen_data *data,
 
 	(void)parsed_flags;
 
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
+
 	if (!(data->cipher & ACVP_CIPHERTYPE_ECC) ||
 	    data->cipher != ACVP_ED25519) {
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
@@ -1749,6 +1756,8 @@ static int lc_eddsa_25519_keygen_en(struct buffer *qbuf, uint64_t curve,
 		logger(LOGGER_ERR, "Curve 25519 only supported\n");
 		return -EINVAL;
 	}
+
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
 
 	CKINT(alloc_buf(LC_ED25519_PUBLICKEYBYTES, qbuf));
 
@@ -1782,6 +1791,8 @@ static int lc_eddsa_25519_siggen(struct eddsa_siggen_data *data,
 	}
 
 	CKNULL(sk, -EINVAL);
+
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
 
 	CKINT(alloc_buf(LC_ED25519_SIGBYTES, &data->signature));
 	if (data->prehash) {
@@ -1829,6 +1840,10 @@ static int lc_eddsa_25519_sigver(struct eddsa_sigver_data *data,
 		return -EINVAL;
 	}
 
+	ret = lc_init(LC_INIT_NON_PQC_ENABLED);
+	if (ret)
+		return ret;
+
 	memcpy(sig.sig, data->signature.buf, data->signature.len);
 	memcpy(pk.pk, data->q.buf, data->q.len);
 
@@ -1873,6 +1888,7 @@ static int lc_eddsa_448_keygen(struct eddsa_keygen_data *data,
 		return -EINVAL;
 	}
 
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
 	CKINT(alloc_buf(LC_ED448_PUBLICKEYBYTES, &data->q));
 	CKINT(alloc_buf(LC_ED448_SECRETKEYBYTES, &data->d));
 
@@ -1898,6 +1914,7 @@ static int lc_eddsa_448_keygen_en(struct buffer *qbuf, uint64_t curve,
 		return -EINVAL;
 	}
 
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
 	CKINT(alloc_buf(LC_ED448_PUBLICKEYBYTES, qbuf));
 
 	sk = acvp_calloc(1, sizeof(struct lc_ed448_sk));
@@ -1931,6 +1948,7 @@ static int lc_eddsa_448_siggen(struct eddsa_siggen_data *data,
 
 	CKNULL(sk, -EINVAL);
 
+	CKINT(lc_init(LC_INIT_NON_PQC_ENABLED));
 	CKINT(alloc_buf(LC_ED448_SIGBYTES, &data->signature));
 	if (data->prehash) {
 		uint8_t digest[LC_SHA512_SIZE_DIGEST];
@@ -1977,6 +1995,10 @@ static int lc_eddsa_448_sigver(struct eddsa_sigver_data *data,
 		logger(LOGGER_ERR, "Wrong key size\n");
 		return -EINVAL;
 	}
+
+	ret = lc_init(LC_INIT_NON_PQC_ENABLED);
+	if (ret)
+		return ret;
 
 	memcpy(sig.sig, data->signature.buf, data->signature.len);
 	memcpy(pk.pk, data->q.buf, data->q.len);

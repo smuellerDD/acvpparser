@@ -211,7 +211,7 @@ int openssl_hash(const EVP_MD *md,
 		 uint8_t *in4, size_t in4len,
 		 uint8_t *out, unsigned int *outlen);
 
-int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name);
+int openssl_ecc_curves(uint64_t curve, int *out_nid, char **curve_name);
 
 int openssl_eddsa_curves(uint64_t curve, uint32_t prehash,
 			 int *out_nid, char **curve_name, char **instance_name);

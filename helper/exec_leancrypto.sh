@@ -32,7 +32,7 @@
 MODULE_PREFIX="leancrypto__"
 MODULE_POSTFIX="_"
 
-EXEC="without_PAA_-_C_implementation"
+EXEC="without_PAA_-_C_implementation without_PAA_-_SBOX_implementation"
 
 if [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	EXEC="$EXEC
@@ -49,6 +49,7 @@ elif [ $(uname -m) = "x86_64" ]; then
 fi
 
 CIPHER_CALL_without_PAA__C_implementation="LC_AES=\"C\" LC_AES_GCM=\"C\" LC_SHA3=\"C\" LC_DILITHIUM=\"C\" LC_KYBER=\"C\""
+CIPHER_CALL_without_PAA__SBOX_implementation="LC_AES=\"AESSBOX\" LC_AES_GCM=\"C\" LC_SHA3=\"C\" LC_DILITHIUM=\"C\" LC_KYBER=\"C\""
 CIPHER_CALL_without_PAA__AVX2_implementation="LC_SHA3=\"AVX2\" LC_DILITHIUM=\"common\" LC_KYBER=\"common\""
 CIPHER_CALL_without_PAA__AVX512_implementation="LC_SHA3=\"AVX512\" LC_DILITHIUM=\"common\" LC_KYBER=\"common\""
 CIPHER_CALL_with_PAA__AESNI_implementation="LC_SHA3=\"AESNI\" LC_AES=\"AESNI\" LC_DILITHIUM=\"common\" LC_KYBER=\"common\""

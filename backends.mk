@@ -312,6 +312,7 @@ ifneq (,$(filter ippcrypto,$(MAKECMDGOALS)))
 		CFLAGS += -DDETERMINISTIC_KEY_GEN -D_NO_IPP_DEPRECATED
 	endif
 
+
 	# Static link for lnx
 	ifeq ($(UNAME_S),Linux)
 		LDFLAGS += $(IPPCRYPTOROOT)/lib/libippcp.a

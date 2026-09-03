@@ -54,7 +54,7 @@ CIPHER_CALL_FFC_DH="OPENSSL_ACVP_DH_KEYGEN=1"
 #	Common implementations
 
 # See lib/module_implementations/definition_impl_openssl.c in acvpproxy
-EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2 EDDSA_3_4 KBKDF_3_1 PQC"
+EXEC_COMMON="TDES_C KBKDF KDA ECDSA_K_B ECDSA_SHA3_K_B ECDH_K_B TLS_v1_3 FFC_DH DRBG_3 EDDSA EDDSA_3_2 EDDSA_3_4 KBKDF_3_1 PQC XECDH"
 
 if [ $(uname -m) = "s390x" ]; then
 	#	Implementations for s390x

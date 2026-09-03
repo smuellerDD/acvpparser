@@ -113,7 +113,8 @@ static const struct { char *algo; char *mode; uint64_t cipher; } conv[] = {
 	{"KAS-FFC-SSC", NULL, ACVP_KAS_FFC_R3_SSC},
 	{"KAS-FFC", NULL, ACVP_DH},
 	{"KAS-IFC-SSC", NULL, ACVP_KAS_IFC_SSC},
-	{"KAS-ED", NULL, ACVP_ECDH_ED},
+
+	{"XECDH", NULL, ACVP_XECDH},
 
 	{"kdf-components", NULL, ACVP_KDF_COMPONENT},
 	{"PBKDF", NULL, ACVP_PBKDF},
@@ -152,6 +153,8 @@ static const struct { char *algo; char *mode; uint64_t cipher; } conv[] = {
 
 	{"ED-25519", NULL, ACVP_ED25519},
 	{"ED-448", NULL, ACVP_ED448},
+	{"Curve25519", NULL, ACVP_CURVE25519},
+	{"Curve448", NULL, ACVP_CURVE448},
 
 	{"KTS-IFC", NULL, ACVP_KTS_IFC},
 	/* KTS schema */
@@ -388,6 +391,14 @@ void ecdsa_get_bufferlen(uint64_t curve, size_t *dlen,
 			*dlen = 66;
 			*xlen = 66;
 			*ylen = 66;
+			break;
+		case ACVP_ED25519:
+			*xlen = 32;
+			*dlen = 32;
+			break;
+		case ACVP_ED448:
+			*dlen = 57;
+			*xlen = 57;
 			break;
 		default:
 			logger(LOGGER_WARN,

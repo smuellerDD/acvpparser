@@ -34,7 +34,6 @@
 #include "parser_drbg.h"
 #include "parser_dsa.h"
 #include "parser_ecdh.h"
-#include "parser_ecdh_ed.h"
 #include "parser_ecdsa.h"
 #include "parser_eddsa.h"
 #include "parser_hmac.h"
@@ -61,6 +60,7 @@
 #include "parser_ml_dsa.h"
 #include "parser_ml_kem.h"
 #include "parser_slh_dsa.h"
+#include "parser_xecdh.h"
 
 #include "safeprimes.h"
 

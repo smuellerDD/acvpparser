@@ -3,6 +3,7 @@ v2.1,8
 - enhancement: add ACVP-Proto, incl. leancrypto kernel tester
 - enhancement: add ML-DSA, ML-KEM parser
 - enhancement: leancrypto - add ML-KEM, ML-DSA
+- fix: Update parsers to support current ACVP test vector versions
 
 v2.1.7
 - enhancement: leancrypto - add EDDSA

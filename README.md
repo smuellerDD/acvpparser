@@ -104,6 +104,21 @@ exist.
 
 Example: To compile the OpenSSL support, invoke: `make openssl`.
 
+## Building on AIX
+
+- Download and install the necessary package:
+
+	* gcc, gcc-cpp, libgcc, gcc13, gcc13-cpp, libgcc13
+	* gmp, libstdcplusplus, libstdcplusplus13
+	* libmpc, libzstd, mpfr, sed, zlib
+	* gettext, libiconv, make
+
+- Set the PATH: `export PATH="/opt/freeware/bin:$PATH"`
+
+- Obtain `getopt.c` and `getopt.h` and place them in the `parser/` directory.
+
+- Build the backend as follows (assuming 64-bit): `CC="gcc -maix64" gmake ...`
+
 ## Building on Windows using MSYS2 (recommended)
 
 - Download and install MSYS2 using the instructions on https://www.msys2.org/

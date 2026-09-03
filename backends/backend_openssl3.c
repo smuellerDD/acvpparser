@@ -1072,7 +1072,7 @@ openssl_ecdh_ss_common(uint64_t cipher,
 
 	bld = OSSL_PARAM_BLD_new();
 
-	CKINT_LOG(openssl_ecdsa_curves(cipher, &nid, &curve_name),
+	CKINT_LOG(openssl_ecc_curves(cipher, &nid, &curve_name),
 			"Conversion of curve failed\n");
 	OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME,
 					curve_name, 0);
@@ -1242,6 +1242,217 @@ ACVP_DEFINE_CONSTRUCTOR(openssl_ecdh_backend)
 static void openssl_ecdh_backend(void)
 {
 	register_ecdh_impl(&openssl_ecdh);
+}
+
+/************************************************
+ * XECDH cipher interface functions
+ ************************************************/
+static int _openssl_xecdh_keygen(uint64_t curve, EVP_PKEY **key)
+{
+	EVP_PKEY_CTX *ctx = NULL;
+	int nid = 0;
+	char *curve_name;
+	int ret = 0;
+
+	CKINT_LOG(openssl_ecc_curves(curve,  &nid, &curve_name),
+		  "Conversion of curve failed\n");
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
+	CKNULL(ctx, -ENOMEM);
+	CKINT_O(EVP_PKEY_keygen_init(ctx));
+	CKINT_O_LOG(EVP_PKEY_keygen(ctx, key), "EVP_PKEY_keygen() failed\n");
+
+out:
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_xecdh_keygen(struct xecdh_keygen_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	int ret = 0;
+
+	(void)parsed_flags;
+
+	CKINT(_openssl_xecdh_keygen(data->cipher, &key));
+
+	CKINT(openssl_pkey_get_octet_bytes(key, OSSL_PKEY_PARAM_PRIV_KEY,
+					   &data->private_key));
+	CKINT(openssl_pkey_get_octet_bytes(key, OSSL_PKEY_PARAM_PUB_KEY,
+					   &data->public_key));
+
+	logger_binary(LOGGER_DEBUG,
+		      data->private_key.buf, data->private_key.len, "private");
+	logger_binary(LOGGER_DEBUG,
+		      data->public_key.buf, data->public_key.len, "public");
+
+out:
+	if (key)
+		EVP_PKEY_free(key);
+	return ret;
+}
+
+static int openssl_xecdh_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
+				     struct buffer *public_key)
+{
+	int nid = 0;
+	char *curve_name;
+	EVP_PKEY_CTX *ctx = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	OSSL_PARAM *params = NULL;
+	int ret = 0;
+
+	CKINT(openssl_ecc_curves(cipher, &nid, &curve_name));
+
+	logger_binary(LOGGER_DEBUG, public_key->buf, public_key->len, "public");
+
+	bld = OSSL_PARAM_BLD_new();
+	OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY,
+					 public_key->buf, public_key->len);
+	params = OSSL_PARAM_BLD_to_param(bld);
+
+	ctx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
+	EVP_PKEY_fromdata_init(ctx);
+	if (EVP_PKEY_fromdata(ctx, pkey, EVP_PKEY_PUBLIC_KEY, params) == 1)
+		ret = 1;
+
+out:
+	if(params)
+		OSSL_PARAM_free(params);
+	if (bld)
+		OSSL_PARAM_BLD_free(bld);
+	if (ctx)
+		EVP_PKEY_CTX_free(ctx);
+	return ret;
+}
+
+static int openssl_xecdh_keyver(struct xecdh_keyver_data *data,
+				flags_t parsed_flags)
+{
+	EVP_PKEY *key = NULL;
+	int ret;
+
+	(void)parsed_flags;
+
+	ret = openssl_xecdh_create_pkey(&key, data->cipher, &data->public_key);
+
+	if (ret) {
+		logger(LOGGER_DEBUG, "XECDH key successfully verified\n");
+		data->keyver_success = 1;
+	} else {
+		logger(LOGGER_DEBUG, "XECDH key verification failed\n");
+		data->keyver_success = 0;
+	}
+	ret = 0;
+
+	if (key)
+		EVP_PKEY_free(key);
+	return ret;
+}
+
+static int openssl_xecdh_ssc(struct xecdh_ssc_data *data, flags_t parsed_flags)
+{
+	int nid = 0, ret = 0;
+	EVP_PKEY_CTX *kactx = NULL, *dctx = NULL;
+	EVP_PKEY *pkey = NULL, *remotekey = NULL;
+	OSSL_PARAM *params = NULL;
+	OSSL_PARAM *params_remote = NULL;
+	OSSL_PARAM_BLD *bld = NULL;
+	char *curve_name;
+
+	(void)parsed_flags;
+
+	CKINT_LOG(openssl_ecc_curves(data->cipher, &nid, &curve_name),
+		  "Conversion of curve failed\n");
+
+	pkey = EVP_PKEY_Q_keygen(NULL, NULL, curve_name);
+	CKNULL_LOG(pkey, -EFAULT, "EVP_PKEY_Q_keygen failed\n");
+
+	CKINT(openssl_pkey_get_octet_bytes(pkey, OSSL_PKEY_PARAM_PUB_KEY,
+					   &data->public_iut));
+
+	logger_binary(LOGGER_DEBUG, data->public_server.buf,
+		      data->public_server.len, "publicServer");
+
+	bld = OSSL_PARAM_BLD_new();
+
+	OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, 1);
+	OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY,
+					 data->public_server.buf,
+					 data->public_server.len);
+
+	params_remote = OSSL_PARAM_BLD_to_param(bld);
+	CKNULL_LOG(params_remote, -ENOMEM, "bld to param failed\n");
+	kactx = EVP_PKEY_CTX_new_from_name(NULL, curve_name, NULL);
+	CKNULL_LOG(kactx, -ENOMEM, "EVP_PKEY_CTX_new_from_name failed\n");
+
+	CKINT_O_LOG(EVP_PKEY_fromdata_init(kactx),
+				"EVP_PKEY_fromdata_init failed\n");
+	CKINT_O_LOG(EVP_PKEY_fromdata(kactx, &remotekey, EVP_PKEY_PUBLIC_KEY,
+				      params_remote),
+		    "EVP_PKEY_fromdata failed\n");
+	dctx = EVP_PKEY_CTX_new_from_pkey(NULL, pkey, NULL);
+	CKNULL_LOG(dctx, -ENOMEM, "EVP_PKEY_CTX_new_from_pkey failed\n");
+
+	ret = EVP_PKEY_derive_init(dctx);
+	if(ret <= 0) {
+		logger(LOGGER_ERR, "EVP_PKEY_derive_init filed: %d\n", ret);
+		goto out;
+	}
+	ret = EVP_PKEY_derive_set_peer(dctx, remotekey);
+	if(ret <= 0) {
+		logger(LOGGER_ERR, "EVP_PKEY_derive_set_peer filed: %d\n", ret);
+		goto out;
+	}
+	OSSL_PARAM_BLD_push_int(bld, OSSL_EXCHANGE_PARAM_EC_ECDH_COFACTOR_MODE,
+				1);
+	params = OSSL_PARAM_BLD_to_param(bld);
+	CKINT(EVP_PKEY_CTX_set_params(dctx, params));
+	ret = EVP_PKEY_derive(dctx, NULL, &data->z.len);
+	if(ret <= 0) {
+		logger(LOGGER_ERR, "EVP_PKEY_derive filed: %d\n", ret);
+		goto out;
+	}
+	CKINT(alloc_buf(data->z.len, &data->z));
+	ret = EVP_PKEY_derive(dctx, data->z.buf, &data->z.len);
+	if(ret <= 0) {
+		logger(LOGGER_ERR, "EVP_PKEY_derive filed: %d\n", ret);
+		goto out;
+	}
+	logger_binary(LOGGER_DEBUG, data->z.buf, data->z.len,
+		      "Generated shared secret");
+
+out:
+	if(pkey)
+		EVP_PKEY_free(pkey);
+	if(remotekey)
+		EVP_PKEY_free(remotekey);
+	if(kactx)
+		EVP_PKEY_CTX_free(kactx);
+	if(dctx)
+		EVP_PKEY_CTX_free(dctx);
+	if(params_remote)
+		OSSL_PARAM_free(params_remote);
+	if(params)
+		OSSL_PARAM_free(params);
+	if(bld)
+		OSSL_PARAM_BLD_free(bld);
+	return ret;
+}
+
+static struct xecdh_backend openssl_xecdh =
+{
+	openssl_xecdh_keygen,
+	openssl_xecdh_keyver,
+	openssl_xecdh_ssc,
+};
+
+ACVP_DEFINE_CONSTRUCTOR(openssl_xecdh_backend)
+static void openssl_xecdh_backend(void)
+{
+	register_xecdh_impl(&openssl_xecdh);
 }
 
 /************************************************
@@ -2665,7 +2876,7 @@ static int _openssl_ecdsa_keygen(uint64_t curve, EVP_PKEY **key)
 	char *curve_name;
 	int ret = 0;
 
-	CKINT_LOG(openssl_ecdsa_curves(curve, &nid , &curve_name),
+	CKINT_LOG(openssl_ecc_curves(curve, &nid , &curve_name),
 		  "Conversion of curve failed\n");
 
 	ctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
@@ -2720,7 +2931,7 @@ static int openssl_ecdsa_create_pkey(EVP_PKEY **pkey, uint64_t cipher,
 	size_t dlen, xlen, ylen;
 	int ret = 0;
 
-	CKINT(openssl_ecdsa_curves(cipher, &nid, &curve_name));
+	CKINT(openssl_ecc_curves(cipher, &nid, &curve_name));
 	ecdsa_get_bufferlen(cipher, &dlen, &xlen, &ylen);
 
 	CKINT(left_pad_buf(Qx, xlen));

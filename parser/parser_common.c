@@ -30,6 +30,21 @@
 # define strcasestr(haystack, needle) StrStrIA(haystack, needle)
 #endif
 
+#ifdef _AIX
+char *strcasestr(const char *haystack, const char *needle) {
+	size_t len = strlen(needle);
+	if (len == 0)
+		return (char *)haystack;
+
+	while (*haystack) {
+		if (strncasecmp(haystack, needle, len) == 0)
+			return (char *)haystack;
+		haystack++;
+	}
+	return NULL;
+}
+#endif
+
 /*
  * Match parsed entry with a search criteria
  * return 0 if match not found, 1 match found
@@ -409,8 +424,6 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(dsa_sigver)
 			CB_HANDLER(ecdh_ss)
 			CB_HANDLER(ecdh_ss_ver)
-			CB_HANDLER(ecdh_ed_ss)
-			CB_HANDLER(ecdh_ed_ss_ver)
 			CB_HANDLER(ecdsa_keygen)
 			CB_HANDLER(ecdsa_keygen_extra)
 			CB_HANDLER(ecdsa_pkvver)
@@ -452,6 +465,9 @@ static int exec_test(const struct json_array *processdata,
 			CB_HANDLER(slh_dsa_keygen)
 			CB_HANDLER(slh_dsa_siggen)
 			CB_HANDLER(slh_dsa_sigver)
+			CB_HANDLER(xecdh_keygen)
+			CB_HANDLER(xecdh_keyver)
+			CB_HANDLER(xecdh_ssc)
 		default:
 			logger(LOGGER_ERR,
 			       "Unknown function callback type %u\n",
@@ -605,6 +621,8 @@ static const struct parser_flagsconv flagsconv_testtype[]= {
 static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_ASYM_TYPE_SIGGEN, {.string = "sigGen"}, "Asymmetric signature generation"},
 	{FLAG_OP_ASYM_TYPE_SIGVER, {.string = "sigVer"}, "Asymmetric signature verification"},
+	{FLAG_OP_ASYM_TYPE_SSCGEN, {.string = "sscGen"}, "Asymmetric shared secret generation"},
+	{FLAG_OP_ASYM_TYPE_SSCVER, {.string = "sscVer"}, "Asymmetric shared secret verification"},
 	{FLAG_OP_ASYM_TYPE_KEYGEN, {.string = "keyGen"}, "Asymmetric key generation"},
 	{FLAG_OP_ASYM_TYPE_KEYVER, {.string = "keyVer"}, "Asymmetric key verification"},
 	{FLAG_OP_RSA_TYPE_LEGACY_SIGVER, {.string = "legacySigVer"},
@@ -631,6 +649,8 @@ static const struct parser_flagsconv flagsconv_mode[] = {
 	{FLAG_OP_KDF_TYPE_800_108_KMAC, {.string = "KMAC"}, "KBKDF KMAC"},
 
 	{FLAG_OP_ASYM_TYPE_ENCAPDECAP, {.string = "encapDecap"}, "ML-KEM encapsulation / decapsulation"},
+
+	{FLAG_OP_XECDH_TYPE_SSC, {.string = "SSC"}, "Shared secret computation"},
 
 	{0, {NULL}, NULL}
 };

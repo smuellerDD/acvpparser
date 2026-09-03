@@ -143,6 +143,9 @@ struct rsa_keygen_prov_prime_data {
 	struct buffer seed;
 	struct buffer e;
 	uint64_t cipher;
+	struct buffer dmp1;
+	struct buffer dmq1;
+	struct buffer iqmp;
 };
 
 /**

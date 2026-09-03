@@ -504,18 +504,17 @@ static int aead_ascon_tester(struct json_object *in, struct json_object *out,
 	const struct json_callbacks ascon_callbacks =
 		SET_CALLBACKS(ascon_callback);
 
-
 	/*
 	 * Define which test result data should be written to the test result
 	 * JSON file.
 	 */
 	const struct json_entry aead_testresult_entries[] = {
 		/* also write empty CT (in case we only perform auth tests) */
-		{"ct",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_ENC | FLAG_OP_AFT},
+		{"ct",		{.data.buf = &vector.data, WRITER_BIN_ALWAYS},	FLAG_OP_ENC | FLAG_OP_AFT},
 		{"tag",		{.data.buf = &vector.tag, WRITER_BIN},	FLAG_OP_ENC | FLAG_OP_AFT},
 
 		/* also write empty PT (in case we only perform auth tests) */
-		{"pt",		{.data.buf = &vector.data, WRITER_BIN},	FLAG_OP_DEC | FLAG_OP_AFT},
+		{"pt",		{.data.buf = &vector.data, WRITER_BIN_ALWAYS},	FLAG_OP_DEC | FLAG_OP_AFT},
 		{"testPassed",	{.data.integer = &vector.integrity_error, WRITER_BOOL_TRUE_TO_FALSE},	FLAG_OP_DEC | FLAG_OP_AFT},
 	};
 	const struct json_testresult aead_testresult = SET_ARRAY(aead_testresult_entries, &ascon_callbacks);

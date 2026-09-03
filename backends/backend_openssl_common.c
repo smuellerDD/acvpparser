@@ -615,7 +615,7 @@ out:
 	return ret;
 }
 
-int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
+int openssl_ecc_curves(uint64_t curve, int *out_nid, char **curve_name)
 {
 	int nid;
 	char *name;
@@ -681,6 +681,14 @@ int openssl_ecdsa_curves(uint64_t curve, int *out_nid, char **curve_name)
 		case ACVP_NISTP521:
 			nid = NID_secp521r1;
 			name = "P-521";
+			break;
+		case ACVP_CURVE25519:
+			nid = NID_X25519;
+			name = "X25519";
+			break;
+		case ACVP_CURVE448:
+			nid = NID_X448;
+			name = "X448";
 			break;
 		default:
 			logger(LOGGER_ERR, "Unknown curve\n");

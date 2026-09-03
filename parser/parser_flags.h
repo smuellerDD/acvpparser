@@ -77,6 +77,10 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_ASYM_TYPE_SIGGEN			(0x0000000000004000ULL)
 /* JSON field is expected for asymmetric sigVer operation */
 #define FLAG_OP_ASYM_TYPE_SIGVER			(0x0000000000008000ULL)
+/* JSON field is expected for asymmetric sscGen operation */
+#define FLAG_OP_ASYM_TYPE_SSCGEN			(0x0000000000004000ULL)
+/* JSON field is expected for asymmetric sscVer operation */
+#define FLAG_OP_ASYM_TYPE_SSCVER			(0x0000000000008000ULL)
 /* RSA: JSON field is expected for RSA legacy sigVer operation */
 #define FLAG_OP_RSA_TYPE_LEGACY_SIGVER			(0x0000000000010000ULL)
 /* RSA: JSON field is expected for RSA component signature primitive */
@@ -91,6 +95,8 @@ typedef uint64_t	flags_t;
 #define FLAG_OP_ML_KEM_TYPE_DECAPSULATION		(0x0000000000040000ULL)
 #define FLAG_OP_ML_KEM_TYPE_DEC_CHECK			(0x0000000000001000ULL)
 #define FLAG_OP_ML_KEM_TYPE_ENC_CHECK			(0x0000000000002000ULL)
+/* XECDH: JSON field is expected for XECDH SSC operation */
+#define FLAG_OP_XECDH_TYPE_SSC				(0x0000000000010000ULL)
 #define FLAG_OP_ASYM_TYPE_MASK				(0x00000000000ff000ULL)
 
 /* ML-DSA: JSON field is expected for ML-DSA deterministic siggen */

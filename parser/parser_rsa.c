@@ -585,15 +585,22 @@ static int rsa_tester(struct json_object *in, struct json_object *out,
 		{"n",	{.data.buf = &rsa_keygen_prov_prime_vector.n, WRITER_BIN},
 			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 		{"d",	{.data.buf = &rsa_keygen_prov_prime_vector.d, WRITER_BIN},
-			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
+			         FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES },
+		/* CRT key format specific data */
+		{"dmp1", {.data.buf = &rsa_keygen_prov_prime_vector.dmp1, WRITER_BIN},
+     				 FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
+		{"dmq1", {.data.buf = &rsa_keygen_prov_prime_vector.dmq1, WRITER_BIN},
+    				 FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
+		{"iqmp", {.data.buf = &rsa_keygen_prov_prime_vector.iqmp, WRITER_BIN},
+     				 FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OP_RSA_CRT},
 	};
 	const struct json_testresult rsa_keygen_prov_prime_testresult = SET_ARRAY(rsa_keygen_prov_prime_testresult_entries, &rsa_keygen_prov_prime_callbacks);
 
 	const struct json_entry rsa_keygen_prov_prime_test_entries[] = {
 		{"seed",{.data.buf = &rsa_keygen_prov_prime_vector.seed, PARSER_BIN},
-					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL },
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL | FLAG_OP_RSA_CRT },
 		{"e",	{.data.buf = &rsa_keygen_prov_prime_vector.e, PARSER_BIN},
-					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL },
+					FLAG_OP_ASYM_TYPE_KEYGEN | FLAG_OP_AFT | FLAG_OP_GDT | FLAG_OP_RSA_PQ_B32_PRIMES | FLAG_OPTIONAL | FLAG_OP_RSA_CRT },
 	};
 	const struct json_array rsa_keygen_prov_prime_test = SET_ARRAY(rsa_keygen_prov_prime_test_entries, &rsa_keygen_prov_prime_testresult);
 

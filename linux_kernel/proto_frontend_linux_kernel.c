@@ -136,6 +136,10 @@ const char *getenv(const char *name)
 			static const char out[] = "RISCV64";
 
 			return out;
+		} else if (proto_implementation == 14) {
+			static const char out[] = "AESSBOX";
+
+			return out;
 		} else {
 			return NULL;
 		}

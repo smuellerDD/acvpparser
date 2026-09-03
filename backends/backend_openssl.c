@@ -2938,7 +2938,7 @@ static int _openssl_ecdsa_keygen(uint64_t curve, EC_KEY **out_key)
 	EC_KEY *key = NULL;
 	int ret = 0, nid = 0;
 
-	CKINT_LOG(openssl_ecdsa_curves(curve, &nid, NULL),
+	CKINT_LOG(openssl_ecc_curves(curve, &nid, NULL),
 		  "Conversion of curve failed\n");
 
 	if (!(key = EC_KEY_new_by_curve_name(nid))) {
@@ -3059,7 +3059,7 @@ static int openssl_ecdsa_pkvver(struct ecdsa_pkvver_data *data,
 		       Qy);
 	CKNULL(Qy, -ENOMEM);
 
-	CKINT(openssl_ecdsa_curves(data->cipher, &nid, NULL));
+	CKINT(openssl_ecc_curves(data->cipher, &nid, NULL));
 
 	key = EC_KEY_new_by_curve_name(nid);
 	CKNULL(key, -ENOMEM);
@@ -3215,7 +3215,7 @@ static int openssl_ecdsa_convert(struct ecdsa_sigver_data *data,
 
 	CKINT_O(openssl_ecdsa_SIG_set0(sig, R, S));
 
-	CKINT(openssl_ecdsa_curves(data->cipher, &nid, NULL));
+	CKINT(openssl_ecc_curves(data->cipher, &nid, NULL));
 
 	key = EC_KEY_new_by_curve_name(nid);
 	CKNULL(key, -EFAULT);
@@ -3675,7 +3675,7 @@ static int openssl_ecdh_ss_common(uint64_t cipher,
 	ecdsa_get_bufferlen(cipher, &dbufferlen, &xbufferlen,
 			    &ybufferlen);
 
-	CKINT_LOG(openssl_ecdsa_curves(cipher, &nid, NULL),
+	CKINT_LOG(openssl_ecc_curves(cipher, &nid, NULL),
 		  "Conversion of curve failed\n");
 
 	Qx = BN_bin2bn((const unsigned char *)Qxrem->buf, (int)Qxrem->len, Qx);

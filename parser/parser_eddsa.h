@@ -31,8 +31,8 @@ extern "C"
 /**
  * @brief EDDSA key generation data structure holding the data for the cipher
  *	  operations specified in eddsa_keygen. This test is used
- *	  for FIPS 186-4 B.4.2 (EDDSA key generation with testing candiates)
- *	  tests as specified in the EDDSA CAVS specification.
+ *	  for FIPS 186-5 A.2.3 (EdDSA Key Pair Generation) tests as specified in
+ *	  the EDDSA CAVS specification.
  *
  * @var d [out] EDDSA private key point
  * @var q [out] EDDSA coordinate of public point Q
@@ -46,7 +46,7 @@ struct eddsa_keygen_data {
 
 /**
  * @brief EDDSA key verification data structure holding the data for the cipher
- *	  operations specified in eddsa_pkvver.
+ *	  operations specified in eddsa_keyver.
  *
  * @var q [in] EDDSA public key
  * @var cipher [in] Cipher pointing to the curve
@@ -129,7 +129,7 @@ struct eddsa_sigver_data {
  *	  shall be tested.
  *
  * All functions return 0 on success or != 0 on error. Note, a failure in the
- * EDDSA key verification @var eddsa_pkvver due to problematic input
+ * EDDSA key verification @var eddsa_keyver due to problematic input
  * parameters is expected. In such cases, an EDDSA key verification error is
  * still considered to be a successful operation and the return code should be
  * 0. Similarly, the signature verification callback @var eddsa_sigver shall

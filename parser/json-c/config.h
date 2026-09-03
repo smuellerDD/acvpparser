@@ -136,7 +136,7 @@
 /* #undef HAVE_XLOCALE_H */
 
 /* Have __thread */
-#define HAVE___THREAD 1
+/* #undef HAVE___THREAD */
 
 /* Public define for json_inttypes.h */
 #define JSON_C_HAVE_INTTYPES_H 1

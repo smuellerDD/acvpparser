@@ -32,7 +32,7 @@
 MODULE_PREFIX="leancrypto__"
 MODULE_POSTFIX="_"
 
-EXEC="without_PAA_-_Kernel_C_implementation"
+EXEC="without_PAA_-_Kernel_C_implementation without_PAA_-_SBOX_implementation"
 
 if [ $(uname -m) = "aarch64" -o $(uname -m) = "arm64" ]; then
 	EXEC="$EXEC
@@ -51,6 +51,7 @@ fi
 # The integer values must be consistent
 # with proto_frontend_linux_kernel.c:getenv()
 CIPHER_CALL_without_PAA__Kernel_C_implementation="ACVPPARSER_PROTOBUF_IMPL=\"1\""
+CIPHER_CALL_without_PAA__Kernel_SBOX_implementation="ACVPPARSER_PROTOBUF_IMPL=\"14\""
 CIPHER_CALL_without_PAA__Kernel_AVX2_implementation="ACVPPARSER_PROTOBUF_IMPL=\"4\""
 CIPHER_CALL_without_PAA__Kernel_AVX512_implementation="ACVPPARSER_PROTOBUF_IMPL=\"5\""
 CIPHER_CALL_with_PAA__Kernel_AESNI_implementation="ACVPPARSER_PROTOBUF_IMPL=\"2\""
