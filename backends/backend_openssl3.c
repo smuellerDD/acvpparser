@@ -432,6 +432,7 @@ static int openssl_mac_generate_helper(struct hmac_data *data, char *mac_algo,
 	OSSL_PARAM_BLD *bld = NULL;
 	OSSL_PARAM *params = NULL;
 	int ret = 0;
+	size_t maclen = 0;
 
 	mac = EVP_MAC_fetch(NULL, mac_algo, NULL);
 	CKNULL(mac, -EFAULT);
@@ -460,7 +461,14 @@ static int openssl_mac_generate_helper(struct hmac_data *data, char *mac_algo,
 	CKINT_O_LOG(EVP_MAC_final(ctx, data->mac.buf, &data->mac.len, data->mac.len),
 			"EVP_MAC_final failed\n");
 
-	logger(LOGGER_DEBUG, "taglen = %zu\n", data->mac.len);
+	// Truncate to requested macLen
+	maclen = data->maclen / 8;
+	if (data->mac.len > maclen) {
+		data->mac.len = maclen;
+		logger(LOGGER_DEBUG, "Truncated tag to length: %u\n", data->maclen);
+	} else {
+		logger(LOGGER_DEBUG, "taglen = %zu\n", data->mac.len);
+	}
 	logger_binary(LOGGER_DEBUG, data->mac.buf, data->mac.len, mac_algo);
 
 	ret = 0;
